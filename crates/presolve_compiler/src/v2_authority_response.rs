@@ -12,10 +12,10 @@ use crate::{
     ResolvedFormFieldDefinitionV1, ResolvedFormFieldValueClassificationV1,
     ResolvedFormValidationDefinitionKindV1, ResolvedFormValidationDefinitionV1,
     ResolvedIntrinsicIdentityV1, ResolvedSlotFieldV1, ResolvedStateInitializerV1,
-    V2AuthoringResolutionsV1,
+    ResolvedTerminalPackageInvocationV1, V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 9;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -36,6 +36,8 @@ pub struct V2AuthorityResponseV1 {
     pub validations: Vec<V2AuthorityResolutionV1>,
     #[serde(default)]
     pub standard_validations: Vec<V2AuthorityStandardValidationResolutionV1>,
+    #[serde(default)]
+    pub package_invocations: Vec<V2AuthorityStandardValidationResolutionV1>,
     pub environment_public: Vec<V2AuthorityResolutionV1>,
 }
 
@@ -145,6 +147,10 @@ pub fn validate_v2_authority_response_v1(
         &request.standard_validations,
         &response.standard_validations,
     )?;
+    validate_standard_validation_family(
+        &request.package_invocations,
+        &response.package_invocations,
+    )?;
     validate_member_family(&request.environment_public, &response.environment_public)
 }
 
@@ -163,6 +169,25 @@ pub fn v2_authoring_resolutions_from_response_v1(
             response.diagnostics.len(),
         ));
     }
+    let package_invocations = response
+        .package_invocations
+        .iter()
+        .map(|resolution| {
+            Ok((
+                range_from_site_id(&resolution.id, "package-invocation", &parsed.syntax.source)?,
+                ResolvedTerminalPackageInvocationV1 {
+                    call_source: range_from_site_id(
+                        &resolution.id,
+                        "package-invocation",
+                        &parsed.syntax.source,
+                    )?,
+                    module_specifier: resolution.module_specifier.clone(),
+                    export_name: resolution.export_name.clone(),
+                    declaration_modules: resolution.identity.declaration_modules.clone(),
+                },
+            ))
+        })
+        .collect::<Result<Vec<_>, V2AuthorityResponseErrorV1>>()?;
     Ok(V2AuthoringResolutionsV1 {
         components: resolutions_for(&response.components, "component", parsed)?
             .into_iter()
@@ -182,9 +207,31 @@ pub fn v2_authoring_resolutions_from_response_v1(
             .collect(),
         actions: resolutions_for(&response.actions, "action", parsed)?
             .into_iter()
-            .map(|(callee_source, identity)| ResolvedActionFieldV1 {
-                callee_source,
-                action_identity: identity,
+            .map(|(callee_source, identity)| {
+                let direct_call = parsed
+                    .classes
+                    .iter()
+                    .flat_map(|class| &class.properties)
+                    .find_map(|property| {
+                        let call = property.initializer_call.as_ref()?;
+                        ((call.callee_span.start, call.callee_span.end)
+                            == (callee_source.start, callee_source.end))
+                            .then_some(call.inline_handler.as_ref()?.direct_call.as_ref()?)
+                    });
+                let terminal_package_invocation = direct_call.and_then(|call| {
+                    package_invocations
+                        .iter()
+                        .find(|(source, _)| {
+                            (source.start, source.end)
+                                == (call.callee_span.start, call.callee_span.end)
+                        })
+                        .map(|(_, invocation)| invocation.clone())
+                });
+                ResolvedActionFieldV1 {
+                    callee_source,
+                    action_identity: identity,
+                    terminal_package_invocation,
+                }
             })
             .collect(),
         effects: resolutions_for(&response.effects, "effect", parsed)?
@@ -511,7 +558,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 9,
+            schema_version: 10,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -531,6 +578,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
             form_fields: Vec::new(),
             validations: Vec::new(),
             standard_validations: Vec::new(),
+            package_invocations: Vec::new(),
             environment_public: Vec::new(),
         };
         (parsed, request, response)
@@ -630,7 +678,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             crate::build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &model)
                 .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 9,
+            schema_version: 10,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -644,6 +692,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             form_fields: Vec::new(),
             validations: Vec::new(),
             standard_validations: Vec::new(),
+            package_invocations: Vec::new(),
             environment_public: vec![V2AuthorityResolutionV1 {
                 id: request.environment_public[0].id.clone(),
                 identity: identity("public"),
@@ -690,7 +739,7 @@ export class Profile extends Component {
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 9,
+            schema_version: 10,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -725,6 +774,7 @@ export class Profile extends Component {
                 input_type: Some("string".into()),
                 output_type: Some("string".into()),
             }],
+            package_invocations: Vec::new(),
             environment_public: Vec::new(),
         };
         let resolutions =

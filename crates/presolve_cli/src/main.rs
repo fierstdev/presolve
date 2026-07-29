@@ -225,6 +225,9 @@ fn run_ergonomic_build(
     attach_form_submission_runtime_module(&project.root, &mut product).unwrap_or_else(|message| {
         application_cli_error("PSFORM1002_SUBMISSION_CAPABILITY_BUNDLE_FAILED", &message)
     });
+    attach_package_invocation_runtime_module(&project.root, &mut product).unwrap_or_else(
+        |message| application_cli_error("PSPKG1001_INVOCATION_BUNDLE_FAILED", &message),
+    );
     publish_file_route_product(&output_root, &product)
         .unwrap_or_else(|error| application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &error));
     println!("Built {}", output_root.display());
@@ -1129,6 +1132,217 @@ fn form_submission_bundle_specifier(
         ));
     }
     Ok(runtime.to_string_lossy().into_owned())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PackageInvocationRuntimeRecordV1 {
+    id: String,
+    owner_component: String,
+    method: String,
+    module_specifier: String,
+    export: String,
+    owner_source: String,
+    declaration_modules: Vec<String>,
+    execution_boundary: String,
+    resume_policy: String,
+}
+
+fn attach_package_invocation_runtime_module(
+    project_root: &Path,
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+) -> Result<(), String> {
+    let mut invocations = BTreeSet::new();
+    for (path, bytes) in &product.artifacts {
+        if path.file_name().and_then(|name| name.to_str())
+            != Some("package-invocations.runtime.json")
+        {
+            continue;
+        }
+        let artifact: serde_json::Value = serde_json::from_slice(bytes)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+        let Some(records) = artifact
+            .get("invocations")
+            .and_then(serde_json::Value::as_array)
+        else {
+            return Err(format!(
+                "{} does not contain package invocation records",
+                path.display()
+            ));
+        };
+        for record in records {
+            invocations.insert(
+                serde_json::from_value::<PackageInvocationRuntimeRecordV1>(record.clone())
+                    .map_err(|error| {
+                        format!(
+                            "{} contains invalid package invocation metadata: {error}",
+                            path.display()
+                        )
+                    })?,
+            );
+        }
+    }
+    if invocations.is_empty() {
+        return Ok(());
+    }
+
+    let mut by_id = BTreeMap::new();
+    for invocation in invocations {
+        if let Some(existing) = by_id.insert(invocation.id.clone(), invocation.clone()) {
+            if existing != invocation {
+                return Err(format!(
+                    "package invocation id {} resolved to multiple exports",
+                    invocation.id
+                ));
+            }
+        }
+    }
+
+    let mut entry = String::new();
+    for (index, invocation) in by_id.values().enumerate() {
+        let specifier = package_invocation_bundle_specifier(invocation)?;
+        entry.push_str(&format!(
+            "import {{ {} as __presolve_package_invocation_{index} }} from {};\n",
+            invocation.export,
+            serde_json::to_string(&specifier)
+                .map_err(|error| format!("failed to encode package module: {error}"))?
+        ));
+    }
+    entry.push_str("const registry = Object.create(null);\n");
+    for (index, invocation) in by_id.values().enumerate() {
+        entry.push_str(&format!(
+            "registry[{}] = __presolve_package_invocation_{index};\n",
+            serde_json::to_string(&invocation.id)
+                .map_err(|error| format!("failed to encode package invocation id: {error}"))?
+        ));
+    }
+    entry.push_str("export const presolvePackageInvocations = Object.freeze(registry);\n");
+
+    let work_root = project_root.join(".presolve");
+    fs::create_dir_all(&work_root)
+        .map_err(|error| format!("failed to create {}: {error}", work_root.display()))?;
+    let entry_path = work_root.join("presolve-package-invocation-entry.mjs");
+    let runner_path = work_root.join("presolve-package-invocation-build.mjs");
+    fs::write(&entry_path, entry)
+        .map_err(|error| format!("failed to write {}: {error}", entry_path.display()))?;
+    fs::write(
+        &runner_path,
+        r#"import { build } from "vite";
+await build({
+  root: process.cwd(),
+  configFile: false,
+  logLevel: "error",
+  build: {
+    outDir: ".presolve/package-invocation-output",
+    emptyOutDir: true,
+    sourcemap: false,
+    assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+    rollupOptions: {
+      input: ".presolve/presolve-package-invocation-entry.mjs",
+      preserveEntrySignatures: "strict",
+      output: {
+        format: "es",
+        entryFileNames: "presolve.package-invocations.js",
+        chunkFileNames: "presolve.package-invocations.[hash].js",
+        assetFileNames: "presolve.package-invocations.[hash][extname]",
+        inlineDynamicImports: true
+      }
+    }
+  }
+});
+"#,
+    )
+    .map_err(|error| format!("failed to write {}: {error}", runner_path.display()))?;
+    let output = Command::new("node")
+        .arg(&runner_path)
+        .current_dir(project_root)
+        .output()
+        .map_err(|error| format!("failed to start the package invocation Vite build: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Vite exited with {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    let output_root = work_root.join("package-invocation-output");
+    let mut bundled = Vec::new();
+    collect_static_publication_input(&output_root, Path::new(""), &mut bundled)?;
+    if !bundled
+        .iter()
+        .any(|(path, _)| path == Path::new("presolve.package-invocations.js"))
+    {
+        return Err("Vite did not emit presolve.package-invocations.js".into());
+    }
+    for (path, bytes) in bundled {
+        if product.artifacts.contains_key(&path) {
+            return Err(format!(
+                "package invocation bundle {} collides with a published artifact",
+                path.display()
+            ));
+        }
+        product
+            .manifest
+            .artifacts
+            .push(presolve_compiler::ApplicationPublicationArtifactV1 {
+                path: path.to_string_lossy().into_owned(),
+                digest: format!("sha256:{:x}", Sha256::digest(&bytes)),
+            });
+        product.artifacts.insert(path, bytes);
+    }
+    product
+        .manifest
+        .artifacts
+        .sort_by(|left, right| left.path.cmp(&right.path));
+    product.artifacts.insert(
+        PathBuf::from("file-routes.manifest.json"),
+        presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
+    );
+    Ok(())
+}
+
+fn package_invocation_bundle_specifier(
+    invocation: &PackageInvocationRuntimeRecordV1,
+) -> Result<String, String> {
+    if !invocation.module_specifier.starts_with('.') {
+        if invocation.module_specifier.starts_with('/') {
+            return Err(format!(
+                "package invocation module {} must be relative or a package specifier",
+                invocation.module_specifier
+            ));
+        }
+        return Ok(invocation.module_specifier.clone());
+    }
+    let mut normalized = PathBuf::new();
+    let joined = Path::new(&invocation.owner_source)
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(&invocation.module_specifier);
+    for component in joined.components() {
+        match component {
+            std::path::Component::Normal(value) => normalized.push(value),
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !normalized.pop() {
+                    return Err(format!(
+                        "package invocation module {} escapes the project",
+                        invocation.module_specifier
+                    ));
+                }
+            }
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                return Err(format!(
+                    "package invocation module {} must stay inside the project",
+                    invocation.module_specifier
+                ))
+            }
+        }
+    }
+    Ok(format!(
+        "../{}",
+        normalized.to_string_lossy().replace('\\', "/")
+    ))
 }
 
 fn collect_static_publication_input(
@@ -6842,6 +7056,51 @@ fn print_usage_and_exit() -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn package_invocation_bundle_specifiers_preserve_packages_and_resolve_relative_modules() {
+        let package = PackageInvocationRuntimeRecordV1 {
+            id: "invocation:package".into(),
+            owner_component: "component:Home".into(),
+            method: "action:record".into(),
+            module_specifier: "analytics-kit".into(),
+            export: "recordVisit".into(),
+            owner_source: "app/routes/index.tsx".into(),
+            declaration_modules: vec!["node_modules/analytics-kit/index.d.ts".into()],
+            execution_boundary: "client".into(),
+            resume_policy: "event_restore".into(),
+        };
+        assert_eq!(
+            package_invocation_bundle_specifier(&package).unwrap(),
+            "analytics-kit"
+        );
+        let relative = PackageInvocationRuntimeRecordV1 {
+            module_specifier: "../components/telemetry.js".into(),
+            ..package
+        };
+        assert_eq!(
+            package_invocation_bundle_specifier(&relative).unwrap(),
+            "../app/components/telemetry.js"
+        );
+    }
+
+    #[test]
+    fn package_invocation_bundle_specifiers_reject_project_escape() {
+        let invocation = PackageInvocationRuntimeRecordV1 {
+            id: "invocation:escape".into(),
+            owner_component: "component:Home".into(),
+            method: "action:record".into(),
+            module_specifier: "../../../outside.js".into(),
+            export: "recordVisit".into(),
+            owner_source: "app/routes/index.tsx".into(),
+            declaration_modules: vec!["outside.d.ts".into()],
+            execution_boundary: "client".into(),
+            resume_policy: "event_restore".into(),
+        };
+        assert!(package_invocation_bundle_specifier(&invocation)
+            .unwrap_err()
+            .contains("escapes the project"));
+    }
 
     #[test]
     fn k17_accepts_only_asm_inspection_schema_v12() {

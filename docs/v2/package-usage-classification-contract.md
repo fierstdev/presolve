@@ -75,8 +75,8 @@ entry that imports only the authority-proven module/export pair and publishes
 one callable registry through the ordinary file-route digest inventory.
 
 The registry coordinate, compiler build identity, module specifier, named
-export, call-site provenance, client execution boundary, and cold-fallback
-resume policy are exact artifact facts. Package source is never serialized
+export, call-site provenance, client execution boundary, and stateless
+event-restore policy are exact artifact facts. Package source is never serialized
 into a compiler semantic contract, inspected for framework behavior, or
 executed during compilation.
 
@@ -96,8 +96,9 @@ slice; Promise-aware cancellation requires its own capability contract.
 
 The runtime records completion or failure evidence and reports a stable runtime
 diagnostic for a rejected invocation. It never interprets package internals.
-Because the activation has no resumable state, a snapshot containing an active
-terminal invocation takes the existing cold-fallback path.
+Because a completed activation has no resumable state, the canonical Action
+event is restored without replaying the package side effect. A later accepted
+event invokes the package export normally from the restored registry.
 
 ## Diagnostic ownership
 

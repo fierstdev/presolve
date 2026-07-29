@@ -1,6 +1,9 @@
 //! Compiler-owned request construction for the installed V2 authority bridge.
 
-use std::{collections::BTreeSet, path::PathBuf};
+use std::{
+    collections::BTreeSet,
+    path::{Component, Path, PathBuf},
+};
 
 use presolve_parser::{ParsedFile, SourceSpan};
 use serde::Serialize;
@@ -11,7 +14,7 @@ use crate::{
     slot_field_sites_v1, AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 9;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 10;
 const V2_VALIDATION_RULE_NAMES: &[&str] = &[
     "required",
     "min",
@@ -64,6 +67,8 @@ pub struct V2AuthorityStandardValidationSiteV1 {
     pub id: String,
     pub file: PathBuf,
     pub position: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub import_position: Option<usize>,
     pub module_specifier: String,
     pub export_name: String,
 }
@@ -117,6 +122,7 @@ pub struct V2AuthorityRequestV1 {
     pub form_fields: Vec<V2AuthorityFormFieldSiteV1>,
     pub validations: Vec<V2AuthoritySiteV1>,
     pub standard_validations: Vec<V2AuthorityStandardValidationSiteV1>,
+    pub package_invocations: Vec<V2AuthorityStandardValidationSiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
 
@@ -323,7 +329,10 @@ pub fn build_v2_authority_request_v1(
             let import = parsed
                 .imports
                 .iter()
-                .filter(|import| import.source != "presolve")
+                .filter(|import| {
+                    import.source != "presolve"
+                        && !relative_import_targets_server(&parsed.path, &import.source)
+                })
                 .flat_map(|import| {
                     import
                         .specifiers
@@ -346,11 +355,13 @@ pub fn build_v2_authority_request_v1(
                 id: selected.id,
                 file: selected.file,
                 position: selected.position,
+                import_position: None,
                 module_specifier,
                 export_name,
             })
         })
         .collect::<Result<Vec<_>, V2AuthorityRequestErrorV1>>()?;
+    let package_invocations = terminal_package_invocation_sites(parsed)?;
     let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
@@ -375,6 +386,7 @@ pub fn build_v2_authority_request_v1(
         form_fields,
         validations,
         standard_validations,
+        package_invocations,
         environment_public,
     })
 }
@@ -423,6 +435,7 @@ pub fn build_v2_authority_component_request_v1(
         form_fields: Vec::new(),
         validations: Vec::new(),
         standard_validations: Vec::new(),
+        package_invocations: Vec::new(),
         environment_public: Vec::new(),
     })
 }
@@ -462,8 +475,90 @@ pub fn build_v2_environment_authority_request_v1(
         form_fields: Vec::new(),
         validations: Vec::new(),
         standard_validations: Vec::new(),
+        package_invocations: Vec::new(),
         environment_public: environment_public_member_sites(parsed, true)?,
     }))
+}
+
+/// Select complete zero-argument direct calls whose callee is a named external
+/// import. This is syntax-only nomination; TypeScript must prove the symbol.
+fn terminal_package_invocation_sites(
+    parsed: &ParsedFile,
+) -> Result<Vec<V2AuthorityStandardValidationSiteV1>, V2AuthorityRequestErrorV1> {
+    let mut sites = parsed
+        .classes
+        .iter()
+        .flat_map(|class| &class.properties)
+        .filter_map(|property| {
+            let invocation = property
+                .initializer_call
+                .as_ref()?
+                .inline_handler
+                .as_ref()?
+                .direct_call
+                .as_ref()?;
+            if invocation.awaited || !invocation.arguments.is_empty() {
+                return None;
+            }
+            let (module_specifier, export_name, import_span) = parsed
+                .imports
+                .iter()
+                .filter(|import| {
+                    import.source != "presolve"
+                        && !relative_import_targets_server(&parsed.path, &import.source)
+                })
+                .flat_map(|import| {
+                    import
+                        .specifiers
+                        .iter()
+                        .map(move |specifier| (import.source.as_str(), specifier))
+                })
+                .find(|(_, specifier)| {
+                    specifier.local == invocation.callee && specifier.imported != "default"
+                })
+                .map(|(source, specifier)| {
+                    (
+                        source.to_owned(),
+                        specifier.imported.clone(),
+                        specifier.local_span,
+                    )
+                })?;
+            Some((
+                invocation.callee_span,
+                module_specifier,
+                export_name,
+                import_span,
+            ))
+        })
+        .map(
+            |(callee_source, module_specifier, export_name, import_span)| {
+                let selected = site_for(
+                    "package-invocation",
+                    AuthoredSourceRangeV1 {
+                        start: callee_source.start,
+                        end: callee_source.end,
+                        line: callee_source.line,
+                        column: callee_source.column,
+                    },
+                    &parsed.path,
+                    &parsed.syntax.source,
+                )?;
+                Ok(V2AuthorityStandardValidationSiteV1 {
+                    id: selected.id,
+                    file: selected.file,
+                    position: selected.position,
+                    import_position: Some(utf16_position(
+                        &parsed.syntax.source,
+                        import_span.start,
+                    )?),
+                    module_specifier,
+                    export_name,
+                })
+            },
+        )
+        .collect::<Result<Vec<_>, V2AuthorityRequestErrorV1>>()?;
+    sites.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(sites)
 }
 
 fn environment_public_member_sites(
@@ -494,6 +589,34 @@ fn environment_public_member_sites(
             )
         })
         .collect()
+}
+
+fn relative_import_targets_server(source_path: &Path, module_specifier: &str) -> bool {
+    if !module_specifier.starts_with('.') {
+        return false;
+    }
+    let mut normalized = PathBuf::new();
+    for component in source_path
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(module_specifier)
+        .components()
+    {
+        match component {
+            Component::Normal(value) => normalized.push(value),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    return true;
+                }
+            }
+            Component::RootDir | Component::Prefix(_) => return true,
+        }
+    }
+    normalized
+        .components()
+        .next()
+        .is_some_and(|component| component.as_os_str() == "server")
 }
 
 fn canonical_import(
@@ -575,7 +698,7 @@ fn utf16_position(source: &str, byte_offset: usize) -> Result<usize, V2Authority
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     use presolve_parser::parse_file;
 
@@ -586,7 +709,8 @@ mod tests {
 
     use super::{
         build_v2_authority_component_request_v1, build_v2_authority_request_v1,
-        build_v2_environment_authority_request_v1, V2AuthorityRequestErrorV1,
+        build_v2_environment_authority_request_v1, relative_import_targets_server,
+        V2AuthorityRequestErrorV1,
     };
 
     #[test]
@@ -824,5 +948,21 @@ const lookalike = localConfig.public("PRESOLVE_PUBLIC_LOOKALIKE");
                 .collect::<Vec<_>>(),
             vec!["runtimeEnvironment", "localConfig"]
         );
+    }
+
+    #[test]
+    fn package_invocation_authority_excludes_server_owned_relative_modules() {
+        assert!(relative_import_targets_server(
+            Path::new("app/routes/docs/index.tsx"),
+            "../../../server/analytics.js"
+        ));
+        assert!(!relative_import_targets_server(
+            Path::new("app/routes/docs/index.tsx"),
+            "../../components/analytics.js"
+        ));
+        assert!(!relative_import_targets_server(
+            Path::new("app/routes/index.tsx"),
+            "analytics-kit"
+        ));
     }
 }

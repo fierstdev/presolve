@@ -5,7 +5,7 @@ import {
   createCanonicalIntrinsicRegistry,
 } from "./index.js";
 
-export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 9;
+export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 10;
 
 /**
  * Resolves explicit source positions for the implemented decorator-free V2
@@ -40,6 +40,16 @@ export async function analyzeV2Authoring(request) {
         { id: `environment-object:${site.id}`, file: site.file, position: site.objectPosition },
         { id: `environment-property:${site.id}`, file: site.file, position: site.propertyPosition },
       ]),
+      ...request.packageInvocations.map(site => ({
+        id: `package-invocation:${site.id}`,
+        file: site.file,
+        position: site.position,
+      })),
+      ...request.packageInvocations.map(site => ({
+        id: `package-import:${site.id}`,
+        file: site.file,
+        position: site.importPosition,
+      })),
     ],
     componentHeritage: request.components.map(site => ({
       id: `component:${site.id}`,
@@ -141,6 +151,21 @@ export async function analyzeV2Authoring(request) {
           }]
         : [];
     }),
+    packageInvocations: request.packageInvocations.flatMap(site => {
+      const identity = resolvedIdentity(symbols.get(`package-invocation:${site.id}`));
+      const importedIdentity = resolvedIdentity(symbols.get(`package-import:${site.id}`));
+      return identity?.name === site.exportName
+        && importedIdentity?.name === site.exportName
+        && sameDeclarationModules(identity, importedIdentity)
+        && identity.declarationModules.length > 0
+        ? [{
+            id: site.id,
+            identity,
+            moduleSpecifier: site.moduleSpecifier,
+            exportName: site.exportName,
+          }]
+        : [];
+    }),
     environmentPublic: request.environmentPublic.flatMap(site => {
       const receiver = classifyResolvedIntrinsic(registry, symbols.get(`environment-object:${site.id}`));
       const member = resolvedIdentity(symbols.get(`environment-property:${site.id}`));
@@ -210,6 +235,9 @@ function validateV2AuthoringRequest(request) {
   if (!Array.isArray(request.standardValidations)) {
     throw new TypeError("V2 authoring Standard Schema validation sites must be an array");
   }
+  if (!Array.isArray(request.packageInvocations)) {
+    throw new TypeError("V2 authoring package invocation sites must be an array");
+  }
   const standardValidationIds = new Set();
   for (const site of request.standardValidations) {
     if (!site || typeof site.id !== "string" || !site.id
@@ -220,6 +248,18 @@ function validateV2AuthoringRequest(request) {
     }
     standardValidationIds.add(site.id);
     validatePosition(site, "Standard Schema validation site");
+  }
+  const packageInvocationIds = new Set();
+  for (const site of request.packageInvocations) {
+    if (!site || typeof site.id !== "string" || !site.id
+      || packageInvocationIds.has(site.id)
+      || typeof site.moduleSpecifier !== "string" || !site.moduleSpecifier
+      || typeof site.exportName !== "string" || !site.exportName
+      || !Number.isInteger(site.importPosition)) {
+      throw new TypeError("V2 authoring package invocation sites require unique ids and named module exports");
+    }
+    packageInvocationIds.add(site.id);
+    validatePosition(site, "package invocation site");
   }
   const validationIds = new Set();
   for (const site of request.validations) {

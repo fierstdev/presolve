@@ -82,6 +82,9 @@ pub struct ComponentNode {
     /// Retained N9 opaque terminal Action facts. They have no runtime lowering
     /// authority until integrity-bound artifact publication is complete.
     pub opaque_action_facts: Vec<AuthoredOpaqueActionFact>,
+    /// Authority-proven named imports used as the complete body of a
+    /// decorator-free Action. Capability meaning belongs to this use site.
+    pub terminal_package_invocations: Vec<AuthoredTerminalPackageInvocationFact>,
     pub server_action_facts: Vec<AuthoredServerActionFact>,
     /// Module imports that shadow compiler-owned validation intrinsic names.
     pub shadowed_validation_intrinsics: BTreeSet<String>,
@@ -143,6 +146,18 @@ pub struct AuthoredOpaqueActionFact {
     pub is_async: bool,
     pub parameter_count: usize,
     pub has_body_effects: bool,
+    pub provenance: SourceProvenance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthoredTerminalPackageInvocationFact {
+    pub id: SemanticId,
+    pub owner_component: SemanticId,
+    pub method: SemanticId,
+    pub method_name: String,
+    pub module_specifier: String,
+    pub export_name: String,
+    pub declaration_modules: Vec<String>,
     pub provenance: SourceProvenance,
 }
 
@@ -1634,6 +1649,7 @@ pub fn build_v2_component_graph_for_module(
         }
         let mut action_endpoints = Vec::new();
         let mut actions = Vec::new();
+        let mut terminal_package_invocations = Vec::new();
         let mut v2_action_parameter_kinds = BTreeMap::new();
         for candidate in authored.declarations.iter().filter(|candidate| {
             candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Action
@@ -1670,9 +1686,58 @@ pub fn build_v2_component_graph_for_module(
                 ));
                 continue;
             };
+            let terminal_evidence = match candidate.derived_evidence.as_ref() {
+                Some(crate::DerivedAuthoredEvidenceV2::TerminalPackageInvocation {
+                    module_specifier,
+                    export_name,
+                    declaration_modules,
+                }) => Some((module_specifier, export_name, declaration_modules)),
+                _ => None,
+            };
+            let imported_package_call = handler.direct_call.as_ref().and_then(|call| {
+                parsed
+                    .imports
+                    .iter()
+                    .filter(|import| import.source != "presolve")
+                    .flat_map(|import| {
+                        import
+                            .specifiers
+                            .iter()
+                            .map(move |specifier| (import, specifier))
+                    })
+                    .find(|(_, specifier)| specifier.local == call.callee)
+            });
+            if terminal_evidence.is_none() {
+                if let Some((import, specifier)) = imported_package_call {
+                    diagnostics.push(ComponentDiagnostic::error(
+                        "PSV2P1001",
+                        format!(
+                            "package call `{}()` in canonical V2 Action `{}` was not admitted: the beta supports only a TypeScript-resolved named import, invoked synchronously with zero arguments as the action's sole result-discarded statement; `{}` from `{}` remains ordinary Vite input outside that closed shape",
+                            handler
+                                .direct_call
+                                .as_ref()
+                                .expect("imported call")
+                                .callee,
+                            candidate.subject,
+                            specifier.imported,
+                            import.source
+                        ),
+                    ));
+                    continue;
+                }
+            }
+            let terminal_call_admitted = terminal_evidence.is_some()
+                && handler
+                    .direct_call
+                    .as_ref()
+                    .is_some_and(|call| !call.awaited && call.arguments.is_empty())
+                && handler.parameters.is_empty()
+                && handler.local_variables.is_empty()
+                && handler.state_updates.is_empty()
+                && handler.unsupported_statement_spans.len() == 1;
             if handler.is_expression_body
                 || handler.is_async
-                || !handler.unsupported_statement_spans.is_empty()
+                || (!handler.unsupported_statement_spans.is_empty() && !terminal_call_admitted)
                 || handler
                     .state_updates
                     .iter()
@@ -1729,6 +1794,25 @@ pub fn build_v2_component_graph_for_module(
                 owner: SemanticOwner::entity(id.clone()),
                 name: name.to_owned(),
             });
+            if let Some((module_specifier, export_name, declaration_modules)) = terminal_evidence {
+                terminal_package_invocations.push(AuthoredTerminalPackageInvocationFact {
+                    id: id.package_invocation(name),
+                    owner_component: id.clone(),
+                    method: endpoint_id.clone(),
+                    method_name: name.to_owned(),
+                    module_specifier: module_specifier.clone(),
+                    export_name: export_name.clone(),
+                    declaration_modules: declaration_modules.clone(),
+                    provenance: SourceProvenance::new(
+                        &parsed.path,
+                        handler
+                            .direct_call
+                            .as_ref()
+                            .expect("validated terminal call")
+                            .span,
+                    ),
+                });
+            }
             v2_action_parameter_kinds.insert(
                 name.to_owned(),
                 handler
@@ -2284,6 +2368,7 @@ pub fn build_v2_component_graph_for_module(
             submission_declaration_facts,
             serialization_declaration_facts,
             opaque_action_facts: Vec::new(),
+            terminal_package_invocations,
             server_action_facts: Vec::new(),
             shadowed_validation_intrinsics: BTreeSet::new(),
             methods,
@@ -2515,6 +2600,7 @@ fn build_component_node(
         submission_declaration_facts,
         serialization_declaration_facts,
         opaque_action_facts,
+        terminal_package_invocations: Vec::new(),
         server_action_facts,
         shadowed_validation_intrinsics,
         methods,

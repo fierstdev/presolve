@@ -613,6 +613,11 @@ impl SemanticId {
     }
 
     #[must_use]
+    pub fn package_invocation(&self, action: &str) -> Self {
+        self.child("package-invocation", action)
+    }
+
+    #[must_use]
     pub fn local_variable(&self, name: &str, index: usize) -> Self {
         self.child("local", &format!("{name}:{index}"))
     }

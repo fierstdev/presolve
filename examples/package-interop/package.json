@@ -1,0 +1,20 @@
+{
+  "name": "presolve-package-interop-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "presolve build",
+    "check": "presolve check",
+    "dev": "presolve dev"
+  },
+  "dependencies": {
+    "presolve": "workspace:@presolve/framework@*",
+    "presolve-example-analytics": "file:./vendor/presolve-example-analytics"
+  },
+  "devDependencies": {
+    "@presolve/cli": "workspace:*",
+    "@presolve/typescript-authority": "workspace:*",
+    "typescript": "npm:typescript@^7.0.2",
+    "vite": "^7.0.0"
+  }
+}

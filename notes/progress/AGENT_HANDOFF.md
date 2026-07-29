@@ -120,48 +120,62 @@ Safari returning-client publication correction:
 - a real WebKit iPhone-class probe proves styled output, no viewport overflow,
   and `Count: 0` to `Count: 1` interactivity against the generated application.
 
+Decorator-free package interoperability now has its first executable vertical
+slice:
+
+- V2 TypeScript authority schema v10 proves the call-site alias and exact
+  named-import declaration identity; same-spelled local functions remain inert;
+- authored-semantics schema v6 carries only the proven terminal coordinate;
+- ordinary package imports in V2 files are Vite inputs and no longer require a
+  legacy semantic-package contract merely to exist;
+- one synchronous, zero-argument, result-discarded package call can own a
+  canonical Action endpoint without `@component`, `@action`, or `@opaque`;
+- the compiler publishes `package-invocations.runtime.json`, and the ergonomic
+  CLI Vite-bundles the exact export into
+  `/presolve.package-invocations.js`;
+- the browser validates the registry before boot, invokes the export once per
+  event, records completion/failure evidence, and emits stable fatal/runtime
+  diagnostics for missing or rejecting modules;
+- a valid snapshot restores the Action event without replaying the external
+  side effect, then remains interactive; and
+- `examples/package-interop` is the release-grade authored and browser example.
+
+The real-browser gate proves cold publication, compatible resume, exactly-once
+execution across repeated events, a missing registry failure, and no diagnostic
+or State corruption. Two complete builds produced identical registry,
+invocation-artifact, and route-document hashes.
+
 ## Next slice
 
-Implement the first executable slice of
-`docs/v2/package-usage-classification-contract.md`: a decorator-free,
-zero-argument terminal named-import call inside a V2 `action()` field, selected
-by TypeScript authority and bundled through the project Vite installation.
-Preserve use-site classification: discarded client terminal calls are bounded
-capabilities, while values flowing into compiler-owned semantics still require
-an explicit semantic contract.
+Broaden V2 Action package invocation from the first closed zero-argument subset
+to compiler-transported serializable arguments and Promise-aware completion,
+with explicit dependency, cancellation, error, and resume products. Do not
+infer arbitrary handler-source execution. Then continue the remaining beta
+gates: Effect execution/cleanup/resume, slot-projected structural hosts,
+Context, completion-grade Forms/Resources/loaders/server actions/capabilities,
+and final release hardening.
 
-Server executors remain outside this beta: the frozen loader/server-action
-contracts complete those families at deterministic compiler handoff and
-explicitly prohibit an inferred executor.
+Server executors remain outside the browser publication boundary until their
+frozen handoff contracts gain an explicit executor product.
 
 ## Verification
 
-- `cargo test -p presolve-parser -p presolve-compiler form_definition -- --nocapture`
-- `cargo test -p presolve-compiler file_route_assembly_projects_canonical_v2_form_into_existing_form_products -- --nocapture`
-- `cargo test -p presolve-cli --no-run`
-- `pnpm --filter @presolve/framework test`
 - `pnpm --filter @presolve/typescript-authority test`
-- `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
-- `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
-- `cargo test -p presolve-cli --test ergonomic_project -- --nocapture`
-- `cargo test -p presolve-cli --test production_runtime_fixtures -- --nocapture`
-- `cargo clippy -p presolve-cli --all-targets -- -D warnings`
-- `node scripts/verify-release-version.mjs 0.2.0-beta.16`
-- `pnpm release:check`
+- `pnpm run test:types`
+- `cargo test -p presolve-compiler file_route_assembly_ -- --nocapture`
+- `cargo test -p presolve-compiler package_invocation -- --nocapture`
+- `cargo test -p presolve-compiler runtime_codegen::tests::emits_runtime_manifest_bootstrap -- --nocapture`
+- `cargo test -p presolve-cli package_invocation_bundle_specifiers -- --nocapture`
+- `cargo test -p presolve-cli --test ergonomic_project -- --nocapture --test-threads=1`
+- `cargo test -p presolve-cli --test application_publication -- --nocapture`
+- `cargo test -p presolve-cli --test runtime_browser decorator_free_package_invocations_bundle_execute_resume_and_fail_closed_in_a_real_browser -- --nocapture --test-threads=1`
+- `pnpm --dir examples/package-interop check`
+- `pnpm --dir examples/package-interop build`
+- deterministic double-build SHA-256 comparison of the registry, invocation
+  artifact, and route document
+- in-app browser verification of `0 -> 1 -> 2`, runtime-ready status, applied
+  application CSS, and zero console errors
 
-The complete 0.2.0-beta.16 local release dry run passes: formatting, strict
-clippy, every Rust and package test, all 57 browser cases, TypeScript 7.0.2,
-public TypeScript, 88 documentation files, a newly packed scaffold, crate and
-VSIX packaging, and deterministic hashes for all ten release packages. Hosted
-CI run `30418471399`, release dry-run `30418471420`, and Publish beta run
-`30419010174` passed. Public npm, Cargo, Marketplace, and GitHub release checks
-confirm beta.16.
-
-Presolve.dev runs beta.16 as Cloudflare Worker version
-`35705c75-0053-4392-a1d5-0e6b6e052030`. All 26 routes return HTTP 200. A
-persistent WebKit profile seeded with beta.15 before deployment loaded the same
-production URL after deployment without a cache clear, used immutable CSS and
-runtime coordinates, remained styled without overflow, and updated the counter
-from `Count: 0` to `Count: 1` with no console or request failures.
-
-Beta completion: 100%.
+The previous “100%” statements referred to completing individual beta.14-16
+release trains and production regressions, not the final beta product scope.
+Against the full authored beta gate list, beta completion is now 36%.

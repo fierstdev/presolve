@@ -28,6 +28,17 @@ pub struct ActionFieldSiteV1 {
 pub struct ResolvedActionFieldV1 {
     pub callee_source: AuthoredSourceRangeV1,
     pub action_identity: ResolvedIntrinsicIdentityV1,
+    pub terminal_package_invocation: Option<ResolvedTerminalPackageInvocationV1>,
+}
+
+/// TypeScript-authoritative identity for one discarded named-import call that
+/// is syntactically owned by the resolved Action handler.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedTerminalPackageInvocationV1 {
+    pub call_source: AuthoredSourceRangeV1,
+    pub module_specifier: String,
+    pub export_name: String,
+    pub declaration_modules: Vec<String>,
 }
 
 /// A validated canonical V2 Action-recognition product.
@@ -164,8 +175,29 @@ pub fn lower_action_fields_v1(
             },
         })
     });
-    let model = normalize_authored_semantics_v1(parsed, candidates)
+    let mut model = normalize_authored_semantics_v1(parsed, candidates)
         .map_err(ActionFieldLoweringErrorV1::InvalidAuthoredSemantics)?;
+    for declaration in &mut model.declarations {
+        let Some(site) = sites
+            .iter()
+            .find(|site| site.subject == declaration.subject)
+        else {
+            continue;
+        };
+        let Some(invocation) = resolution_by_site
+            .get(&range_key(site.callee_source))
+            .and_then(|resolution| resolution.terminal_package_invocation.as_ref())
+        else {
+            continue;
+        };
+        declaration.derived_evidence = Some(
+            crate::DerivedAuthoredEvidenceV2::TerminalPackageInvocation {
+                module_specifier: invocation.module_specifier.clone(),
+                export_name: invocation.export_name.clone(),
+                declaration_modules: invocation.declaration_modules.clone(),
+            },
+        );
+    }
     Ok(ActionFieldLoweringV1 { sites, model })
 }
 
@@ -239,6 +271,7 @@ class Counter extends Base {
             [ResolvedActionFieldV1 {
                 callee_source: sites[0].callee_source,
                 action_identity: identity("action"),
+                terminal_package_invocation: None,
             }],
         )
         .unwrap();
@@ -280,6 +313,7 @@ class Counter extends Base {
                     column: 1,
                 },
                 action_identity: identity("action"),
+                terminal_package_invocation: None,
             }],
         )
         .expect_err("resolved actions must join a canonical component field");

@@ -1212,7 +1212,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const sourceAt = site => readFileSync(site.file, "utf8").slice(site.position);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 9,
+  schemaVersion: 10,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states
@@ -3029,7 +3029,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 9,
+  schemaVersion: 10,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
@@ -3415,7 +3415,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 9,
+  schemaVersion: 10,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
@@ -4442,7 +4442,7 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 9,
+  schemaVersion: 10,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
@@ -8904,6 +8904,117 @@ fn run_chrome_with_timeout(chrome: PathBuf, args: &[&str], timeout: Duration) ->
 
         thread::sleep(Duration::from_millis(50));
     }
+}
+
+#[test]
+fn decorator_free_package_invocations_bundle_execute_resume_and_fail_closed_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let example_root = repo_root.join("examples/package-interop");
+    let build = Command::new(presolve_cli_bin())
+        .arg("build")
+        .current_dir(&example_root)
+        .output()
+        .expect("build package interoperability example");
+    assert!(
+        build.status.success(),
+        "package interoperability build failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    let dist = example_root.join("dist");
+    let route_root = dist.join("routes/root");
+    let index = fs::read_to_string(route_root.join("index.html")).expect("package example page");
+    let manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(route_root.join("resume.runtime.json"))
+            .expect("package example resume manifest"),
+    )
+    .expect("package example resume manifest JSON");
+    let snapshot = resume_bootstrap_snapshot(&manifest);
+    let accepted = resume_bootstrap_probe_page(
+        &index,
+        &format!(
+            "window.__PRESOLVE_RESUME_SNAPSHOT__ = {};",
+            serde_json::to_string(&snapshot).expect("package example snapshot JSON")
+        ),
+        r#"
+if (runtime.resume.mode !== "resume" || runtime.resume.failure !== null) fail("package Action did not preserve compatible resume");
+const button = document.getElementById("record-visit");
+const output = document.getElementById("visit-count");
+button.click();
+await waitFor(() => output.textContent === "1", "first package invocation");
+await waitFor(() => runtime.package_invocations.length === 1 && runtime.package_invocations[0].status === "complete", "first invocation evidence");
+button.click();
+await waitFor(() => output.textContent === "2", "second package invocation");
+await waitFor(() => runtime.package_invocations.length === 2 && runtime.package_invocations[1].status === "complete", "second invocation evidence");
+if (runtime.diagnostics.length !== 0) fail("package invocation emitted unexpected diagnostics");"#,
+        "PRESOLVE_PACKAGE_INVOCATION_RESUME_PASS",
+    );
+    fs::write(route_root.join("package-resume.html"), accepted)
+        .expect("write package resume probe");
+
+    let broken = index.replace(
+        "/presolve.package-invocations.js",
+        "/missing-package-invocations.js",
+    );
+    let failure_probe = broken.replace(
+        "</body>",
+        r#"<script>
+const waitForPackageFailure = (predicate) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) { resolve(); return; }
+    if (Date.now() > deadline) { reject(new Error("package failure timeout")); return; }
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitForPackageFailure(() => document.documentElement.dataset.presolveRuntime === "error" && window.__PRESOLVE__);
+  const diagnostics = window.__PRESOLVE__.diagnostics;
+  if (!diagnostics.some((diagnostic) => diagnostic.code === "PSR_PACKAGE_INVOCATION_MODULE_FAILED" && diagnostic.fatal === true)) {
+    throw new Error("missing package module diagnostic was not retained");
+  }
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_PACKAGE_INVOCATION_FAILURE_PASS</div>");
+})().catch((error) => {
+  document.body.insertAdjacentHTML("beforeend", `<pre>PRESOLVE_PACKAGE_INVOCATION_FAILURE_FAIL: ${error.message}</pre>`);
+});
+</script>
+</body>"#,
+    );
+    fs::write(route_root.join("package-failure.html"), failure_probe)
+        .expect("write package failure probe");
+
+    let server = StaticServer::start(dist.clone());
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    for (file, marker) in [
+        (
+            "package-resume.html",
+            "PRESOLVE_PACKAGE_INVOCATION_RESUME_PASS",
+        ),
+        (
+            "package-failure.html",
+            "PRESOLVE_PACKAGE_INVOCATION_FAILURE_PASS",
+        ),
+    ] {
+        let profile_dir = route_root.join(format!("chrome-profile-{file}-{}", std::process::id()));
+        fs::create_dir_all(&profile_dir).expect("create package probe Chrome profile");
+        let output = run_chrome_probe(
+            chrome.clone(),
+            &format!("--user-data-dir={}", profile_dir.display()),
+            &format!("http://127.0.0.1:{}/routes/root/{file}", server.port),
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains(marker),
+            "package browser probe {file} failed\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            stdout,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    server.stop();
 }
 
 struct StaticServer {

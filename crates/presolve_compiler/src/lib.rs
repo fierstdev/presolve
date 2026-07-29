@@ -159,6 +159,7 @@ pub mod runtime_effect_instance;
 pub mod runtime_form_artifact;
 pub mod runtime_form_registry;
 pub mod runtime_opaque_artifact;
+pub mod runtime_package_invocation_artifact;
 pub mod runtime_resource_artifact;
 pub mod semantic_capability;
 pub mod semantic_graph;
@@ -222,6 +223,7 @@ pub use action_authority::{
 pub use action_field_lowering::{
     action_field_sites_v1, lower_action_fields_v1, ActionFieldLoweringErrorV1,
     ActionFieldLoweringV1, ActionFieldSiteV1, ResolvedActionFieldV1,
+    ResolvedTerminalPackageInvocationV1,
 };
 pub use application_publication::{
     application_publication_manifest_json_v1, build_application_publication_product_from_asm_v1,
@@ -286,22 +288,22 @@ pub use component_graph::{
     AuthoredContextDeclarationCandidate, AuthoredDeclarationKind, AuthoredOpaqueActionFact,
     AuthoredRouteLoaderDeclarationFact, AuthoredServerActionFact, AuthoredSlotDeclarationCandidate,
     AuthoredStandardSchemaValidationFact, AuthoredSubmissionDeclarationFact,
-    AuthoredValidationRuleArgument, AuthoredValidationRuleArgumentKind,
-    AuthoredValidationRuleDeclarationFact, AuthoredValidationRuleExpression,
-    AuthoredValidationRuleExpressionKind, ComparisonOperator, ComponentAction, ComponentDiagnostic,
-    ComponentDiagnosticSeverity, ComponentEffectField, ComponentGraph, ComponentMethod,
-    ComponentNode, ComputedExpression, ComputedExpressionKind, ConstantEvaluationError,
-    ConstantExpression, ConstantExpressionKind, ConsumerDeclaration, ContextDeclaration,
-    ContextDeclarationCandidateKind, ContextDeclarationViolation, ContextDesignator,
-    DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel, EffectBodySyntax,
-    EffectCleanupSyntax, EffectExpression, EffectExpressionKind, EffectStatementSyntax,
-    EffectStatementSyntaxKind, FormDeclarationCandidate, FormDeclarationStatus,
-    FormDeclarationViolation, FormDesignatorFact, FormFieldDeclarationCandidate,
-    FormFieldDeclarationViolation, LogicalOperator, MethodCall, MethodLocalVariable,
-    MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild, RenderEventHandler,
-    RenderFragment, RenderList, RenderModel, SerializableValue, SlotDeclaration,
-    SlotDeclarationViolation, SlotKind, StateField, StateOperation, UnsupportedEffectStatementKind,
-    UnsupportedFormDesignatorFact,
+    AuthoredTerminalPackageInvocationFact, AuthoredValidationRuleArgument,
+    AuthoredValidationRuleArgumentKind, AuthoredValidationRuleDeclarationFact,
+    AuthoredValidationRuleExpression, AuthoredValidationRuleExpressionKind, ComparisonOperator,
+    ComponentAction, ComponentDiagnostic, ComponentDiagnosticSeverity, ComponentEffectField,
+    ComponentGraph, ComponentMethod, ComponentNode, ComputedExpression, ComputedExpressionKind,
+    ConstantEvaluationError, ConstantExpression, ConstantExpressionKind, ConsumerDeclaration,
+    ContextDeclaration, ContextDeclarationCandidateKind, ContextDeclarationViolation,
+    ContextDesignator, DeclaredStateType, DeclaredStateTypeKind, DiagnosticSecondaryLabel,
+    EffectBodySyntax, EffectCleanupSyntax, EffectExpression, EffectExpressionKind,
+    EffectStatementSyntax, EffectStatementSyntaxKind, FormDeclarationCandidate,
+    FormDeclarationStatus, FormDeclarationViolation, FormDesignatorFact,
+    FormFieldDeclarationCandidate, FormFieldDeclarationViolation, LogicalOperator, MethodCall,
+    MethodLocalVariable, MethodParameter, RenderAttribute, RenderAttributeValue, RenderChild,
+    RenderEventHandler, RenderFragment, RenderList, RenderModel, SerializableValue,
+    SlotDeclaration, SlotDeclarationViolation, SlotKind, StateField, StateOperation,
+    UnsupportedEffectStatementKind, UnsupportedFormDesignatorFact,
 };
 pub use component_inheritance_lowering::{
     component_inheritance_sites_v1, lower_component_inheritance_v1,
@@ -644,8 +646,8 @@ pub use ordinary_template_integrity::{
     StateInstanceStorageIntegrityCode,
 };
 pub use page_codegen::{
-    embed_opaque_runtime_artifact, generate_standalone_page,
-    generate_standalone_page_with_component_runtime,
+    embed_opaque_runtime_artifact, embed_package_invocation_runtime_artifact,
+    generate_standalone_page, generate_standalone_page_with_component_runtime,
     generate_standalone_page_with_component_runtime_and_forms,
     generate_standalone_page_with_computed_runtime, generate_standalone_page_with_context_runtime,
     generate_standalone_page_with_effect_runtime, generate_standalone_page_with_resume_runtime,
@@ -934,6 +936,12 @@ pub use runtime_opaque_artifact::{
     runtime_opaque_artifact_json, validate_runtime_opaque_artifact, RuntimeOpaqueArtifact,
     RuntimeOpaqueArtifactActivation, RuntimeOpaqueArtifactBuildError,
     RuntimeOpaqueArtifactValidationError, RUNTIME_OPAQUE_ARTIFACT_SCHEMA_VERSION,
+};
+pub use runtime_package_invocation_artifact::{
+    build_runtime_package_invocation_artifact, runtime_package_invocation_artifact_json,
+    validate_runtime_package_invocation_artifact, RuntimePackageInvocation,
+    RuntimePackageInvocationArtifact, RuntimePackageInvocationArtifactValidationError,
+    PACKAGE_INVOCATION_REGISTRY_PATH, RUNTIME_PACKAGE_INVOCATION_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_resource_artifact::{
     build_runtime_resource_artifact, build_runtime_resource_artifact_with_modules,

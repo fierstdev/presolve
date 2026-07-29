@@ -12,6 +12,28 @@ importers:
         specifier: npm:typescript@^7.0.2
         version: typescript@7.0.2
 
+  examples/package-interop:
+    dependencies:
+      presolve:
+        specifier: workspace:@presolve/framework@*
+        version: link:../../framework/packages/presolve
+      presolve-example-analytics:
+        specifier: file:./vendor/presolve-example-analytics
+        version: file:examples/package-interop/vendor/presolve-example-analytics
+    devDependencies:
+      '@presolve/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@presolve/typescript-authority':
+        specifier: workspace:*
+        version: link:../../packages/typescript-authority
+      typescript:
+        specifier: npm:typescript@^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.6
+
   framework/packages/presolve: {}
 
   packages/cli:
@@ -527,6 +549,9 @@ packages:
     resolution: {integrity: sha512-KBDEIpLrvpv16pp3K0Fw+UCoZfopFjjgeB+0tA/aaThfEE74kKDLrgg603YvOWJyg3+WYtyq3xYsQWsIyZlPqQ==}
     engines: {node: ^10 || ^12 || >=14}
 
+  presolve-example-analytics@file:examples/package-interop/vendor/presolve-example-analytics:
+    resolution: {directory: examples/package-interop/vendor/presolve-example-analytics, type: directory}
+
   rollup@4.62.2:
     resolution: {integrity: sha512-RFnrW4lhXA3s3eqHDZvN654g8OTjzRfqpIRJYczCGB6HzphckVAi/Qh4tbPUbRuDi7s1Llv8g/NspLkttY3gTA==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
@@ -849,6 +874,8 @@ snapshots:
       nanoid: 3.3.16
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  presolve-example-analytics@file:examples/package-interop/vendor/presolve-example-analytics: {}
 
   rollup@4.62.2:
     dependencies:

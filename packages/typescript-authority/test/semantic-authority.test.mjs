@@ -144,6 +144,7 @@ test("the V2 authoring bridge resolves canonical component, State, Action, Effec
     formFields: [],
     validations: [],
     standardValidations: [],
+    packageInvocations: [],
     environmentPublic: [
       {
         id: "application-name",
@@ -194,12 +195,64 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     formFields: [],
     validations: [],
     standardValidations: [],
+    packageInvocations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
   assert.deepEqual(result.states, []);
   assert.deepEqual(result.actions, []);
   assert.deepEqual(result.effects, []);
+});
+
+test("the V2 authoring bridge proves exact named-import package invocations", async () => {
+  const packageFile = resolve(root, "tests/framework-public-api/src/V2Package.tsx");
+  const packageSource = readFileSync(packageFile, "utf8");
+  const importedCall = packageSource.lastIndexOf("emitMetric()");
+  const localCall = packageSource.lastIndexOf("recordMetric()");
+  const result = await analyzeV2Authoring({
+    schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
+    configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+    canonical: {
+      component: { file: packageFile, position: packageSource.indexOf("Component") },
+      action: { file: packageFile, position: packageSource.indexOf("action") },
+      validationRules: [],
+    },
+    components: [{ id: "package", file: packageFile, position: packageSource.indexOf("V2Package extends") }],
+    states: [],
+    actions: [
+      { id: "send", file: packageFile, position: packageSource.indexOf("action(()") },
+      { id: "local", file: packageFile, position: packageSource.lastIndexOf("action(()") },
+    ],
+    effects: [],
+    slots: [],
+    forms: [],
+    formFields: [],
+    validations: [],
+    standardValidations: [],
+    packageInvocations: [
+      {
+        id: "imported",
+        file: packageFile,
+        position: importedCall,
+        importPosition: packageSource.indexOf("emitMetric"),
+        moduleSpecifier: "./V2PackageHelper.js",
+        exportName: "recordMetric",
+      },
+      {
+        id: "lookalike",
+        file: packageFile,
+        position: localCall,
+        importPosition: packageSource.indexOf("emitMetric"),
+        moduleSpecifier: "./V2PackageHelper.js",
+        exportName: "recordMetric",
+      },
+    ],
+    environmentPublic: [],
+  });
+  assert.equal(result.diagnostics.length, 0);
+  assert.deepEqual(result.packageInvocations.map(entry => entry.id), ["imported"]);
+  assert.equal(result.packageInvocations[0].identity.name, "recordMetric");
+  assert.equal(result.packageInvocations[0].moduleSpecifier, "./V2PackageHelper.js");
 });
 
 test("the V2 authoring bridge resolves canonical decorator-free Form evidence", async () => {
@@ -255,6 +308,7 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
       moduleSpecifier: "./V2Schemas.js",
       exportName: "displayNameSchema",
     }],
+    packageInvocations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.forms.map(entry => entry.id), ["profile-form"]);
@@ -300,6 +354,7 @@ test("the V2 authoring bridge recognizes a direct Component heritage-expression 
     formFields: [],
     validations: [],
     standardValidations: [],
+    packageInvocations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["direct"]);
@@ -325,6 +380,7 @@ test("the V2 authoring bridge resolves environment evidence without a component 
     formFields: [],
     validations: [],
     standardValidations: [],
+    packageInvocations: [],
     environmentPublic: [{
       id: "application-name",
       file: frameworkFile,
@@ -364,6 +420,7 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
         formFields: [],
         validations: [],
         standardValidations: [],
+        packageInvocations: [],
         environmentPublic: [],
       }),
       encoding: "utf8",

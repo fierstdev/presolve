@@ -24,19 +24,22 @@ use crate::{
     build_production_reports, build_production_runtime_artifact, build_resume_chunk_graph,
     build_resume_manifest, build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
-    build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
-    build_template_manifest_from_asm, embed_opaque_runtime_artifact, emit_production_modules,
-    extract_production_chunk_graph, generate_ordinary_instance_html_for_component,
-    generate_runtime_stub, generate_standalone_page_with_resume_runtime,
+    build_runtime_opaque_artifact_with_modules, build_runtime_package_invocation_artifact,
+    build_runtime_resource_artifact_with_modules, build_template_manifest_from_asm,
+    embed_opaque_runtime_artifact, embed_package_invocation_runtime_artifact,
+    emit_production_modules, extract_production_chunk_graph,
+    generate_ordinary_instance_html_for_component, generate_runtime_stub,
+    generate_standalone_page_with_resume_runtime,
     generate_standalone_page_with_resume_runtime_and_resources, lower_components_to_ir,
     optimization_report_json, optimize_context_ir, optimize_effect_ir,
     production_audit_report_json_v1, production_runtime_artifact_json, resume_manifest_json,
     runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
     runtime_cost_report_json, runtime_effect_artifact_json, runtime_forms_artifact_json,
-    runtime_opaque_artifact_json, runtime_resource_artifact_json, template_manifest_json,
-    validate_runtime_opaque_artifact, validate_runtime_resource_artifact, CompilationUnit,
-    ConstantFoldingPass, ExecutableProgramFingerprint, ImmutableAsmPass, ProductionReportInputs,
-    ProductionRootChunkInput, SemanticId, SharedChunkCandidatePlan,
+    runtime_opaque_artifact_json, runtime_package_invocation_artifact_json,
+    runtime_resource_artifact_json, template_manifest_json, validate_runtime_opaque_artifact,
+    validate_runtime_package_invocation_artifact, validate_runtime_resource_artifact,
+    CompilationUnit, ConstantFoldingPass, ExecutableProgramFingerprint, ImmutableAsmPass,
+    ProductionReportInputs, ProductionRootChunkInput, SemanticId, SharedChunkCandidatePlan,
 };
 
 pub const APPLICATION_PUBLICATION_MANIFEST_SCHEMA_VERSION: u32 = 1;
@@ -334,6 +337,19 @@ pub fn build_application_publication_product_from_asm_v1(
         }
         Some(artifact)
     };
+    let package_invocation_runtime_artifact = if asm.terminal_package_invocations.is_empty() {
+        None
+    } else {
+        let artifact = build_runtime_package_invocation_artifact(&asm);
+        if !validate_runtime_package_invocation_artifact(&artifact).is_empty() {
+            return Err(ApplicationPublicationErrorV1 {
+                code: "PSAPP2009_PACKAGE_INVOCATION_RUNTIME_ARTIFACT_INVALID",
+                message: "compiler produced an invalid decorator-free package invocation artifact"
+                    .into(),
+            });
+        }
+        Some(artifact)
+    };
 
     let ir = lower_components_to_ir(&asm);
     let computed_runtime_artifact = build_runtime_computed_artifact(&asm, &ir);
@@ -356,6 +372,9 @@ pub fn build_application_publication_product_from_asm_v1(
     let opaque_runtime_json = opaque_runtime_artifact
         .as_ref()
         .map(runtime_opaque_artifact_json);
+    let package_invocation_runtime_json = package_invocation_runtime_artifact
+        .as_ref()
+        .map(runtime_package_invocation_artifact_json);
     let (production_chunk_graph, _) = extract_production_chunk_graph(
         &SharedChunkCandidatePlan {
             candidates: Vec::new(),
@@ -419,6 +438,11 @@ pub fn build_application_publication_product_from_asm_v1(
     } else {
         page_html
     };
+    let page_html = if let Some(package_invocations) = &package_invocation_runtime_artifact {
+        embed_package_invocation_runtime_artifact(page_html, package_invocations)
+    } else {
+        page_html
+    };
     let page_html = production_mode_page_html(
         page_html,
         request.profile == ApplicationPublicationProfileV1::Production,
@@ -440,6 +464,9 @@ pub fn build_application_publication_product_from_asm_v1(
         .as_ref()
         .map_or(0, |json| json.len() as u64)
         + opaque_runtime_json
+            .as_ref()
+            .map_or(0, |json| json.len() as u64)
+        + package_invocation_runtime_json
             .as_ref()
             .map_or(0, |json| json.len() as u64);
     let production_bytes = byte_count(
@@ -553,6 +580,13 @@ pub fn build_application_publication_product_from_asm_v1(
     }
     if let Some(json) = opaque_runtime_json {
         insert_artifact(&mut artifacts, "opaque.runtime.json", json.into_bytes());
+    }
+    if let Some(json) = package_invocation_runtime_json {
+        insert_artifact(
+            &mut artifacts,
+            "package-invocations.runtime.json",
+            json.into_bytes(),
+        );
     }
     for chunk in &resume_chunks.chunks {
         artifacts.insert(

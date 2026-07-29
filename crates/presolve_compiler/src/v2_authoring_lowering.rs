@@ -227,6 +227,7 @@ class Counter extends AliasedBase {
                         column: action_callee.column,
                     },
                     action_identity: identity("action"),
+                    terminal_package_invocation: None,
                 }],
                 effects: vec![crate::ResolvedEffectFieldV1 {
                     callee_source: crate::AuthoredSourceRangeV1 {

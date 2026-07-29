@@ -119,6 +119,9 @@ pub struct ApplicationSemanticModel {
     /// resolution facts only until a later artifact/runtime lowering product
     /// consumes them.
     pub opaque_action_resolutions: Vec<crate::OpaqueActionResolution>,
+    /// Decorator-free named-import terminal calls classified by their Action
+    /// use site. The package implementation remains outside compiler meaning.
+    pub terminal_package_invocations: Vec<crate::AuthoredTerminalPackageInvocationFact>,
     /// Validated Resource declaration products projected into the canonical
     /// runtime activation artifact when a host supplies exact module locations.
     pub resource_declarations: BTreeMap<ResourceId, crate::ResourceDeclaration>,
@@ -1376,6 +1379,11 @@ pub fn build_application_semantic_model_from_component_graph(
         collect_resource_endpoint_resolutions(&component_graph.components, None);
     let opaque_action_resolutions =
         collect_opaque_action_resolutions(&component_graph.components, None);
+    let terminal_package_invocations = component_graph
+        .components
+        .iter()
+        .flat_map(|component| component.terminal_package_invocations.clone())
+        .collect();
     let base_semantic_types = SemanticTypeModel::from_components(
         &component_graph.components,
         &component_graph.provenance,
@@ -1740,6 +1748,7 @@ pub fn build_application_semantic_model_from_component_graph(
         forms,
         resource_endpoint_resolutions,
         opaque_action_resolutions,
+        terminal_package_invocations,
         resource_declarations,
         resource_activations,
         form_field_declaration_candidates,
@@ -1878,7 +1887,7 @@ pub fn build_file_route_application_semantic_model_for_unit_with_packages_and_v2
     let modules = crate::build_module_graph(unit);
     let mut bindings =
         crate::binding_table::build_binding_table_with_packages(unit, &symbols, &modules, packages);
-    retain_standard_schema_runtime_bindings(&mut bindings, unit, &modules, v2_authoring);
+    retain_v2_runtime_import_bindings(&mut bindings, unit, &modules, v2_authoring);
     build_application_semantic_model_from_files_with_bindings_mode_and_v2(
         unit.files(),
         Some(&bindings),
@@ -1887,7 +1896,7 @@ pub fn build_file_route_application_semantic_model_for_unit_with_packages_and_v2
     )
 }
 
-fn retain_standard_schema_runtime_bindings(
+fn retain_v2_runtime_import_bindings(
     bindings: &mut crate::BindingTable,
     unit: &CompilationUnit,
     modules: &crate::ModuleGraph,
@@ -1904,19 +1913,34 @@ fn retain_standard_schema_runtime_bindings(
         else {
             continue;
         };
+        // A package import is ordinary Vite input until a Presolve semantic
+        // use site claims it. Merely importing a package in a V2 source file
+        // must not require the legacy semantic-package contract.
+        for import in parsed
+            .imports
+            .iter()
+            .filter(|import| import.source != "presolve" && !import.source.starts_with('.'))
+        {
+            specifiers.insert((model.source_path.clone(), import.source.clone()));
+        }
         for evidence in model
             .declarations
             .iter()
             .filter_map(|declaration| declaration.derived_evidence.as_ref())
         {
-            let crate::DerivedAuthoredEvidenceV2::StandardSchemaValidation {
-                module_specifier,
-                export_name,
-                declaration_modules,
-                ..
-            } = evidence
-            else {
-                continue;
+            let (module_specifier, export_name, declaration_modules) = match evidence {
+                crate::DerivedAuthoredEvidenceV2::StandardSchemaValidation {
+                    module_specifier,
+                    export_name,
+                    declaration_modules,
+                    ..
+                }
+                | crate::DerivedAuthoredEvidenceV2::TerminalPackageInvocation {
+                    module_specifier,
+                    export_name,
+                    declaration_modules,
+                } => (module_specifier, export_name, declaration_modules),
+                _ => continue,
             };
             let Some(import) = parsed
                 .imports
@@ -2003,7 +2027,7 @@ pub fn build_file_route_application_semantic_model_for_route_with_packages_and_v
     let modules = crate::build_module_graph(unit);
     let mut bindings =
         crate::binding_table::build_binding_table_with_packages(unit, &symbols, &modules, packages);
-    retain_standard_schema_runtime_bindings(&mut bindings, unit, &modules, v2_authoring);
+    retain_v2_runtime_import_bindings(&mut bindings, unit, &modules, v2_authoring);
     build_application_semantic_model_from_files_with_bindings_mode_and_v2(
         unit.files(),
         Some(&bindings),
@@ -2105,6 +2129,10 @@ fn build_application_semantic_model_from_files_with_bindings_mode_and_v2(
     diagnostics.extend(collect_opaque_action_lowering_diagnostics(
         &opaque_action_resolutions,
     ));
+    let terminal_package_invocations = components
+        .iter()
+        .flat_map(|component| component.terminal_package_invocations.clone())
+        .collect();
 
     let mut component_invocations = collect_component_invocations(
         &components,
@@ -2524,6 +2552,7 @@ fn build_application_semantic_model_from_files_with_bindings_mode_and_v2(
         forms,
         resource_endpoint_resolutions,
         opaque_action_resolutions,
+        terminal_package_invocations,
         resource_declarations,
         resource_activations,
         form_field_declaration_candidates,
@@ -4862,6 +4891,138 @@ mod tests {
             .diagnostics
             .iter()
             .all(|diagnostic| diagnostic.code != "PSC1001"));
+    }
+
+    #[test]
+    fn file_route_assembly_admits_only_authority_proven_terminal_package_invocations() {
+        let unit = CompilationUnit::parse_sources([(
+            "app/routes/index.tsx",
+            "import { action, Component } from \"presolve\"; import { recordVisit as sendVisit } from \"analytics-kit\"; export class Home extends Component { record = action(() => { sendVisit(); }); render() { return <button onClick={this.record}>Record</button>; } }",
+        )]);
+        let parsed = &unit.files()[0];
+        let class = &parsed.classes[0];
+        let property = &class.properties[0];
+        let model = CanonicalAuthoredSemanticModelV1 {
+            schema_version: crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
+            source_path: parsed.path.clone(),
+            declarations: vec![
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Component,
+                    subject: "Home".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: class.span.start,
+                        end: class.span.end,
+                        line: class.span.line,
+                        column: class.span.column,
+                    },
+                    intrinsic_identity: None,
+                    derived_evidence: None,
+                },
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Action,
+                    subject: "Home.record".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: property.span.start,
+                        end: property.span.end,
+                        line: property.span.line,
+                        column: property.span.column,
+                    },
+                    intrinsic_identity: None,
+                    derived_evidence: Some(
+                        crate::DerivedAuthoredEvidenceV2::TerminalPackageInvocation {
+                            module_specifier: "analytics-kit".into(),
+                            export_name: "recordVisit".into(),
+                            declaration_modules: vec![
+                                "node_modules/analytics-kit/index.d.ts".into()
+                            ],
+                        },
+                    ),
+                },
+            ],
+        };
+        let asm =
+            build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+                &unit,
+                &crate::SemanticPackageResolutionTable::default(),
+                &BTreeMap::from([("app/routes/index.tsx".into(), model)]),
+            )
+            .expect("authority-proven package invocation route assembly");
+        assert!(asm
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.code != "PSBIND1009"));
+        let [invocation] = asm.terminal_package_invocations.as_slice() else {
+            panic!("one canonical package invocation");
+        };
+        assert_eq!(invocation.module_specifier, "analytics-kit");
+        assert_eq!(invocation.export_name, "recordVisit");
+        assert_eq!(
+            invocation.id,
+            asm.components[0].id.package_invocation("record")
+        );
+        let artifact = crate::build_runtime_package_invocation_artifact(&asm);
+        assert!(crate::validate_runtime_package_invocation_artifact(&artifact).is_empty());
+        assert_eq!(
+            artifact.registry_path,
+            crate::PACKAGE_INVOCATION_REGISTRY_PATH
+        );
+    }
+
+    #[test]
+    fn file_route_assembly_reports_unadmitted_package_use_at_the_action_site() {
+        let unit = CompilationUnit::parse_sources([(
+            "app/routes/index.tsx",
+            "import { action, Component } from \"presolve\"; import { recordVisit as sendVisit } from \"analytics-kit\"; export class Home extends Component { record = action(() => { sendVisit(); }); render() { return <button onClick={this.record}>Record</button>; } }",
+        )]);
+        let parsed = &unit.files()[0];
+        let class = &parsed.classes[0];
+        let property = &class.properties[0];
+        let model = CanonicalAuthoredSemanticModelV1 {
+            schema_version: crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
+            source_path: parsed.path.clone(),
+            declarations: vec![
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Component,
+                    subject: "Home".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: class.span.start,
+                        end: class.span.end,
+                        line: class.span.line,
+                        column: class.span.column,
+                    },
+                    intrinsic_identity: None,
+                    derived_evidence: None,
+                },
+                CanonicalAuthoredDeclarationV1 {
+                    kind: CanonicalAuthoredDeclarationKindV1::Action,
+                    subject: "Home.record".into(),
+                    source: crate::AuthoredSourceRangeV1 {
+                        start: property.span.start,
+                        end: property.span.end,
+                        line: property.span.line,
+                        column: property.span.column,
+                    },
+                    intrinsic_identity: None,
+                    derived_evidence: None,
+                },
+            ],
+        };
+        let asm =
+            build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring(
+                &unit,
+                &crate::SemanticPackageResolutionTable::default(),
+                &BTreeMap::from([("app/routes/index.tsx".into(), model)]),
+            )
+            .expect("unadmitted package call should produce a precise diagnostic");
+        assert!(asm
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.code != "PSBIND1009"));
+        assert!(asm
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PSV2P1001"));
+        assert!(asm.terminal_package_invocations.is_empty());
     }
 
     #[test]

@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use presolve_parser::ParsedFile;
 use serde::{Deserialize, Serialize};
 
-pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 5;
+pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 6;
 
 /// A serializable source range shared by the syntax and semantic boundaries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -105,6 +105,14 @@ pub enum DerivedAuthoredEvidenceV2 {
         declaration_modules: Vec<String>,
         input_type: Option<String>,
         output_type: Option<String>,
+    },
+    /// An authority-proven named import invoked as the complete body of a
+    /// decorator-free Action. The discarded result gives this use site
+    /// terminal capability meaning without classifying the package globally.
+    TerminalPackageInvocation {
+        module_specifier: String,
+        export_name: String,
+        declaration_modules: Vec<String>,
     },
 }
 
@@ -263,6 +271,14 @@ pub fn normalize_authored_semantics_v1(
                 computed_dependencies.dedup();
             }
             if let Some(DerivedAuthoredEvidenceV2::StandardSchemaValidation {
+                declaration_modules,
+                ..
+            }) = &mut derived_evidence
+            {
+                declaration_modules.sort();
+                declaration_modules.dedup();
+            }
+            if let Some(DerivedAuthoredEvidenceV2::TerminalPackageInvocation {
                 declaration_modules,
                 ..
             }) = &mut derived_evidence

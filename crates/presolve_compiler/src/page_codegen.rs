@@ -2,8 +2,8 @@ use crate::{
     runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
     runtime_effect_artifact_json, runtime_forms_artifact_json, template_manifest_json,
     ResumeManifest, RuntimeComponentArtifact, RuntimeComputedArtifact, RuntimeContextArtifact,
-    RuntimeEffectArtifact, RuntimeFormsArtifact, RuntimeOpaqueArtifact, RuntimeResourceArtifact,
-    TemplateManifest,
+    RuntimeEffectArtifact, RuntimeFormsArtifact, RuntimeOpaqueArtifact,
+    RuntimePackageInvocationArtifact, RuntimeResourceArtifact, TemplateManifest,
 };
 
 #[must_use]
@@ -212,6 +212,29 @@ pub fn embed_opaque_runtime_artifact(page: String, opaque: &RuntimeOpaqueArtifac
     page.replacen(
         "    <script src=\"./runtime.js\" defer></script>",
         &(opaque_script + "    <script src=\"./runtime.js\" defer></script>"),
+        1,
+    )
+}
+
+/// Embeds the compiler-authorized decorator-free package invocation registry
+/// metadata immediately before runtime boot.
+#[must_use]
+pub fn embed_package_invocation_runtime_artifact(
+    page: String,
+    package_invocations: &RuntimePackageInvocationArtifact,
+) -> String {
+    let mut artifact_script =
+        "    <script type=\"application/json\" id=\"presolve-package-invocations-runtime\">\n"
+            .to_string();
+    for line in crate::runtime_package_invocation_artifact_json(package_invocations).lines() {
+        artifact_script.push_str("      ");
+        artifact_script.push_str(&escape_script_json_line(line));
+        artifact_script.push('\n');
+    }
+    artifact_script.push_str("    </script>\n");
+    page.replacen(
+        "    <script src=\"./runtime.js\" defer></script>",
+        &(artifact_script + "    <script src=\"./runtime.js\" defer></script>"),
         1,
     )
 }

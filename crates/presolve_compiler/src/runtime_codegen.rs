@@ -9,6 +9,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const FORMS_ARTIFACT_ELEMENT_ID = "presolve-forms-runtime";
   const RESOURCES_ARTIFACT_ELEMENT_ID = "presolve-resources-runtime";
   const OPAQUE_ARTIFACT_ELEMENT_ID = "presolve-opaque-runtime";
+  const PACKAGE_INVOCATIONS_ARTIFACT_ELEMENT_ID = "presolve-package-invocations-runtime";
   const RESUME_MANIFEST_ELEMENT_ID = "presolve-resume-runtime";
   const RESUME_SNAPSHOT_ELEMENT_ID = "presolve-resume-snapshot";
   const PRODUCTION_RUNTIME_ELEMENT_ID = "presolve-production-runtime";
@@ -25,6 +26,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 6;
   const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_PACKAGE_INVOCATIONS_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
   const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 2;
   const SUPPORTED_RESUME_RUNTIME_PROTOCOL_VERSION = 1;
@@ -72,6 +74,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   };
   let standardSchemaValidators = new Map();
   let formSubmissionCapabilities = new Map();
+  let packageInvocationRegistry = new Map();
 
   function exactObjectKeys(value, expected) {
     if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -521,8 +524,11 @@ const RUNTIME_STUB: &str = r#"(() => {
     return `${componentName}:${method}`;
   }
 
-  function validateManifestActionBindings(manifest, opaqueArtifact, diagnostics) {
+  function validateManifestActionBindings(manifest, opaqueArtifact, packageInvocationsArtifact, diagnostics) {
     const opaqueMethods = new Set((opaqueArtifact?.activations ?? []).map((activation) => activation.method));
+    const packageInvocationMethods = new Set(
+      (packageInvocationsArtifact?.invocations ?? []).map((invocation) => invocation.method)
+    );
     for (const component of manifest.components ?? []) {
       const actionsByMethod = new Map();
       const legacyMethods = new Set();
@@ -581,7 +587,8 @@ const RUNTIME_STUB: &str = r#"(() => {
           throw new PresolveBootError("PSR_INVALID_ACTION_BINDING");
         }
         if (actionsByMethod.get(event.method_id) !== event.action_batch_id
-          && !opaqueMethods.has(event.method_id)) {
+          && !opaqueMethods.has(event.method_id)
+          && !packageInvocationMethods.has(event.method_id)) {
           reportDiagnostic(
             diagnostics,
             "PSR_INVALID_ACTION_BINDING",
@@ -595,7 +602,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
-  function validateManifestSchema(manifest, effectArtifact, componentArtifact, opaqueArtifact, diagnostics) {
+  function validateManifestSchema(manifest, effectArtifact, componentArtifact, opaqueArtifact, packageInvocationsArtifact, diagnostics) {
     if (
       manifest?.schema_version !== SUPPORTED_SCHEMA_VERSION &&
       manifest?.schema_version !== FORMS_MANIFEST_SCHEMA_VERSION &&
@@ -685,7 +692,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     if (manifest.schema_version >= ACTION_MANIFEST_SCHEMA_VERSION) {
-      validateManifestActionBindings(manifest, opaqueArtifact, diagnostics);
+      validateManifestActionBindings(
+        manifest,
+        opaqueArtifact,
+        packageInvocationsArtifact,
+        diagnostics
+      );
     }
   }
 
@@ -752,6 +764,77 @@ const RUNTIME_STUB: &str = r#"(() => {
       ids.add(activation.id);
       methods.add(activation.method);
     }
+  }
+
+  function readPackageInvocationsArtifact(diagnostics) {
+    const element = document.getElementById(PACKAGE_INVOCATIONS_ARTIFACT_ELEMENT_ID);
+    if (element === null) return null;
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_PACKAGE_INVOCATIONS_ARTIFACT", "Package invocation metadata was not stored in a script element", { artifactElementId: PACKAGE_INVOCATIONS_ARTIFACT_ELEMENT_ID }, true);
+      throw new PresolveBootError("PSR_INVALID_PACKAGE_INVOCATIONS_ARTIFACT");
+    }
+    try { return JSON.parse(element.textContent ?? ""); } catch (error) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_PACKAGE_INVOCATIONS_ARTIFACT", "Package invocation metadata JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
+      throw new PresolveBootError("PSR_INVALID_PACKAGE_INVOCATIONS_ARTIFACT");
+    }
+  }
+
+  function validatePackageInvocationsArtifact(artifact, diagnostics) {
+    if (artifact === null) return;
+    if (artifact.schema_version !== SUPPORTED_PACKAGE_INVOCATIONS_ARTIFACT_SCHEMA_VERSION
+      || typeof artifact.registry_path !== "string"
+      || !Array.isArray(artifact.invocations)) {
+      reportDiagnostic(diagnostics, "PSR_UNSUPPORTED_PACKAGE_INVOCATIONS_ARTIFACT_SCHEMA", "Package invocation metadata did not match the compiler artifact contract", { schema_version: artifact.schema_version }, true);
+      throw new PresolveBootError("PSR_UNSUPPORTED_PACKAGE_INVOCATIONS_ARTIFACT_SCHEMA");
+    }
+    const ids = new Set();
+    const methods = new Set();
+    for (const invocation of artifact.invocations) {
+      if (typeof invocation?.id !== "string" || ids.has(invocation.id)
+        || typeof invocation?.method !== "string" || methods.has(invocation.method)
+        || typeof invocation?.owner_component !== "string"
+        || typeof invocation?.module_specifier !== "string"
+        || typeof invocation?.export !== "string"
+        || typeof invocation?.owner_source !== "string"
+        || !Array.isArray(invocation?.declaration_modules)
+        || invocation.declaration_modules.length === 0
+        || invocation.execution_boundary !== "client"
+        || invocation.resume_policy !== "event_restore") {
+        reportDiagnostic(diagnostics, "PSR_INVALID_PACKAGE_INVOCATIONS_ARTIFACT", "Package invocation metadata did not retain one exact compiler-authorized call boundary", { invocation }, true);
+        throw new PresolveBootError("PSR_INVALID_PACKAGE_INVOCATIONS_ARTIFACT");
+      }
+      ids.add(invocation.id);
+      methods.add(invocation.method);
+    }
+  }
+
+  async function loadPackageInvocationRegistry(artifact, diagnostics) {
+    if (artifact === null) return new Map();
+    let imported;
+    try {
+      imported = await import(new URL(artifact.registry_path, document.baseURI).href);
+    } catch (error) {
+      reportDiagnostic(diagnostics, "PSR_PACKAGE_INVOCATION_MODULE_FAILED", "The compiler-published package invocation module could not be loaded", {
+        path: artifact.registry_path,
+        message: error instanceof Error ? error.message : String(error)
+      }, true);
+      throw new PresolveBootError("PSR_PACKAGE_INVOCATION_MODULE_FAILED");
+    }
+    const registry = imported?.presolvePackageInvocations;
+    if (registry === null || typeof registry !== "object" || Array.isArray(registry)) {
+      reportDiagnostic(diagnostics, "PSR_PACKAGE_INVOCATION_MODULE_MISMATCH", "The package invocation module did not expose the compiler-issued registry", {}, true);
+      throw new PresolveBootError("PSR_PACKAGE_INVOCATION_MODULE_MISMATCH");
+    }
+    const callables = new Map();
+    for (const invocation of artifact.invocations) {
+      const callable = registry[invocation.id];
+      if (typeof callable !== "function") {
+        reportDiagnostic(diagnostics, "PSR_PACKAGE_INVOCATION_MODULE_MISMATCH", "A bundled package invocation was not callable", { invocation: invocation.id }, true);
+        throw new PresolveBootError("PSR_PACKAGE_INVOCATION_MODULE_MISMATCH");
+      }
+      callables.set(invocation.id, callable);
+    }
+    return callables;
   }
 
   function validateResourcesArtifact(resourcesArtifact, diagnostics) {
@@ -3131,7 +3214,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     return nextInstances;
   }
 
-  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact, opaqueArtifact) {
+  function createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact, opaqueArtifact, packageInvocationsArtifact) {
     const computedEvaluations = new Map();
     const storageValues = new Map();
     const storageByComponentField = new Map();
@@ -3173,6 +3256,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       legacyActionsByComponentMethod: new Map(),
       opaqueTerminalsByMethod: new Map((opaqueArtifact?.activations ?? []).map((activation) => [activation.method, activation])),
       opaqueActivations: [],
+      packageInvocationsByMethod: new Map(
+        (packageInvocationsArtifact?.invocations ?? []).map((invocation) => [invocation.method, invocation])
+      ),
+      packageInvocationRuns: [],
       eventsByType: new Map(),
       elementsByNode,
       diagnostics,
@@ -4094,6 +4181,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
     const actionRecord = store.actionsByMethod.get(event.method_id)
       ?? (store.opaqueTerminalsByMethod.has(event.method_id)
+        || store.packageInvocationsByMethod.has(event.method_id)
         ? { action_batch_id: event.action_batch_id, actions: [] }
         : undefined);
 
@@ -4387,7 +4475,10 @@ const RUNTIME_STUB: &str = r#"(() => {
       executeContextUpdates(store, actionBatchId);
       executeCompletedActionEffects(store, actionBatchId);
       const methodId = executionContext?.method_id;
-      if (typeof methodId === "string") executeOpaqueTerminal(store, methodId);
+      if (typeof methodId === "string") {
+        executeOpaqueTerminal(store, methodId);
+        executePackageInvocation(store, methodId);
+      }
     } finally {
       store.activeActionBatch = null;
       store.activeExecutionContext = null;
@@ -4411,6 +4502,28 @@ const RUNTIME_STUB: &str = r#"(() => {
         evidence.status = "failed";
         reportDiagnostic(store.diagnostics, "PSR_OPAQUE_TERMINAL_FAILURE", "A compiler-authorized opaque terminal failed", { activation: terminal.id, message: error instanceof Error ? error.message : String(error) });
       });
+  }
+
+  function executePackageInvocation(store, methodId) {
+    const invocation = store.packageInvocationsByMethod.get(methodId);
+    if (invocation === undefined) return;
+    const evidence = { invocation: invocation.id, method: methodId, status: "running" };
+    store.packageInvocationRuns.push(evidence);
+    try {
+      const callable = packageInvocationRegistry.get(invocation.id);
+      if (typeof callable !== "function") {
+        throw new Error("compiler-issued registry callable is missing");
+      }
+      Promise.resolve(callable())
+        .then(() => { evidence.status = "complete"; })
+        .catch((error) => {
+          evidence.status = "failed";
+          reportDiagnostic(store.diagnostics, "PSR_PACKAGE_INVOCATION_FAILURE", "A compiler-authorized package invocation failed", { invocation: invocation.id, message: error instanceof Error ? error.message : String(error) });
+        });
+    } catch (error) {
+      evidence.status = "failed";
+      reportDiagnostic(store.diagnostics, "PSR_PACKAGE_INVOCATION_FAILURE", "A compiler-authorized package invocation failed", { invocation: invocation.id, message: error instanceof Error ? error.message : String(error) });
+    }
   }
 
   function registerComponentEvents(store, component) {
@@ -4753,6 +4866,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (record === undefined) return;
     const actionRecord = store.actionsByMethod.get(record.handler_method_id)
       ?? (store.opaqueTerminalsByMethod.has(record.handler_method_id)
+        || store.packageInvocationsByMethod.has(record.handler_method_id)
         ? { action_batch_id: record.action_batch_id, actions: [] }
         : undefined);
     const component = store.components.get(record.component_instance_id);
@@ -5305,6 +5419,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     contextArtifact,
     effectArtifact,
     componentArtifact,
+    packageInvocationsArtifact,
     diagnostics
   ) {
     const store = createRuntimeStore(
@@ -5313,7 +5428,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       computedArtifact,
       contextArtifact,
       effectArtifact,
-      componentArtifact
+      componentArtifact,
+      null,
+      packageInvocationsArtifact
     );
     store.componentArtifact = componentArtifact;
     store.componentInstances = new Map();
@@ -6076,6 +6193,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     componentArtifact,
     formsArtifact,
     resourcesArtifact,
+    packageInvocationsArtifact,
     diagnostics
   ) {
     const store = allocateResumeStateComputedStore(
@@ -6086,6 +6204,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       contextArtifact,
       effectArtifact,
       componentArtifact,
+      packageInvocationsArtifact,
       diagnostics
     );
     allocateResumeResources(store, registry, resourcesArtifact);
@@ -6135,6 +6254,7 @@ const RUNTIME_STUB: &str = r#"(() => {
         state: resource.state,
         generation: resource.generation
       })),
+      package_invocations: store.packageInvocationRuns,
       slot_binding_runs: [],
       component_failures: []
     });
@@ -6161,6 +6281,8 @@ const RUNTIME_STUB: &str = r#"(() => {
     component_instance_tree = [],
     forms = [],
     resources = [],
+    opaque_terminals = [],
+    package_invocations = [],
     slot_binding_runs = [],
     component_failures = [],
     diagnostics
@@ -6187,6 +6309,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       component_instance_tree,
       forms,
       resources,
+      opaque_terminals,
+      package_invocations,
       slot_binding_runs,
       component_failures
     };
@@ -6257,12 +6381,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     }));
   }
 
-  async function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, formsArtifact, resourcesArtifact, opaqueArtifact, diagnostics) {
+  async function initializeRuntime(manifest, computedArtifact, contextArtifact, effectArtifact, componentArtifact, formsArtifact, resourcesArtifact, opaqueArtifact, packageInvocationsArtifact, diagnostics) {
     const bindingAnchors = collectBindingAnchors();
     const conditionalAnchors = collectConditionalAnchors();
     const listAnchors = collectListAnchors();
     const elementsByNode = collectElementAnchors();
-    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact, opaqueArtifact);
+    const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact, opaqueArtifact, packageInvocationsArtifact);
     store.componentArtifact = componentArtifact;
     store.componentInstances = new Map((componentArtifact?.instances ?? []).map((instance) => [instance.instance, { ...instance, status: "created" }]));
     store.slotBindings = new Map((componentArtifact?.slot_binding_programs ?? []).map((binding) => [binding.binding, binding]));
@@ -6431,6 +6555,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       })),
       resources: [...store.resources.entries()].map(([id, resource]) => ({ id, state: resource.state, generation: resource.generation })),
       opaque_terminals: [...store.opaqueActivations],
+      package_invocations: store.packageInvocationRuns,
       slot_binding_runs: [...store.slotBindings.keys()],
       component_failures: []
     });
@@ -6454,7 +6579,20 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateEffectArtifactInstances(effectArtifact, componentArtifact, diagnostics);
       const opaqueArtifact = readOpaqueArtifact(diagnostics);
       validateOpaqueArtifact(opaqueArtifact, diagnostics);
-      validateManifestSchema(manifest, effectArtifact, componentArtifact, opaqueArtifact, diagnostics);
+      const packageInvocationsArtifact = readPackageInvocationsArtifact(diagnostics);
+      validatePackageInvocationsArtifact(packageInvocationsArtifact, diagnostics);
+      packageInvocationRegistry = await loadPackageInvocationRegistry(
+        packageInvocationsArtifact,
+        diagnostics
+      );
+      validateManifestSchema(
+        manifest,
+        effectArtifact,
+        componentArtifact,
+        opaqueArtifact,
+        packageInvocationsArtifact,
+        diagnostics
+      );
       const formsArtifact = readFormsArtifact(diagnostics);
       validateFormsArtifact(formsArtifact, manifest, diagnostics);
       standardSchemaValidators = await loadStandardSchemaValidators(formsArtifact, diagnostics);
@@ -6479,6 +6617,7 @@ const RUNTIME_STUB: &str = r#"(() => {
             componentArtifact,
             formsArtifact,
             resourcesArtifact,
+            packageInvocationsArtifact,
             diagnostics
           );
         },
@@ -6491,6 +6630,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           formsArtifact,
           resourcesArtifact,
           opaqueArtifact,
+          packageInvocationsArtifact,
           diagnostics
         )
       });
@@ -6705,6 +6845,10 @@ mod tests {
         assert!(runtime.contains("const actionRecord = store.actionsByMethod.get(event.method_id)"));
         assert!(runtime.contains("actionRecord.action_batch_id !== event.action_batch_id"));
         assert!(runtime.contains("executeActions"));
+        assert!(runtime.contains("function executePackageInvocation"));
+        assert!(runtime.contains("presolvePackageInvocations"));
+        assert!(runtime.contains("PSR_PACKAGE_INVOCATION_MODULE_MISMATCH"));
+        assert!(runtime.contains("PSR_PACKAGE_INVOCATION_FAILURE"));
         assert!(runtime.contains("executeCompletedActionEffects"));
         assert!(runtime.contains("activeActionBatch"));
         assert!(runtime.contains("executeInitialEffects"));
