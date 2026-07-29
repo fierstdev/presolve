@@ -122,9 +122,13 @@ Safari returning-client publication correction:
 
 ## Next slice
 
-Advance only the next explicit authored beta gate. Do not add a cache-busting
-site workaround or reopen beta.16 publication unless new production evidence
-contradicts the returning-client proof.
+Implement the first executable slice of
+`docs/v2/package-usage-classification-contract.md`: a decorator-free,
+zero-argument terminal named-import call inside a V2 `action()` field, selected
+by TypeScript authority and bundled through the project Vite installation.
+Preserve use-site classification: discarded client terminal calls are bounded
+capabilities, while values flowing into compiler-owned semantics still require
+an explicit semantic contract.
 
 Server executors remain outside this beta: the frozen loader/server-action
 contracts complete those families at deterministic compiler handoff and
