@@ -2,8 +2,9 @@
 
 ## Current objective
 
-Publish the locally verified `0.2.0-beta.16` content-addressed asset correction,
-then adopt it on Presolve.dev and verify returning WebKit clients.
+Continue from the published and production-verified `0.2.0-beta.16` baseline.
+The content-addressed asset correction is live on Presolve.dev and has
+returning-client WebKit proof.
 
 ## Completed slices
 
@@ -121,10 +122,9 @@ Safari returning-client publication correction:
 
 ## Next slice
 
-Merge the prepared release into `main`, publish tag `v0.2.0-beta.16` through
-GitHub Actions, verify every public package, then update Presolve.dev from those
-public packages and verify both fresh and returning WebKit navigation against
-the immutable stylesheet and runtime coordinates.
+Advance only the next explicit authored beta gate. Do not add a cache-busting
+site workaround or reopen beta.16 publication unless new production evidence
+contradicts the returning-client proof.
 
 Server executors remain outside this beta: the frozen loader/server-action
 contracts complete those families at deterministic compiler handoff and
@@ -148,8 +148,16 @@ explicitly prohibit an inferred executor.
 The complete 0.2.0-beta.16 local release dry run passes: formatting, strict
 clippy, every Rust and package test, all 57 browser cases, TypeScript 7.0.2,
 public TypeScript, 88 documentation files, a newly packed scaffold, crate and
-VSIX packaging, and deterministic hashes for all ten release packages. The
-previous beta.15 hosted publication remains live until the beta.16 GitHub
-Actions release completes.
+VSIX packaging, and deterministic hashes for all ten release packages. Hosted
+CI run `30418471399`, release dry-run `30418471420`, and Publish beta run
+`30419010174` passed. Public npm, Cargo, Marketplace, and GitHub release checks
+confirm beta.16.
+
+Presolve.dev runs beta.16 as Cloudflare Worker version
+`35705c75-0053-4392-a1d5-0e6b6e052030`. All 26 routes return HTTP 200. A
+persistent WebKit profile seeded with beta.15 before deployment loaded the same
+production URL after deployment without a cache clear, used immutable CSS and
+runtime coordinates, remained styled without overflow, and updated the counter
+from `Count: 0` to `Count: 1` with no console or request failures.
 
 Beta completion: 100%.
