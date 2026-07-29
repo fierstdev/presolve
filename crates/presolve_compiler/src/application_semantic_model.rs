@@ -2139,13 +2139,30 @@ fn build_application_semantic_model_from_files_with_bindings_mode_and_v2(
             crate::layout_composition_virtual_invocations_from_provenance_v1(&plan, &provenance)
         }
     };
-    let component_instance_plan = plan_component_instances_with_virtual_invocations(
+    let mut component_instance_plan = plan_component_instances_with_virtual_invocations(
         &components,
         &component_invocations,
         &virtual_invocations,
         &template_entities,
         &provenance,
     );
+    if let ApplicationAssemblyMode::FileRoute(selected) = &mode {
+        let selected_roots = component_instance_plan
+            .instances
+            .values()
+            .filter(|instance| instance.component == *selected)
+            .map(|instance| instance.owner_root.clone())
+            .collect::<BTreeSet<_>>();
+        component_instance_plan
+            .roots
+            .retain(|root, _| selected_roots.contains(root));
+        component_instance_plan
+            .instances
+            .retain(|_, instance| selected_roots.contains(&instance.owner_root));
+        component_instance_plan
+            .blocked
+            .retain(|_, instance| selected_roots.contains(&instance.owner_root));
+    }
     component_invocations.extend(virtual_invocations.clone());
     let component_instance_scope = build_component_instance_scope_graph(&component_instance_plan);
     let component_composition = analyze_component_composition(
@@ -7003,6 +7020,89 @@ class Home extends Component {
         assert!(html.contains("<main"));
         assert!(html.contains("<article"));
         assert!(html.contains("Home"));
+    }
+
+    #[test]
+    fn selected_file_route_excludes_sibling_instances_and_runtime_targets() {
+        let unit = CompilationUnit::parse_sources([
+            (
+                "app/layout.tsx",
+                r#"
+@component()
+class AppLayout extends Component {
+  @slot() children!: SlotContent;
+  render() { return <main><slot /></main>; }
+}
+"#,
+            ),
+            (
+                "app/routes/index.tsx",
+                r#"
+@component()
+class Home extends Component {
+  count = state(0);
+  @action() increment() { this.count += 1; }
+  render() { return <button onClick={this.increment}>{this.count}</button>; }
+}
+"#,
+            ),
+            (
+                "app/routes/about.tsx",
+                r#"
+@component()
+class About extends Component {
+  open = state(false);
+  @action() toggle() { this.open = !this.open; }
+  render() { return <button onClick={this.toggle}>{this.open}</button>; }
+}
+"#,
+            ),
+        ]);
+        let packages = crate::SemanticPackageResolutionTable::default();
+        let all_routes =
+            build_file_route_application_semantic_model_for_unit_with_packages(&unit, &packages)
+                .expect("valid file routes");
+        let home = all_routes
+            .components
+            .iter()
+            .find(|component| component.module_path == std::path::Path::new("app/routes/index.tsx"))
+            .expect("home route")
+            .id
+            .clone();
+        let about = all_routes
+            .components
+            .iter()
+            .find(|component| component.module_path == std::path::Path::new("app/routes/about.tsx"))
+            .expect("about route")
+            .id
+            .clone();
+
+        let selected = crate::build_file_route_application_semantic_model_for_route_with_packages(
+            &unit, &packages, &home,
+        )
+        .expect("selected route model");
+        assert_eq!(selected.component_instance_plan.roots.len(), 1);
+        assert!(selected
+            .component_instance_plan
+            .instances
+            .values()
+            .any(|instance| instance.component == home));
+        assert!(!selected
+            .component_instance_plan
+            .instances
+            .values()
+            .any(|instance| instance.component == about));
+
+        let artifact =
+            crate::build_runtime_component_artifact(&selected, &selected.component_ir_optimization);
+        assert!(artifact
+            .ordinary_template_events
+            .iter()
+            .all(|event| event.component_id == home.to_string()));
+        assert!(artifact
+            .ordinary_template_targets
+            .iter()
+            .all(|target| target.component_id != about.to_string()));
     }
 
     #[test]
