@@ -2656,11 +2656,8 @@ fn resume_bootstrap_probe_page(
     assertions: &str,
     marker: &str,
 ) -> String {
-    let runtime_tag = r#"<script src="./runtime.js" defer></script>"#;
-    let page = index.replace(
-        runtime_tag,
-        &format!("<script>{prelude}</script>\n{runtime_tag}"),
-    );
+    let page =
+        insert_before_deferred_runtime_script(index, &format!("<script>{prelude}</script>\n"));
     let split = marker.len() / 2;
     let marker_start = &marker[..split];
     let marker_end = &marker[split..];
@@ -2687,6 +2684,31 @@ const waitFor = async (predicate, label) => {{
 </body>"#
     );
     page.replace("</body>", &probe)
+}
+
+fn insert_before_deferred_runtime_script(index: &str, insertion: &str) -> String {
+    let runtime_start = index
+        .find(r#"<script src="./runtime"#)
+        .expect("compiler-emitted runtime script");
+    let runtime_end_suffix = r#"" defer></script>"#;
+    let runtime_end = runtime_start
+        + index[runtime_start..]
+            .find(runtime_end_suffix)
+            .expect("compiler-emitted deferred runtime script")
+        + runtime_end_suffix.len();
+    let runtime_tag = &index[runtime_start..runtime_end];
+    assert!(
+        runtime_tag == r#"<script src="./runtime.js" defer></script>"#
+            || (runtime_tag.starts_with(r#"<script src="./runtime."#)
+                && runtime_tag.ends_with(r#".js" defer></script>"#)),
+        "unexpected compiler-emitted runtime script tag: {runtime_tag}"
+    );
+
+    let mut page = String::with_capacity(index.len() + insertion.len());
+    page.push_str(&index[..runtime_start]);
+    page.push_str(insertion);
+    page.push_str(&index[runtime_start..]);
+    page
 }
 
 #[test]
@@ -2856,10 +2878,7 @@ fn write_v2_structural_resume_probe_page(output_root: &Path, cold_dump: &str) {
   window.__PRESOLVE_STRUCTURAL_RESUME_DOM__ = document.querySelector("main").innerHTML;
 })();
 </script>"#;
-    page = page.replace(
-        "<script src=\"./runtime.js\" defer></script>",
-        &format!("{bootstrap}<script src=\"./runtime.js\" defer></script>"),
-    );
+    page = insert_before_deferred_runtime_script(&page, bootstrap);
     page = page.replace(
         "</body>",
         r#"<script>

@@ -2,8 +2,8 @@
 
 ## Current objective
 
-Publish and adopt the content-addressed asset correction discovered by
-Presolve.dev Safari clients after `0.2.0-beta.15`.
+Publish the locally verified `0.2.0-beta.16` content-addressed asset correction,
+then adopt it on Presolve.dev and verify returning WebKit clients.
 
 ## Completed slices
 
@@ -121,9 +121,10 @@ Safari returning-client publication correction:
 
 ## Next slice
 
-Prepare and publish `0.2.0-beta.16`, then update Presolve.dev from the public
-packages and verify both fresh and returning WebKit navigation against the
-immutable stylesheet and runtime coordinates.
+Merge the prepared release into `main`, publish tag `v0.2.0-beta.16` through
+GitHub Actions, verify every public package, then update Presolve.dev from those
+public packages and verify both fresh and returning WebKit navigation against
+the immutable stylesheet and runtime coordinates.
 
 Server executors remain outside this beta: the frozen loader/server-action
 contracts complete those families at deterministic compiler handoff and
@@ -141,14 +142,14 @@ explicitly prohibit an inferred executor.
 - `cargo test -p presolve-cli --test ergonomic_project -- --nocapture`
 - `cargo test -p presolve-cli --test production_runtime_fixtures -- --nocapture`
 - `cargo clippy -p presolve-cli --all-targets -- -D warnings`
-- `node scripts/verify-release-version.mjs 0.2.0-beta.15`
+- `node scripts/verify-release-version.mjs 0.2.0-beta.16`
 - `pnpm release:check`
 
-The complete 0.2.0-beta.15 local and hosted gates pass. GitHub Actions published
-all npm packages, crates, native CLIs, VS Code prerelease 0.2.15, and the GitHub
-prerelease. Public registry queries return beta.15. Presolve.dev is deployed
-from the public packages and all 26 routes plus mobile menu closure, counter
-interactivity, route navigation, styling, and zero runtime errors are verified
-in production.
+The complete 0.2.0-beta.16 local release dry run passes: formatting, strict
+clippy, every Rust and package test, all 57 browser cases, TypeScript 7.0.2,
+public TypeScript, 88 documentation files, a newly packed scaffold, crate and
+VSIX packaging, and deterministic hashes for all ten release packages. The
+previous beta.15 hosted publication remains live until the beta.16 GitHub
+Actions release completes.
 
 Beta completion: 100%.

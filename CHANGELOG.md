@@ -8,6 +8,16 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.16 - 2026-07-28
+
+### Fixed
+
+- Conventional application documents now link content-addressed
+  `app.<sha256>.css` and route-local `runtime.<sha256>.js` artifacts. Stable
+  `/app.css` and `runtime.js` compatibility files remain in the compiler-issued
+  inventory, while returning Safari clients can no longer pair current HTML
+  with stale or previously failed external publication bytes.
+
 ## 0.2.0-beta.15 - 2026-07-28
 
 ### Fixed
