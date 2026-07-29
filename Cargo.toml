@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/fierstdev/presolve"
 homepage = "https://github.com/fierstdev/presolve"
 description = "The Presolve compiler toolchain for TypeScript web applications."
-version = "0.2.0-beta.16"
+version = "0.2.0-beta.17"
 rust-version = "1.85"
 
 [workspace.lints.rust]

@@ -472,7 +472,7 @@ mod tests {
             normalize_authored_semantics_v1(&parsed, [state.clone(), component.clone(), state])
                 .expect("valid resolved candidates");
 
-        assert_eq!(model.schema_version, 5);
+        assert_eq!(model.schema_version, 6);
         assert_eq!(model.declarations.len(), 2);
         assert_eq!(model.declarations[0].subject, "Card");
         assert_eq!(
@@ -495,7 +495,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&model).expect("serializable model"),
             serde_json::json!({
-                "schema_version": 5,
+                "schema_version": 6,
                 "source_path": "src/Card.tsx",
                 "declarations": [
                     {

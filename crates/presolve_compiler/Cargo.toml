@@ -16,7 +16,7 @@ crate-type = ["rlib", "cdylib"]
 wasm = ["dep:wasm-bindgen"]
 
 [dependencies]
-presolve_parser = { package = "presolve-parser", path = "../presolve_parser", version = "0.2.0-beta.16" }
+presolve_parser = { package = "presolve-parser", path = "../presolve_parser", version = "0.2.0-beta.17" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"

@@ -8,6 +8,22 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.17 - 2026-07-28
+
+### Added
+
+- Decorator-free Actions can invoke an exact named import from an ordinary
+  installed package. The compiler proves import identity, Vite publishes a
+  deterministic package-call registry, and the browser executes the admitted
+  call after the compiler-owned state batch on both cold activation and
+  structural resume.
+- Package-call artifacts, runtime evidence, and stable diagnostics now
+  distinguish compiler-owned semantic calls from packages used only as
+  ordinary build inputs. Aliases retain authority, while local lookalikes,
+  unproven calls, missing registries, and non-callable exports fail closed.
+- The `examples/package-interop` application provides reproducible build and
+  real-browser proof for third-party package interoperability.
+
 ## 0.2.0-beta.16 - 2026-07-28
 
 ### Fixed

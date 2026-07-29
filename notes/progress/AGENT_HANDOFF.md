@@ -2,9 +2,10 @@
 
 ## Current objective
 
-Continue from the published and production-verified `0.2.0-beta.16` baseline.
-The content-addressed asset correction is live on Presolve.dev and has
-returning-client WebKit proof.
+Publish the prepared and fully dry-run-verified `0.2.0-beta.17` release train
+from `fierstdev/presolve`, then update Presolve.dev from the public packages.
+The prior content-addressed asset correction remains live with returning-client
+WebKit proof.
 
 ## Completed slices
 
@@ -106,8 +107,8 @@ Completed, Failed, Cancelled, Invalid, or reset-to-Idle transitions.
 The real-browser acceptance project proves deterministic double-build
 publication, exact nested values including `File[]`, fulfillment, rejection,
 reset-driven abort, duplicate suppression, cold boot, and resumed submission.
-The full inherited workspace gate, including 57 browser tests and the updated
-290343-byte production runtime baseline, passes.
+The full inherited workspace gate, including the expanded 58-browser-test
+matrix and updated 297,509-byte production runtime baseline, passes.
 
 Safari returning-client publication correction:
 
@@ -147,13 +148,17 @@ invocation-artifact, and route-document hashes.
 
 ## Next slice
 
-Broaden V2 Action package invocation from the first closed zero-argument subset
-to compiler-transported serializable arguments and Promise-aware completion,
-with explicit dependency, cancellation, error, and resume products. Do not
-infer arbitrary handler-source execution. Then continue the remaining beta
-gates: Effect execution/cleanup/resume, slot-projected structural hosts,
-Context, completion-grade Forms/Resources/loaders/server actions/capabilities,
-and final release hardening.
+Merge the verified beta.17 preparation into `main`, tag
+`v0.2.0-beta.17`, publish it through GitHub Actions, and verify every public
+registry coordinate before adopting it on Presolve.dev.
+
+After publication, broaden V2 Action package invocation from the first closed
+zero-argument subset to compiler-transported serializable arguments and
+Promise-aware completion, with explicit dependency, cancellation, error, and
+resume products. Do not infer arbitrary handler-source execution. Then
+continue the remaining beta gates: Effect execution/cleanup/resume,
+slot-projected structural hosts, Context, completion-grade
+Forms/Resources/loaders/server actions/capabilities, and final hardening.
 
 Server executors remain outside the browser publication boundary until their
 frozen handoff contracts gain an explicit executor product.
@@ -175,7 +180,9 @@ frozen handoff contracts gain an explicit executor product.
   artifact, and route document
 - in-app browser verification of `0 -> 1 -> 2`, runtime-ready status, applied
   application CSS, and zero console errors
+- `pnpm release:check`
 
 The previous “100%” statements referred to completing individual beta.14-16
 release trains and production regressions, not the final beta product scope.
+The current full-beta completion estimate is 38%.
 Against the full authored beta gate list, beta completion is now 36%.
