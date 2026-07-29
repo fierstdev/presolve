@@ -2,9 +2,8 @@
 
 ## Current objective
 
-Publish and verify `0.2.0-beta.15`, which fixes conventional file-route runtime
-product isolation. The selected route's layout/route instance tree must be the
-only authority for its runtime component and resume records.
+Begin post-beta adoption and feedback work from the published
+`0.2.0-beta.15` contract.
 
 ## Completed slices
 
@@ -111,10 +110,9 @@ The full inherited workspace gate, including 57 browser tests and the updated
 
 ## Next slice
 
-Push the verified beta.15 release commit to `fierstdev/presolve`, publish tag
-`v0.2.0-beta.15` through GitHub Actions, and verify the public registries. Then
-upgrade and deploy presolve.dev and confirm the mobile navigation closes after
-same-page and cross-page selection without route-local runtime leakage.
+Continue post-beta adoption and feedback work. Preserve the selected-file-route
+isolation regression whenever adding route, layout, runtime component, or
+resume products.
 
 Server executors remain outside this beta: the frozen loader/server-action
 contracts complete those families at deterministic compiler handoff and
@@ -132,8 +130,11 @@ explicitly prohibit an inferred executor.
 - `node scripts/verify-release-version.mjs 0.2.0-beta.15`
 - `pnpm release:check`
 
-The complete 0.2.0-beta.15 local release gate passes. The selected-file-route
-regression, the real presolve.dev artifact inspection, and browser interaction
-proof all pass. Hosted publication and public coordinate verification remain.
+The complete 0.2.0-beta.15 local and hosted gates pass. GitHub Actions published
+all npm packages, crates, native CLIs, VS Code prerelease 0.2.15, and the GitHub
+prerelease. Public registry queries return beta.15. Presolve.dev is deployed
+from the public packages and all 26 routes plus mobile menu closure, counter
+interactivity, route navigation, styling, and zero runtime errors are verified
+in production.
 
 Beta completion: 100%.
