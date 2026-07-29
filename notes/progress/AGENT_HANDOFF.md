@@ -2,8 +2,8 @@
 
 ## Current objective
 
-Begin post-beta adoption and feedback work from the published
-`0.2.0-beta.15` contract.
+Publish and adopt the content-addressed asset correction discovered by
+Presolve.dev Safari clients after `0.2.0-beta.15`.
 
 ## Completed slices
 
@@ -108,11 +108,22 @@ reset-driven abort, duplicate suppression, cold boot, and resumed submission.
 The full inherited workspace gate, including 57 browser tests and the updated
 290343-byte production runtime baseline, passes.
 
+Safari returning-client publication correction:
+
+- canonical CSS now publishes at immutable `/app.<sha256>.css` and the retained
+  `/app.css` compatibility coordinate;
+- each route document executes `runtime.<sha256>.js` while the existing
+  `runtime.js` artifact remains available to tooling and compatible hosts;
+- the file-route manifest inventories and digest-verifies both immutable and
+  compatibility artifacts; and
+- a real WebKit iPhone-class probe proves styled output, no viewport overflow,
+  and `Count: 0` to `Count: 1` interactivity against the generated application.
+
 ## Next slice
 
-Continue post-beta adoption and feedback work. Preserve the selected-file-route
-isolation regression whenever adding route, layout, runtime component, or
-resume products.
+Prepare and publish `0.2.0-beta.16`, then update Presolve.dev from the public
+packages and verify both fresh and returning WebKit navigation against the
+immutable stylesheet and runtime coordinates.
 
 Server executors remain outside this beta: the frozen loader/server-action
 contracts complete those families at deterministic compiler handoff and
@@ -127,6 +138,9 @@ explicitly prohibit an inferred executor.
 - `pnpm --filter @presolve/typescript-authority test`
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 - `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
+- `cargo test -p presolve-cli --test ergonomic_project -- --nocapture`
+- `cargo test -p presolve-cli --test production_runtime_fixtures -- --nocapture`
+- `cargo clippy -p presolve-cli --all-targets -- -D warnings`
 - `node scripts/verify-release-version.mjs 0.2.0-beta.15`
 - `pnpm release:check`
 

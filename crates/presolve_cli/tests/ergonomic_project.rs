@@ -7,6 +7,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
+use sha2::{Digest as _, Sha256};
+
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
@@ -555,15 +557,32 @@ fn canonical_application_files_own_the_document_and_global_stylesheet() {
         String::from_utf8_lossy(&output.stderr)
     );
     let html = fs::read_to_string(root.join("dist/routes/root/index.html")).unwrap();
-    assert!(html.contains(
-        "<link rel=\"stylesheet\" href=\"/app.css?v=36709dfafff32d5ed90c36b3b50c450fe2d484fdb88eb49abcb5f6b17cbff2c8\">"
-    ));
+    let stylesheet_digest = "36709dfafff32d5ed90c36b3b50c450fe2d484fdb88eb49abcb5f6b17cbff2c8";
+    assert!(html.contains(&format!(
+        "<link rel=\"stylesheet\" href=\"/app.{stylesheet_digest}.css\">"
+    )));
     assert!(html.contains("app-shell"));
     assert!(!html.contains("<main><main"));
     assert_eq!(
         fs::read_to_string(root.join("dist/app.css")).unwrap(),
         ".app-shell { min-height: 100vh; }\n"
     );
+    assert_eq!(
+        fs::read_to_string(root.join(format!("dist/app.{stylesheet_digest}.css"))).unwrap(),
+        ".app-shell { min-height: 100vh; }\n"
+    );
+    let runtime = fs::read(root.join("dist/routes/root/runtime.js")).unwrap();
+    let runtime_digest = format!("{:x}", Sha256::digest(&runtime));
+    assert!(html.contains(&format!(
+        "<script src=\"./runtime.{runtime_digest}.js\" defer></script>"
+    )));
+    assert_eq!(
+        fs::read(root.join(format!("dist/routes/root/runtime.{runtime_digest}.js"))).unwrap(),
+        runtime
+    );
+    let manifest = fs::read_to_string(root.join("dist/file-routes.manifest.json")).unwrap();
+    assert!(manifest.contains(&format!("app.{stylesheet_digest}.css")));
+    assert!(manifest.contains(&format!("routes/root/runtime.{runtime_digest}.js")));
     fs::remove_dir_all(root).unwrap();
 }
 

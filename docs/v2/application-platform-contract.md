@@ -63,7 +63,11 @@ and must not reconstruct route or artifact identity.
 compiler virtual entry. CSS Modules, PostCSS/Tailwind configuration, imported
 fonts/media, and `public` assets remain Vite inputs with physical output
 identities only. The canonical `app/app.css` is the exception: the compiler
-publishes its exact bytes at `/app.css` and owns the document-level link. The
+publishes its exact bytes at both the compatibility path `/app.css` and the
+immutable `/app.<sha256>.css` coordinate owned by the document-level link.
+Every route likewise retains `runtime.js` as a compatibility artifact while
+its document executes `runtime.<sha256>.js`. Current HTML therefore cannot be
+paired with stale stylesheet or runtime bytes by a returning browser. The
 adapter records Vite manifest output but gives no compiler identity to those
 entries; it preserves a compiler identity only for the compiler-selected
 virtual entry.

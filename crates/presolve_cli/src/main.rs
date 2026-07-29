@@ -213,6 +213,8 @@ fn run_ergonomic_build(
         .unwrap_or_else(|message| application_cli_error("PSMETA1004_DISCOVERY_FAILED", &message));
     attach_application_document_inputs(&project.root, &mut product)
         .unwrap_or_else(|message| application_cli_error("PSDOC1005_PUBLICATION_FAILED", &message));
+    attach_content_addressed_runtime_inputs(&mut product)
+        .unwrap_or_else(|message| application_cli_error("PSDOC1006_RUNTIME_FAILED", &message));
     attach_static_publication_inputs(&project.root, &mut product).unwrap_or_else(|message| {
         application_cli_error("PSROUTE3008_PUBLICATION_FAILED", &message)
     });
@@ -256,10 +258,8 @@ fn attach_application_document_inputs(
         let additional_head = stylesheet
             .as_ref()
             .map(|bytes| {
-                format!(
-                    "    <link rel=\"stylesheet\" href=\"/app.css?v={:x}\">\n",
-                    Sha256::digest(bytes)
-                )
+                let digest = format!("{:x}", Sha256::digest(bytes));
+                format!("    <link rel=\"stylesheet\" href=\"/app.{digest}.css\">\n")
             })
             .unwrap_or_default();
         let route_artifacts = product
@@ -280,13 +280,91 @@ fn attach_application_document_inputs(
         }
     }
     if let Some(bytes) = stylesheet {
-        let path = PathBuf::from("app.css");
-        if product.artifacts.contains_key(&path) {
+        let compatibility_path = PathBuf::from("app.css");
+        if product.artifacts.contains_key(&compatibility_path) {
             return Err("app/app.css collides with a compiler-published artifact".into());
         }
-        product.artifacts.insert(path.clone(), bytes);
-        update_publication_artifact_digest(product, &path)?;
+        let content_path = PathBuf::from(format!("app.{:x}.css", Sha256::digest(bytes.as_slice())));
+        if product.artifacts.contains_key(&content_path) {
+            return Err(format!(
+                "app/app.css collides with compiler-published artifact {}",
+                content_path.display()
+            ));
+        }
+        product
+            .artifacts
+            .insert(compatibility_path.clone(), bytes.clone());
+        product.artifacts.insert(content_path.clone(), bytes);
+        update_publication_artifact_digest(product, &compatibility_path)?;
+        update_publication_artifact_digest(product, &content_path)?;
     }
+    refresh_file_route_publication_manifest(product);
+    Ok(())
+}
+
+/// Gives every route runtime an immutable browser coordinate while retaining
+/// `runtime.js` as a compatibility artifact for existing hosts and tooling.
+fn attach_content_addressed_runtime_inputs(
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+) -> Result<(), String> {
+    let runtimes = product
+        .artifacts
+        .iter()
+        .filter(|(path, _)| {
+            path.starts_with("routes") && path.file_name().is_some_and(|name| name == "runtime.js")
+        })
+        .map(|(path, bytes)| (path.clone(), bytes.clone()))
+        .collect::<Vec<_>>();
+    for (compatibility_path, bytes) in runtimes {
+        let parent = compatibility_path.parent().ok_or_else(|| {
+            format!(
+                "runtime artifact has no parent: {}",
+                compatibility_path.display()
+            )
+        })?;
+        let content_name = format!("runtime.{:x}.js", Sha256::digest(bytes.as_slice()));
+        let content_path = parent.join(&content_name);
+        match product.artifacts.get(&content_path) {
+            Some(existing) if existing != &bytes => {
+                return Err(format!(
+                    "content-addressed runtime collision at {}",
+                    content_path.display()
+                ));
+            }
+            Some(_) => {}
+            None => {
+                product.artifacts.insert(content_path.clone(), bytes);
+            }
+        }
+        update_publication_artifact_digest(product, &content_path)?;
+
+        let page_path = parent.join("index.html");
+        let page = product
+            .artifacts
+            .get(&page_path)
+            .ok_or_else(|| format!("missing route document {}", page_path.display()))?;
+        let page = String::from_utf8(page.clone())
+            .map_err(|error| format!("{} is not UTF-8: {error}", page_path.display()))?;
+        let stable_reference = "./runtime.js";
+        if !page.contains(stable_reference) {
+            return Err(format!(
+                "{} does not reference the compatibility runtime",
+                page_path.display()
+            ));
+        }
+        let page = page.replacen(stable_reference, &format!("./{content_name}"), 1);
+        product
+            .artifacts
+            .insert(page_path.clone(), page.into_bytes());
+        update_publication_artifact_digest(product, &page_path)?;
+    }
+    refresh_file_route_publication_manifest(product);
+    Ok(())
+}
+
+fn refresh_file_route_publication_manifest(
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+) {
     product
         .manifest
         .artifacts
@@ -295,7 +373,6 @@ fn attach_application_document_inputs(
         PathBuf::from("file-routes.manifest.json"),
         presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
     );
-    Ok(())
 }
 
 fn update_publication_artifact_digest(

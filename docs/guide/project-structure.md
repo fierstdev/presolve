@@ -18,11 +18,14 @@ my-app/
 
 `app/app.tsx` is the application shell. It composes shared providers,
 navigation, and footer around route content without owning document metadata.
-`app/app.css` is the global stylesheet: Presolve publishes it as `/app.css`
-and inserts its link in the generated document head. `app/index.html` is a
-compiler template, not a traditional HTML entry point; it must include exactly
-one `{{ head }}`, `{{ app }}`, and `{{ runtime }}` placeholder. The compiler
-owns what those placeholders contain.
+`app/app.css` is the global stylesheet: Presolve publishes its exact bytes at
+the compatibility path `/app.css` and links the immutable
+`/app.<sha256>.css` artifact from the generated document head. Each route
+similarly executes an immutable `runtime.<sha256>.js` artifact while retaining
+`runtime.js` for compatibility. `app/index.html` is a compiler template, not a
+traditional HTML entry point; it must include exactly one `{{ head }}`,
+`{{ app }}`, and `{{ runtime }}` placeholder. The compiler owns what those
+placeholders contain.
 
 `app/routes/index.tsx` is `/`. Nested directories create nested path segments,
 so `app/routes/docs/getting-started.tsx` is `/docs/getting-started/`. Route

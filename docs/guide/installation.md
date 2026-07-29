@@ -27,11 +27,13 @@ pnpm build
 
 `check` validates application semantics without publishing a production build.
 `build` writes the compiler-issued output to `dist/`. It publishes
-`app/app.css` as `/app.css` and includes it from the document head, while
-copying `public/` to the root of `dist/`; both are included in the deployment
-inventory. The former `styles/` directory remains supported for beta
-compatibility and is copied to `dist/styles/`. Do not edit files in that
-directory: run the compiler again after changing source.
+`app/app.css` at both the `/app.css` compatibility path and an immutable
+`/app.<sha256>.css` path linked from the document head. Route documents execute
+their matching `runtime.<sha256>.js` while retaining `runtime.js` for
+compatibility. It also copies `public/` to the root of `dist/`; every emitted
+file is included in the deployment inventory. The former `styles/` directory
+remains supported for beta compatibility and is copied to `dist/styles/`. Do
+not edit generated output: run the compiler again after changing source.
 
 For the first static deployment target, continue with
 [Cloudflare deployment](../reference/cloudflare.md).
