@@ -8,6 +8,16 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.15 - 2026-07-28
+
+### Fixed
+
+- Conventional file-route publication now prunes sibling route roots before
+  runtime products are derived. Component targets, bindings, events, state,
+  and resume records remain local to the selected layout/route instance tree,
+  preventing `PSR_INVALID_ORDINARY_TARGET` when another route owns
+  interactivity.
+
 ## 0.2.0-beta.14 - 2026-07-28
 
 ### Added

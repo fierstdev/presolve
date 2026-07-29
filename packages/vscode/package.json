@@ -1,7 +1,7 @@
 {
   "name": "presolve-vscode",
   "displayName": "Presolve",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "Presolve language tooling for Visual Studio Code.",
   "publisher": "fierstdev",
   "license": "MIT OR Apache-2.0",

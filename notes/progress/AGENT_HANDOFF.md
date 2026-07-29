@@ -2,10 +2,9 @@
 
 ## Current objective
 
-Complete the canonical decorator-free V2 Forms gate from the supplied
-`presolve-v2-beta-specification.zip`. The authoritative source form is
-`defineForm({ serialization, fields, submit })` with nested `field(...)`
-declarations and compiler-owned `bind:value`, `bind:checked`, and `bind:files`.
+Publish and verify `0.2.0-beta.15`, which fixes conventional file-route runtime
+product isolation. The selected route's layout/route instance tree must be the
+only authority for its runtime component and resume records.
 
 ## Completed slices
 
@@ -112,10 +111,14 @@ The full inherited workspace gate, including 57 browser tests and the updated
 
 ## Next slice
 
-Begin post-beta adoption and feedback work from the published 0.2.0-beta.14
-contract. Server executors remain outside this beta: the frozen
-loader/server-action contracts complete those families at deterministic
-compiler handoff and explicitly prohibit an inferred executor.
+Push the verified beta.15 release commit to `fierstdev/presolve`, publish tag
+`v0.2.0-beta.15` through GitHub Actions, and verify the public registries. Then
+upgrade and deploy presolve.dev and confirm the mobile navigation closes after
+same-page and cross-page selection without route-local runtime leakage.
+
+Server executors remain outside this beta: the frozen loader/server-action
+contracts complete those families at deterministic compiler handoff and
+explicitly prohibit an inferred executor.
 
 ## Verification
 
@@ -126,17 +129,11 @@ compiler handoff and explicitly prohibit an inferred executor.
 - `pnpm --filter @presolve/typescript-authority test`
 - `pnpm exec tsc -p tests/framework-public-api/tsconfig.json`
 - `cargo test -p presolve-cli --test runtime_browser decorator_free_v2_form_fields_bind_and_validate_in_a_real_browser -- --nocapture`
-- `node scripts/verify-release-version.mjs 0.2.0-beta.14`
+- `node scripts/verify-release-version.mjs 0.2.0-beta.15`
 - `pnpm release:check`
 
-The complete 0.2.0-beta.14 local and hosted release gates pass. GitHub Actions
-published the prerelease, all 13 npm packages and their `beta` tags, all three
-crates, and VS Code prerelease 0.2.14; each public coordinate was independently
-verified.
-The isolated GitHub browser job now installs the locked Node workspace required
-by the real Vite-backed Form acceptance project before running Chrome.
-TypeScript declaration-module identity coordinates are also case-folded
-independently of host filesystem behavior; authored bundler specifiers retain
-their exact source case.
+The complete 0.2.0-beta.15 local release gate passes. The selected-file-route
+regression, the real presolve.dev artifact inspection, and browser interaction
+proof all pass. Hosted publication and public coordinate verification remain.
 
 Beta completion: 100%.
