@@ -33,10 +33,40 @@ pub fn apply_document_template_v1(
     validate_template(template)?;
     let (head, app, runtime) = split_generated_page(generated_page)?;
     let head = format!("{head}{additional_head}");
-    Ok(template
-        .replacen("{{ head }}", &head, 1)
-        .replacen("{{ app }}", app, 1)
-        .replacen("{{ runtime }}", runtime, 1))
+    let mut replacements = [
+        (
+            template
+                .find("{{ head }}")
+                .expect("validated template has one head placeholder"),
+            "{{ head }}",
+            head.as_str(),
+        ),
+        (
+            template
+                .find("{{ app }}")
+                .expect("validated template has one app placeholder"),
+            "{{ app }}",
+            app,
+        ),
+        (
+            template
+                .find("{{ runtime }}")
+                .expect("validated template has one runtime placeholder"),
+            "{{ runtime }}",
+            runtime,
+        ),
+    ];
+    replacements.sort_by_key(|(offset, _, _)| *offset);
+
+    let mut output = String::with_capacity(template.len() + head.len() + app.len() + runtime.len());
+    let mut cursor = 0;
+    for (offset, placeholder, value) in replacements {
+        output.push_str(&template[cursor..offset]);
+        output.push_str(value);
+        cursor = offset + placeholder.len();
+    }
+    output.push_str(&template[cursor..]);
+    Ok(output)
 }
 
 fn validate_template(template: &str) -> Result<(), DocumentTemplateErrorV1> {
@@ -165,5 +195,23 @@ mod tests {
             .code,
             "PSDOC1003_TEMPLATE_PLACEHOLDER_INVALID"
         );
+    }
+
+    #[test]
+    fn preserves_document_placeholder_spelling_inside_rendered_application_content() {
+        let page = PAGE.replace(
+            "<main>Home</main>",
+            "<main><code>{{ head }} {{ app }} {{ runtime }}</code></main>",
+        );
+        let output = apply_document_template_v1(
+            "<!doctype html>\n<html lang=\"en\">\n<head>{{ head }}</head>\n<body>{{ app }}{{ runtime }}</body>\n</html>\n",
+            &page,
+            "",
+        )
+        .unwrap();
+
+        assert!(output.contains("<code>{{ head }} {{ app }} {{ runtime }}</code>"));
+        assert_eq!(output.matches("presolve-template-manifest").count(), 1);
+        assert_eq!(output.matches("{{ runtime }}").count(), 1);
     }
 }

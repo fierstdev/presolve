@@ -260,12 +260,31 @@ Presolve.dev route built with this compiler now proves, at a 390px viewport:
 - native invalid submission blocking; and
 - a valid Form submission updating State.
 
+The same site proof exposed document-template placeholder capture. Sequential
+`replacen()` calls inserted application HTML before selecting the runtime
+placeholder, so documentation that displayed literal `{{ runtime }}` consumed
+the runtime payload inside its code block and left the template location
+unfilled. Document assembly now locates all three validated positions before
+inserting any payload and projects them in source order. A compiler regression
+preserves all three literal spellings inside application content while emitting
+exactly one runtime manifest. The Presolve.dev project-structure artifact now
+contains a compact 2,515-byte HTML sample with all three literals and no runtime
+spill, rather than an 835,288-byte contaminated code sample.
+
 ## Next slice
 
-Publish the instance-name correction immediately as `0.2.0-beta.19`, install
-that exact public release in Presolve.dev, expand the Examples information
-architecture and production-grade example library, then rerun the complete
-local and production acceptance matrix before Cloudflare deployment.
+Publish the instance-name and document-template corrections immediately as
+`0.2.0-beta.19`, install that exact public release in Presolve.dev, then
+characterize and close the dev-server HMR contract and expand the Examples
+information architecture and production-grade example library before rerunning
+the complete local and production acceptance matrix for Cloudflare deployment.
+
+The complete beta.19 release dry run passes after the audited runtime baseline
+decreased by six bytes from the identity spelling correction: strict formatting
+and clippy, the Rust workspace with 663 compiler tests, all 59 browser cases,
+package and TypeScript 7.0.2 tests, 90 documentation files, clean-room scaffold
+installation, Rust/VSIX packaging, production budgets, and deterministic
+release package hashes.
 
 Then continue the remaining beta gates: broader Actions, Effect
 execution/cleanup/resume, slot-projected structural hosts, Context,

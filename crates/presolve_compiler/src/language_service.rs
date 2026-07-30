@@ -480,7 +480,7 @@ mod tests {
         let invalid_identity = String::from_utf8(PRODUCT.to_vec())
             .expect("fixture is utf8")
             .replacen(
-                "d31ef3a9043fe30012f3952ad7ef7b13e1660b667de4e5ef1c4b60152fdf9778",
+                "18f132a35fdf6a7bc5863d4df45613cac0dc8b5e55c506f47a234f8a5ff73600",
                 "10b83768e45763bda26d18867a69751b58b05f0d81125e3a4d6b4bd3c9ed0ffc",
                 1,
             );

@@ -50,8 +50,8 @@ assert.match(readFileSync(join(target, ".env.example"), "utf8"), /PRESOLVE_PUBLI
 assert.match(readFileSync(join(target, ".gitignore"), "utf8"), /!\.env\.example/);
 const manifest = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
 assert.equal(manifest.packageManager, "pnpm@11.17.0");
-assert.equal(manifest.dependencies.presolve, "npm:@presolve/framework@0.2.0-beta.18");
-assert.equal(manifest.devDependencies["@presolve/typescript-authority"], "0.2.0-beta.18");
+assert.equal(manifest.dependencies.presolve, "npm:@presolve/framework@0.2.0-beta.19");
+assert.equal(manifest.devDependencies["@presolve/typescript-authority"], "0.2.0-beta.19");
 assert.equal(manifest.devDependencies.vite, "^7.0.0");
 assert.ok(manifest.scripts["deploy:prepare"]);
 assert.equal(manifest.scripts["deploy:node:prepare"], "presolve deploy node --prepare");

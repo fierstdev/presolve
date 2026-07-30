@@ -8,6 +8,19 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.19 - 2026-07-29
+
+### Fixed
+
+- Cold-boot and resume component records now retain the authored component
+  name used by compiler-owned Computed evaluations. Initial Computed bindings
+  no longer render `undefined` until the first Action when an application shell
+  and route component share one publication.
+- Document-template placeholders are replaced only at their validated template
+  positions. Application content can now display literal `{{ head }}`,
+  `{{ app }}`, and `{{ runtime }}` examples without consuming compiler payloads
+  or moving the runtime into a code block.
+
 ## 0.2.0-beta.18 - 2026-07-29
 
 ### Added
