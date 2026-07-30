@@ -67,6 +67,110 @@ artifact amendment rather than retaining or evaluating handler source.
 The legacy `@action() @opaque(package, export)` form remains compatibility-only
 and is not evidence for this source form.
 
+## Serializable Action arguments and Promise completion amendment
+
+The next executable slice extends only the terminal Action form above. It does
+not grant package-wide semantics or admit arbitrary Action source.
+
+### Synchronous parameter forwarding
+
+An Action may forward its complete ordered parameter list to the named package
+export:
+
+```tsx
+import { recordMetric } from "@acme/analytics";
+import { action, Component } from "presolve";
+
+export class Checkout extends Component {
+  record = action((category: string, value: number) => {
+    recordMetric(category, value);
+  });
+
+  render() {
+    return <button onClick={() => this.record("checkout", 1)}>Record</button>;
+  }
+}
+```
+
+Every forwarded value must be an existing canonical Action parameter with an
+exact `string`, `number`, `boolean`, or `null` annotation. The package call
+must forward every Action parameter exactly once and in declaration order.
+The event artifact remains the value authority and transports the corresponding
+static serializable arguments. Literals inside the package call, reordering,
+duplication, omission, local variables, State reads, computed values, object or
+array values, captures, spreads, and member expressions are not admitted by
+this amendment.
+
+The TypeScript authority must prove the resolved named export, its resolved call
+signature, and compatibility with the authored call. A synchronous invocation
+must not return a Promise. Its result remains discarded and cannot enter a
+compiler-owned product.
+
+### Promise-aware invocation
+
+An asynchronous terminal Action has one additional compiler-injected final
+parameter:
+
+```tsx
+import { recordMetric } from "@acme/analytics";
+import { action, Component } from "presolve";
+
+export class Checkout extends Component {
+  record = action(async (category: string, signal: AbortSignal) => {
+    await recordMetric(category, signal);
+  });
+
+  render() {
+    return <button onClick={() => this.record("checkout")}>Record</button>;
+  }
+}
+```
+
+The final parameter must be named `signal`, have the exact TypeScript-resolved
+DOM `AbortSignal` identity, and be forwarded as the final package argument.
+The event caller supplies only the preceding serializable parameters. The
+package call must be the Action's sole awaited statement, and the resolved call
+signature must return `Promise<void>`. Non-awaited Promises, non-void Promise
+results, additional statements, catches/finally blocks, and caller-supplied
+signals fail closed.
+
+### Artifact and lifecycle
+
+The terminal-invocation artifact records, for each invocation:
+
+- the ordered event-argument indexes and primitive codecs;
+- synchronous or Promise completion;
+- whether the compiler appends an owned `AbortSignal`;
+- `replace_previous_per_component_instance` concurrency for Promise work;
+- `abort_on_replacement_teardown_or_pagehide` cancellation; and
+- `restore_event_without_replay` resume behavior.
+
+The runtime validates those facts before readiness. It constructs the package
+argument list from the accepted event record, never from DOM text or retained
+handler source. A Promise invocation owns one `AbortController`. A later
+activation of the same invocation for the same component instance aborts the
+prior activation before calling the export. Component teardown and `pagehide`
+abort pending work. Fulfillment records `complete`; an expected abort records
+`cancelled` without a failure diagnostic; other rejection or synchronous throw
+records `failed` and preserves the package error under
+`PSR_PACKAGE_INVOCATION_FAILURE`.
+
+Pending package work is not serialized. Snapshot publication retains only the
+existing event binding and terminal-invocation artifact. Resume never imports
+or replays a prior activation; the next accepted event starts a new generation
+from the validated registry. A stale settlement from an aborted generation
+cannot overwrite the current evidence.
+
+### Diagnostic ownership
+
+`PSV2P1001` remains the source-admission diagnostic and now distinguishes
+unproven named imports, argument mapping, signature/completion, and signal
+identity failures. Artifact mismatches remain fatal boot diagnostics.
+Presolve owns transport, generation, cancellation, failure recording, and
+resume behavior. TypeScript owns assignability and declaration resolution,
+Vite owns platform bundling, and the package owns its implementation and
+cooperation with the supplied `AbortSignal`.
+
 ## Publication and integrity
 
 The compiler publishes an immutable terminal-invocation record joined to the
