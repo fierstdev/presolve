@@ -7422,6 +7422,9 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (next === null) fail("starter computed output was missing");
   if (!output.textContent.includes("Count: 0")) fail("starter initial count was not zero");
   if (next.textContent.trim() !== "1") fail(`starter initial computed output was ${next.textContent}`);
+  if (!window.__PRESOLVE__.components.some((component) => component.name === "Home")) {
+    fail("starter route instance did not retain its authored component name");
+  }
   if (getComputedStyle(button).cursor !== "pointer") fail("starter button styling was not applied");
   button.click();
   await waitFor(() => output.textContent.includes("Count: 1"), "starter counter update");

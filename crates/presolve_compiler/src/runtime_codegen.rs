@@ -5581,7 +5581,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       const component = {
         instance_id: instance.instance,
-        name: instance.component,
+        name: definition.name,
         manifest: definition,
         state: {}
       };
@@ -6584,7 +6584,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           store.computedSlotsByInstanceComputed.set(pair, slot);
           store.computedDirtySlots.set(slot.dirty_slot_id, slot.dirty_initial_value === true);
         }
-        const component = { instance_id: instance.instance, name: instance.component, manifest: definition, state: {} };
+        const component = { instance_id: instance.instance, name: definition.name, manifest: definition, state: {} };
         for (const state of computedArtifact?.state ?? []) {
           if (state.component !== definition.name) continue;
           const slot = store.stateSlotsByInstanceStorage.get(`${instance.instance}|${state.storage}`);
@@ -6908,6 +6908,7 @@ mod tests {
         assert!(runtime.contains(
             "if (component !== null && evaluation.component !== component.name) continue;"
         ));
+        assert!(!runtime.contains("name: instance.component"));
         assert!(runtime.contains("/computed-cache:"));
         assert!(runtime.contains("/computed-dirty:"));
         assert!(runtime.contains("LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2"));

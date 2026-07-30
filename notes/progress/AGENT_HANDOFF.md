@@ -231,15 +231,41 @@ VSIX packaging, and deterministic hashes for all ten release packages. The
 compiler-contract version change regenerated the canonical tooling query
 snapshot and its validation identity.
 
+Hosted CI `30513133319`, release dry run `30513133285`, and Publish beta
+`30513847524` completed successfully for `0.2.0-beta.18`. The publish run
+released all crates, npm packages, native CLI binaries, VS Code prerelease
+`0.2.18`, and the non-draft GitHub prerelease.
+
+Presolve.dev then installed the exact public beta.18 packages. Its mobile
+browser acceptance probe found a second identity defect: the corrected initial
+Computed loop selected evaluations by authored component name, but cold-boot
+and resume component records retained the semantic component ID in their
+`name` field. The runtime therefore skipped the correct route evaluations and
+registered their bindings with empty caches, rendering `$ undefined` and
+`Estimated accounts undefined` until an Action happened to run the
+instance-qualified update path.
+
+Cold-boot and resume allocation now retain `definition.name`, matching the
+computed artifact's authoritative component owner while continuing to use the
+semantic ID as the instance definition lookup key. A generator assertion
+forbids the incorrect `name: instance.component` spelling, and the generated
+starter browser probe verifies the authored route name. The production-shaped
+Presolve.dev route built with this compiler now proves, at a 390px viewport:
+
+- runtime ready with zero diagnostics;
+- content-addressed CSS applied and no horizontal overflow;
+- initial cart total `$ 24` and estimated accounts `1000`;
+- Action/Computed updates to `$ 48` and `3000`;
+- boolean Action state, structural pipeline tabs, and Preview/Code switching;
+- native invalid submission blocking; and
+- a valid Form submission updating State.
+
 ## Next slice
 
-Commit the reviewed beta.18 preparation, push it through
-`fierstdev/presolve` `main`, and publish the `v0.2.0-beta.18` tag through
-GitHub Actions. Then install that exact public release in Presolve.dev. The
-deployed Examples route must prove every preview, Preview/Code switch,
-package-free Action, Computed value, conditional pipeline panel, Form
-validation/submission path, mobile layout, and zero runtime diagnostics against
-production HTTPS.
+Publish the instance-name correction immediately as `0.2.0-beta.19`, install
+that exact public release in Presolve.dev, expand the Examples information
+architecture and production-grade example library, then rerun the complete
+local and production acceptance matrix before Cloudflare deployment.
 
 Then continue the remaining beta gates: broader Actions, Effect
 execution/cleanup/resume, slot-projected structural hosts, Context,
@@ -270,6 +296,6 @@ frozen handoff contracts gain an explicit executor product.
 
 The previous “100%” statements referred to completing individual beta.14-16
 release trains and production regressions, not the final beta product scope.
-The current full-beta completion estimate remains 45% until the scaffold,
-publication, documentation, and showcase reconciliation is published and
-deployed.
+The current full-beta completion estimate is 48%. Beta.18 publication is
+complete, but the initial Computed identity correction and expanded showcase
+must be published and deployed before this authored gate can close.
