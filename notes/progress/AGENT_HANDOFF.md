@@ -2,10 +2,11 @@
 
 ## Current objective
 
-Publish the prepared and fully dry-run-verified `0.2.0-beta.17` release train
-from `fierstdev/presolve`, then update Presolve.dev from the public packages.
-The prior content-addressed asset correction remains live with returning-client
-WebKit proof.
+Broaden decorator-free V2 Action package invocation beyond the beta.17
+zero-argument subset with compiler-transported serializable arguments and
+Promise-aware completion. The amendment must define dependency, cancellation,
+failure, teardown, and resume products without retaining or evaluating handler
+source.
 
 ## Completed slices
 
@@ -146,19 +147,37 @@ execution across repeated events, a missing registry failure, and no diagnostic
 or State corruption. Two complete builds produced identical registry,
 invocation-artifact, and route-document hashes.
 
+The `0.2.0-beta.17` public release and site adoption are complete:
+
+- hosted `main` CI `30455449678` and release dry run `30455449652` passed;
+- Publish beta run `30456828739` published all three crates, all npm packages
+  and native CLIs, VS Code prerelease `0.2.17`, and the non-draft GitHub
+  prerelease;
+- independent npm queries resolved every public package's `beta` tag to
+  `0.2.0-beta.17`;
+- Presolve.dev installs the public beta.17 framework, CLI, and TypeScript
+  authority packages and documents use-site package classification without
+  decorators; and
+- Cloudflare Worker version `758ba975-db0a-4772-9a7c-9225b76b20a1`
+  (release SHA-256
+  `e374169289c6402125b522df8a448d5ae474efd515df4493b7d621c660738a6e`)
+  serves the beta.17 homepage and package guide. Production mobile proof
+  covers content-addressed CSS, returning reload, logos, internal code
+  scrolling, opaque menus, menu close-on-navigation, and `Count: 0` to
+  `Count: 1` with no console diagnostics.
+
 ## Next slice
 
-Merge the verified beta.17 preparation into `main`, tag
-`v0.2.0-beta.17`, publish it through GitHub Actions, and verify every public
-registry coordinate before adopting it on Presolve.dev.
+Amend the package-usage contract for compiler-transported serializable Action
+arguments and Promise-aware completion, then implement it through the existing
+TypeScript authority, canonical authored model, invocation artifact, Vite
+registry, browser runtime, resume, diagnostics, example, and real-browser
+proof. Do not infer arbitrary handler-source execution.
 
-After publication, broaden V2 Action package invocation from the first closed
-zero-argument subset to compiler-transported serializable arguments and
-Promise-aware completion, with explicit dependency, cancellation, error, and
-resume products. Do not infer arbitrary handler-source execution. Then
-continue the remaining beta gates: Effect execution/cleanup/resume,
-slot-projected structural hosts, Context, completion-grade
-Forms/Resources/loaders/server actions/capabilities, and final hardening.
+Then continue the remaining beta gates: broader Actions, Effect
+execution/cleanup/resume, slot-projected structural hosts, Context,
+completion-grade Forms/Resources/loaders/server actions/capabilities, and final
+hardening.
 
 Server executors remain outside the browser publication boundary until their
 frozen handoff contracts gain an explicit executor product.
@@ -184,5 +203,5 @@ frozen handoff contracts gain an explicit executor product.
 
 The previous “100%” statements referred to completing individual beta.14-16
 release trains and production regressions, not the final beta product scope.
-The current full-beta completion estimate is 38%.
-Against the full authored beta gate list, beta completion is now 36%.
+The current full-beta completion estimate is 40% after beta.17 publication and
+production documentation adoption.
