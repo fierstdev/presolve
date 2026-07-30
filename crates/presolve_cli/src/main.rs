@@ -407,8 +407,8 @@ fn update_publication_artifact_digest(
     Ok(())
 }
 
-/// Runs the installed TypeScript-authority bridge for decorator-free V2 source
-/// before legacy application assembly starts.  This is intentionally an
+/// Runs the installed TypeScript-authority bridge for current Presolve source
+/// before compatibility application assembly starts. This is intentionally an
 /// orchestration adapter: it selects no framework meaning and fails rather
 /// than routing an authority failure through the legacy decorator graph.
 struct V2AuthoringProjectProductsV1 {
@@ -468,13 +468,13 @@ fn validate_v2_authoring_project(
     }
     if !config_file.is_file() {
         return Err(format!(
-            "decorator-free V2 source requires {}; add the project TypeScript configuration before check or build",
+            "Presolve application source requires {}; add the project TypeScript configuration before check or build",
             config_file.display()
         ));
     }
     if !executable.is_file() {
         return Err(format!(
-            "decorator-free V2 source requires {}; install @presolve/typescript-authority in this project",
+            "Presolve application source requires {}; install @presolve/typescript-authority in this project",
             executable.display()
         ));
     }
@@ -5744,7 +5744,10 @@ fn publish_application_product(
     output_root: &Path,
     product: &presolve_compiler::ApplicationPublicationProductV1,
 ) -> Result<(), String> {
+    let current = current_application_publication_stage(output_root)?;
+    remove_obsolete_application_publication_stages(output_root, current.as_deref())?;
     let stage = create_application_publication_stage(output_root)?;
+    let mut committed = false;
     let publication = (|| {
         for (relative_path, bytes) in &product.artifacts {
             validate_publication_relative_path(relative_path)?;
@@ -5772,9 +5775,11 @@ fn publish_application_product(
                 output_root.display()
             )
         })?;
+        committed = true;
+        remove_obsolete_application_publication_stages(output_root, Some(&stage))?;
         Ok(())
     })();
-    if publication.is_err() {
+    if publication.is_err() && !committed {
         let _ = fs::remove_dir_all(&stage);
     }
     publication
@@ -5784,7 +5789,10 @@ fn publish_file_route_product(
     output_root: &Path,
     product: &presolve_compiler::FileRoutePublicationProductV1,
 ) -> Result<(), String> {
+    let current = current_application_publication_stage(output_root)?;
+    remove_obsolete_application_publication_stages(output_root, current.as_deref())?;
     let stage = create_application_publication_stage(output_root)?;
+    let mut committed = false;
     let publication = (|| {
         for (relative_path, bytes) in &product.artifacts {
             validate_publication_relative_path(relative_path)?;
@@ -5829,19 +5837,113 @@ fn publish_file_route_product(
                 output_root.display()
             )
         })?;
+        committed = true;
+        remove_obsolete_application_publication_stages(output_root, Some(&stage))?;
         Ok(())
     })();
-    if publication.is_err() {
+    if publication.is_err() && !committed {
         let _ = fs::remove_dir_all(&stage);
     }
     publication
 }
 
-fn create_application_publication_stage(output_root: &Path) -> Result<PathBuf, String> {
-    let parent = output_root
+fn current_application_publication_stage(output_root: &Path) -> Result<Option<PathBuf>, String> {
+    let metadata = match fs::symlink_metadata(output_root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(format!(
+                "failed to inspect application publication pointer {}: {error}",
+                output_root.display()
+            ))
+        }
+    };
+    if !metadata.file_type().is_symlink() {
+        return Ok(None);
+    }
+    let target = fs::read_link(output_root).map_err(|error| {
+        format!(
+            "failed to read application publication pointer {}: {error}",
+            output_root.display()
+        )
+    })?;
+    Ok(Some(if target.is_absolute() {
+        target
+    } else {
+        application_publication_parent(output_root).join(target)
+    }))
+}
+
+fn remove_obsolete_application_publication_stages(
+    output_root: &Path,
+    keep: Option<&Path>,
+) -> Result<(), String> {
+    let parent = application_publication_parent(output_root);
+    let entries = fs::read_dir(parent).map_err(|error| {
+        format!(
+            "failed to inspect application publication stages in {}: {error}",
+            parent.display()
+        )
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|error| {
+            format!(
+                "failed to inspect an application publication stage in {}: {error}",
+                parent.display()
+            )
+        })?;
+        let path = entry.path();
+        if keep.is_some_and(|keep| keep == path)
+            || !is_application_publication_stage_name(output_root, &entry.file_name())
+        {
+            continue;
+        }
+        let metadata = fs::symlink_metadata(&path).map_err(|error| {
+            format!(
+                "failed to inspect application publication stage {}: {error}",
+                path.display()
+            )
+        })?;
+        if !metadata.file_type().is_dir() {
+            continue;
+        }
+        fs::remove_dir_all(&path).map_err(|error| {
+            format!(
+                "failed to retire obsolete application publication stage {}: {error}",
+                path.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
+fn application_publication_parent(output_root: &Path) -> &Path {
+    output_root
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."));
+        .unwrap_or_else(|| Path::new("."))
+}
+
+fn is_application_publication_stage_name(output_root: &Path, candidate: &std::ffi::OsStr) -> bool {
+    let Some(output_name) = output_root.file_name() else {
+        return false;
+    };
+    let prefix = format!(".{}.presolve-release-", output_name.to_string_lossy());
+    let candidate = candidate.to_string_lossy();
+    let Some(suffix) = candidate.strip_prefix(&prefix) else {
+        return false;
+    };
+    let Some((process_id, sequence)) = suffix.split_once('-') else {
+        return false;
+    };
+    !process_id.is_empty()
+        && process_id.bytes().all(|byte| byte.is_ascii_digit())
+        && !sequence.is_empty()
+        && sequence.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn create_application_publication_stage(output_root: &Path) -> Result<PathBuf, String> {
+    let parent = application_publication_parent(output_root);
     let name = output_root
         .file_name()
         .ok_or_else(|| "output root has no file name".to_string())?

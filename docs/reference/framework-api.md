@@ -21,14 +21,11 @@ registration authority.
 | `slot()` / `SlotContent` | Instance-field initializer and type for default or named Slots. |
 | `environment.public(name)` | Manifest-backed read of an admitted `PRESOLVE_PUBLIC_*` value. |
 
-## Legacy compatibility declarations
+## Historical declarations
 
-`component()`, the zero-argument `action()`/`effect()` overloads, `computed()`,
-`context()`, `provide()`, `consume()`, `form()`, `serialize()`, `field()`,
-`validate()`, `submit()`, `resource()`, `loader()`, `serverAction()`, and
-`opaque()` remain supported only as explicitly labelled alpha-compatibility
-declarations. They are not the source form emitted by `create-presolve`, and a
-decorator-free replacement for each one requires its own compiler contract.
+Presolve 0.1 declarations are retained for migration analysis, not as the
+current beta authoring API. This reference and the generated scaffold are the
+source of truth for new applications.
 
 See [components](../guide/components.md), [reactivity](../guide/reactivity.md),
 [composition](../guide/composition.md), and

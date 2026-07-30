@@ -16,9 +16,7 @@ export class Welcome extends Component {
 ```
 
 Extending `Component` is compiler-owned authoring evidence; importing a
-component does not create a runtime component registry. `@component()` remains
-an alpha compatibility form for existing applications, but do not add it to
-new beta source.
+component does not create a runtime component registry.
 
 ## Inputs
 

@@ -10,6 +10,7 @@ that application.
 - [Introduction](guide/introduction.md)
 - [Install Presolve](guide/installation.md)
 - [Project structure](guide/project-structure.md)
+- [Styling, assets, Tailwind, and Vite](guide/styling-and-vite.md)
 - [Components](guide/components.md)
 - [State, actions, computed values, and effects](guide/reactivity.md)
 

@@ -37,7 +37,10 @@ captured value:
 ```
 
 Do not write reactive state outside an action except during permitted field
-initialization. Async action behavior is not part of the beta contract.
+initialization. General asynchronous Action bodies are not admitted. The one
+documented async form is a result-discarded terminal package call with exact
+primitive arguments and a compiler-injected final `AbortSignal`; see
+[Third-party packages](third-party-packages.md).
 
 ## Computed values
 

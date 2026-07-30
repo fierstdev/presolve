@@ -87,46 +87,14 @@ canonical State updates. Imported capability calls, Standard Schema adapters,
 and server-side revalidation are tracked as completion gates and fail closed
 instead of being ignored.
 
-## Legacy Form compatibility
+## Resource status
 
-`@form()` declares a component-owned form. `@field()` associates a stateful
-field with it, and `@submit()` declares the action that handles its submission.
-This decorator syntax remains an alpha-compatibility capability and is not
-emitted by the V2 scaffold.
+The current beta does not expose a new-project Resource, loader, or server
+action declaration. Retained compiler products can classify historical
+handoffs for migration and deployment, but they are not current authoring
+guidance.
 
-```tsx
-import {
-  action, component, field, form, serialize, submit, Component, type Form,
-} from "presolve";
-
-@component()
-export class ProfileForm extends Component {
-  @form() @serialize("json") profile!: Form;
-  @field("profile", "identity.name") name = "";
-
-  @action() @submit("profile")
-  save(): void {
-    // Persist through an admitted capability boundary.
-  }
-
-  render() {
-    return <form form={this.profile}><input field={this.name} /></form>;
-  }
-}
-```
-
-Supported legacy serialization formats are `json`, `form-data`, and
-`url-encoded`. `required()` creates a validation rule and `@validate(rule)`
-attaches one to a legacy field.
-
-## Resources (legacy compatibility)
-
-Use `@resource(endpoint)` for a compiler-declared resource field. This is an
-alpha-compatibility declaration. A resource
-has `data`, `error`, and `state` (`idle`, `pending`, `ready`, `failed`, or
-`cancelled`). `@loader(endpoint)` and `@serverAction(endpoint)` declare the
-corresponding explicit endpoint boundaries.
-
-Endpoints must be present in the compiler's application/package capability
-information. The static Cloudflare adapter rejects executable server handoffs;
-do not present a resource declaration as a general server-runtime substitute.
+Use a Form submission or package Action only when its exact documented client
+contract fits. The static Cloudflare adapter does not execute arbitrary server
+handoffs, and Presolve does not infer a Resource from `fetch()` or a
+same-shaped object.

@@ -2,10 +2,12 @@
 
 ## Current objective
 
-Reconcile `create-presolve` with the canonical beta authoring model documented
-on Presolve.dev. The generated project, generated README, CLI guidance, public
-project-structure guide, styling/Vite guide, runnable examples, and site
-showcases must describe and prove one exact ownership model.
+Publish the reconciled `create-presolve` and application-publication contract,
+then adopt that release in Presolve.dev and prove every production-shaped
+showcase in a rendered browser. The generated project, generated README, CLI
+guidance, public project-structure guide, styling/Vite guide, runnable
+examples, and site showcases must describe and prove one exact ownership
+model.
 
 ## Completed slices
 
@@ -189,19 +191,46 @@ Promise completion surface:
   662 compiler tests; the audited runtime baseline is 301,905 bytes and remains
   within its production budgets.
 
+The canonical scaffold, publication, and documentation reconciliation is
+implemented and locally proven:
+
+- `create-presolve` now has interactive destination selection plus
+  `--help`/`--version`/closed option handling and refuses every existing target;
+- the generated application owns document metadata in `app/index.html`,
+  shared composition in `app/app.tsx`, page landmarks in routes, byte-exact
+  global CSS in `app/app.css`, and root-addressed files in `public/`;
+- the starter is mobile-first, keyboard-visible, reduced-motion aware, and
+  proves State, Action, and Computed updates in a real browser beneath a shared
+  application shell;
+- the generated README and public guides explain the complete ownership model,
+  content-addressed CSS, public versus imported assets, Tailwind/PostCSS
+  preprocessing, Vite's bounded bundling role, package Action classification,
+  and fail-closed server boundaries;
+- successful atomic application and file-route builds now retire obsolete
+  exact Presolve release directories while retaining the active release,
+  preserving the active pointer on failure, and leaving caller lookalikes
+  untouched; and
+- the Presolve.dev production-shaped Examples route exposed a framework bug:
+  computed initialization ran every global evaluation for every component
+  instance. Runtime execution now filters each evaluation to its compiler-owned
+  component definition, so an app shell cannot request a route's computed slot.
+
+The exact scaffold app-shell + route-computed browser regression passes with
+State, Action, Computed, immutable CSS, metadata, landmarks, and zero runtime
+diagnostics. Application publication, all 18 ergonomic-project tests,
+production determinism, production budgets, strict touched-crate clippy,
+TypeScript 7.0.2 compatibility, and all 90 public documentation files pass.
+The audited runtime baseline is 302,247 bytes and remains within the committed
+budgets.
+
 ## Next slice
 
-Diff the generated `create-presolve` project against the current Presolve.dev
-beta concepts. Correct the scaffold, its embedded README/help, and clean-room
-tests so new applications use the canonical `app/index.html`, `app/app.tsx`,
-`app/app.css`, route, component, and `public/` ownership model.
-
-Then add a comprehensive public project-structure guide explaining how and why
-each boundary exists, plus an evidence-backed styling and Vite guide covering
-automatic global CSS, ordinary imports, Tailwind/PostCSS, public and imported
-assets, hashing/publication, diagnostic ownership, supported forms, and
-fail-closed boundaries. Runnable examples and Presolve.dev itself must
-demonstrate those claims.
+Complete the uninterrupted release gate, prepare and publish
+`0.2.0-beta.18` through `fierstdev/presolve`, then install that exact public
+release in Presolve.dev. The deployed Examples route must prove every preview,
+Preview/Code switch, package-free Action, Computed value, conditional pipeline
+panel, Form validation/submission path, mobile layout, and zero runtime
+diagnostics against production HTTPS.
 
 Then continue the remaining beta gates: broader Actions, Effect
 execution/cleanup/resume, slot-projected structural hosts, Context,
@@ -232,5 +261,6 @@ frozen handoff contracts gain an explicit executor product.
 
 The previous “100%” statements referred to completing individual beta.14-16
 release trains and production regressions, not the final beta product scope.
-The current full-beta completion estimate is 45% after the typed and
-Promise-aware package Action gate.
+The current full-beta completion estimate remains 45% until the scaffold,
+publication, documentation, and showcase reconciliation is published and
+deployed.

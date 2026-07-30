@@ -3884,6 +3884,12 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     const priorExecutionContext = store.activeExecutionContext;
+    const component = componentInstanceId === null
+      ? null
+      : store.components.get(componentInstanceId);
+    if (componentInstanceId !== null && component === undefined) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
     if (componentInstanceId !== null) {
       store.activeExecutionContext = { component_instance_id: componentInstanceId };
     }
@@ -3902,6 +3908,7 @@ const RUNTIME_STUB: &str = r#"(() => {
           continue;
         }
 
+        if (component !== null && evaluation.component !== component.name) continue;
         if (!isComputedDirty(store, computed)) continue;
 
         storeComputedValue(store, evaluation, executeComputedProgram(store, evaluation));
@@ -6898,6 +6905,9 @@ mod tests {
         assert!(runtime.contains("computedSlotsByInstanceComputed: new Map()"));
         assert!(runtime.contains("computedDirtySlots: new Map()"));
         assert!(runtime.contains("function computedSlotForExecution"));
+        assert!(runtime.contains(
+            "if (component !== null && evaluation.component !== component.name) continue;"
+        ));
         assert!(runtime.contains("/computed-cache:"));
         assert!(runtime.contains("/computed-dirty:"));
         assert!(runtime.contains("LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2"));

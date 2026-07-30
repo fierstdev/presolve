@@ -24,6 +24,18 @@ fn project_root(label: &str) -> PathBuf {
     root
 }
 
+fn publication_stage_count(root: &PathBuf) -> usize {
+    let prefix = ".dist.presolve-release-";
+    fs::read_dir(root)
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry.file_type().is_ok_and(|kind| kind.is_dir())
+                && entry.file_name().to_string_lossy().starts_with(prefix)
+        })
+        .count()
+}
+
 #[cfg(unix)]
 #[test]
 fn decorator_free_v2_source_uses_installed_authority_for_file_route_assembly() {
@@ -337,6 +349,11 @@ process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFile
         bundle,
         fs::read(root.join("dist/presolve.validators.js")).unwrap(),
         "Standard Schema publication must be byte deterministic"
+    );
+    assert_eq!(
+        publication_stage_count(&root),
+        1,
+        "repeated file-route builds must retain only the active atomic release"
     );
     fs::remove_dir_all(root).unwrap();
 }
@@ -1080,6 +1097,24 @@ process.stdout.write(JSON.stringify({
         String::from_utf8_lossy(&deploy.stderr)
     );
     assert!(application.join("dist/routes/root/index.html").is_file());
+    let html =
+        fs::read_to_string(application.join("dist/routes/root/index.html")).expect("starter HTML");
+    assert!(html.contains("Ship the page. Resume the behavior."));
+    assert!(html.contains("Interactive proof"));
+    assert!(html.contains("width=device-width"));
+    assert!(html.contains("href=\"/favicon.svg\""));
+    assert!(html.contains("href=\"/app."));
+    assert!(!html.contains("<main><main"));
+    assert!(application.join("dist/app.css").is_file());
+    assert!(application.join("dist/favicon.svg").is_file());
+    let css = fs::read_to_string(application.join("dist/app.css")).expect("starter CSS");
+    assert!(css.contains("@media (min-width: 48rem)"));
+    assert!(css.contains("prefers-reduced-motion"));
+    let component_artifact =
+        fs::read_to_string(application.join("dist/routes/root/component.runtime.json"))
+            .expect("starter component artifact");
+    assert!(component_artifact.contains("increment"));
+    assert!(component_artifact.contains("action_batch_id"));
     assert!(application
         .join(".presolve/cloudflare/deployment.plan.json")
         .is_file());

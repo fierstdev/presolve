@@ -10,9 +10,11 @@ pnpm dev
 ```
 
 The generated project already includes the public `presolve` authoring package,
-the `@presolve/cli` command, TypeScript 7, a route directory, and a VS Code
-extension recommendation. It does not require a route registry, a component
-name registry, or a `presolve.json` file for ordinary applications.
+the `@presolve/cli` command, TypeScript 7, project-local Vite, canonical
+document/shell/style files, a mobile-first interactive starter route, a public
+favicon, and a VS Code extension recommendation. It does not require a route
+registry, a component name registry, a Vite configuration file, or a
+`presolve.json` file for ordinary applications.
 
 Open the project directory—not an individual source file—in VS Code. Install
 the **Presolve** extension when prompted. The project-local TypeScript version
@@ -34,6 +36,12 @@ compatibility. It also copies `public/` to the root of `dist/`; every emitted
 file is included in the deployment inventory. The former `styles/` directory
 remains supported for beta compatibility and is copied to `dist/styles/`. Do
 not edit generated output: run the compiler again after changing source.
+
+Read [Project structure and ownership](project-structure.md) before moving
+shared UI or document metadata. Read
+[Styling, assets, Tailwind, and Vite](styling-and-vite.md) before adding a CSS
+transform or custom Vite entry; the canonical `app/app.css` path and the
+adapter-owned Vite path have deliberately different responsibilities.
 
 For the first static deployment target, continue with
 [Cloudflare deployment](../reference/cloudflare.md).

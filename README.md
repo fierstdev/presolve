@@ -24,10 +24,12 @@ pnpm dev
 The generated application includes TypeScript 7, routes under `app/routes`, the
 public `@presolve/framework` package installed under the canonical `presolve`
 authoring alias, the `@presolve/cli` command, and a VS Code extension
-recommendation. It needs no route registry or configuration file for the normal
-workflow.
+recommendation. Its polished starter demonstrates the canonical document,
+application shell, global CSS, public asset, route, and
+interactive State/Action model. It needs no route registry, Vite configuration,
+or Presolve configuration file for the normal workflow.
 
-Decorator-free layouts use `extends Component` and the V2 slot field form:
+Layouts extend `Component` and use the slot field form:
 `children: SlotContent = slot()`. During build, `app/app.css` is published as
 `/app.css` and linked from the generated document head; `public/` is copied to
 the root of `dist/`; both are integrity-listed for deployment.
@@ -50,8 +52,10 @@ share the same prerelease version.
 
 Start with the [introduction](docs/guide/introduction.md) and
 [installation guide](docs/guide/installation.md). The complete guide and
-reference cover components, state, [resumability](docs/guide/resumability.md),
-routes, packages, VS Code, Cloudflare, and the maintainer
+reference cover [project ownership](docs/guide/project-structure.md),
+[styling and Vite](docs/guide/styling-and-vite.md), components, state,
+[resumability](docs/guide/resumability.md), routes, packages, VS Code,
+Cloudflare, and the maintainer
 [publication runbook](docs/reference/publishing.md).
 
 ## Contributing

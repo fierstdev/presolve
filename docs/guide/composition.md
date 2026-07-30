@@ -34,31 +34,12 @@ Slot content remains owned by the caller even though it is placed in the
 callee's outlet. Do not use a different nested-children syntax until the
 compiler supports its lowering.
 
-## Context (legacy compatibility)
+## Context status
 
-The current public API declares Context with decorators on a static field and
-uses a stable `"Class.field"` designator for providers and consumers. This is
-an alpha-compatibility form, not decorator-free V2 source.
+Context projection and resume exist in compiler products, but the current beta
+does not expose a new-project Context declaration. The compiler fails closed
+instead of inferring a shared-value API from an ordinary field or runtime tree.
+Use explicit component inputs and Actions for current applications.
 
-```tsx
-import { component, consume, context, provide, Component } from "presolve";
-
-@component()
-export class ThemeRoot extends Component {
-  @context() static mode = "light";
-  @provide("ThemeRoot.mode") modeForChildren = ThemeRoot.mode;
-
-  render() { return <main><ThemeLabel /></main>; }
-}
-
-@component()
-export class ThemeLabel extends Component {
-  @consume("ThemeRoot.mode") mode!: string;
-
-  render() { return <span>{this.mode}</span>; }
-}
-```
-
-Treat provider-owned values as read-only to consumers. Expose an action through
-normal component composition when a consumer must request a change. Provider
-resolution is compiler-planned; it is not runtime tree traversal.
+Historical Context declarations are retained only for migration analysis; they
+are not part of this guide's authoring surface.

@@ -9,5 +9,22 @@ pnpm install
 pnpm dev
 ```
 
-The generated project includes the public authoring package, compiler CLI,
-TypeScript 7 configuration, file routes, and a VS Code extension recommendation.
+Run the command without a directory in an interactive terminal to choose the
+destination from a prompt. Use `--help` for the complete invocation and
+`--version` to inspect the release train.
+
+The generated project is a complete, accessible application rather than an
+empty fixture. It includes:
+
+- the canonical `app/index.html`, `app/app.tsx`, and `app/app.css` ownership
+  model;
+- a mobile-first global design baseline and interactive route;
+- file routes, shared-component, server, asset, public, and test homes;
+- a real public favicon and metadata;
+- the public framework, compiler CLI, TypeScript 7, project-local Vite, and
+  Cloudflare deployment tooling;
+- a VS Code extension recommendation; and
+- an application README explaining structure, styling, Vite, build products,
+  and deployment.
+
+The creator refuses to overwrite any existing path.

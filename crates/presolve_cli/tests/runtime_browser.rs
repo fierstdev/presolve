@@ -4512,6 +4512,88 @@ process.stdout.write(JSON.stringify({
     fs::remove_dir_all(project_root).expect("failed to remove V2 action browser project");
 }
 
+#[cfg(unix)]
+#[test]
+fn fresh_create_presolve_starter_is_styled_accessible_and_interactive_in_a_real_browser() {
+    let _guard = browser_test_guard();
+    let repo_root = repo_root();
+    let project_root = repo_root.join("target/psc-browser-test/create-presolve-starter");
+    if project_root.exists() {
+        fs::remove_dir_all(&project_root)
+            .expect("failed to clean previous scaffold browser project");
+    }
+    let scaffold = repo_root.join("packages/create-presolve/bin/create-presolve.mjs");
+    let created = Command::new("node")
+        .arg(scaffold)
+        .arg(&project_root)
+        .output()
+        .expect("failed to run create-presolve");
+    assert!(
+        created.status.success(),
+        "create-presolve failed: {}",
+        String::from_utf8_lossy(&created.stderr)
+    );
+
+    let executable = project_root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().expect("authority executable parent"))
+        .expect("failed to create scaffold authority executable parent");
+    fs::write(
+        &executable,
+        r#"#!/usr/bin/env node
+import { readFileSync } from "node:fs";
+const request = JSON.parse(readFileSync(0, "utf8"));
+const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
+process.stdout.write(JSON.stringify({
+  schemaVersion: 11,
+  diagnostics: [],
+  components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
+  states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
+  actions: request.actions.map(site => ({ id: site.id, identity: identity("action") })),
+  effects: request.effects.map(site => ({ id: site.id, identity: identity("effect") })),
+  slots: request.slots.map(site => ({ id: site.id, identity: identity("slot") })),
+  environmentPublic: request.environmentPublic.map(site => ({ id: site.id, identity: identity("public") })),
+}));
+"#,
+    )
+    .expect("failed to write scaffold authority executable");
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755))
+        .expect("failed to mark scaffold authority executable");
+
+    let output = Command::new(presolve_cli_bin())
+        .current_dir(&project_root)
+        .arg("build")
+        .output()
+        .expect("failed to build generated starter");
+    assert!(
+        output.status.success(),
+        "generated starter build failed\nstatus: {}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let route_root = project_root.join("dist/routes/root");
+    write_scaffold_starter_probe_page(&route_root);
+    let server = StaticServer::start(project_root.join("dist"));
+    let chrome = chrome_bin().expect("headless Chrome was not found");
+    let profile_dir = project_root.join("chrome-profile");
+    fs::create_dir_all(&profile_dir).expect("failed to create scaffold Chrome profile");
+    let output = run_chrome_probe(
+        chrome,
+        &format!("--user-data-dir={}", profile_dir.display()),
+        &format!("http://127.0.0.1:{}/routes/root/probe.html", server.port),
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    server.stop();
+    assert!(
+        stdout.contains("PRESOLVE_SCAFFOLD_BROWSER_TEST_PASS"),
+        "generated starter browser probe did not pass\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    fs::remove_dir_all(project_root).expect("failed to remove scaffold browser project");
+}
+
 #[test]
 fn decrement_counter_decrements_in_a_real_browser() {
     let _guard = browser_test_guard();
@@ -7307,6 +7389,56 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
 
     fs::write(out_dir.join("probe.html"), probe)
         .expect("failed to write framework Counter browser probe page");
+}
+
+fn write_scaffold_starter_probe_page(out_dir: &Path) {
+    let index =
+        fs::read_to_string(out_dir.join("index.html")).expect("failed to read scaffold page");
+    let probe = index.replace(
+        "</body>",
+        r#"<script>
+const fail = (message) => { throw new Error(message); };
+const waitFor = (predicate, label) => new Promise((resolve, reject) => {
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (predicate()) return resolve();
+    if (Date.now() > deadline) return reject(new Error(`Timed out waiting for ${label}`));
+    setTimeout(tick, 20);
+  };
+  tick();
+});
+(async () => {
+  await waitFor(() => document.documentElement.dataset.presolveRuntime === "ready", "runtime ready");
+  if (document.querySelectorAll("main").length !== 1) fail("starter did not own exactly one main landmark");
+  if (document.querySelector(".skip-link") === null) fail("starter skip link was not emitted");
+  const viewport = document.querySelector('meta[name="viewport"]')?.content;
+  if (viewport !== "width=device-width, initial-scale=1") fail("starter viewport metadata was missing");
+  if (document.querySelector('link[rel="icon"][href="/favicon.svg"]') === null) fail("starter favicon was missing");
+  if (getComputedStyle(document.body).backgroundColor !== "rgb(7, 9, 15)") fail("global CSS was not applied");
+  const button = document.querySelector(".counter button");
+  const output = document.querySelector(".counter output");
+  const next = document.querySelector(".counter strong");
+  if (button === null || output === null) fail("starter counter controls were missing");
+  if (next === null) fail("starter computed output was missing");
+  if (!output.textContent.includes("Count: 0")) fail("starter initial count was not zero");
+  if (next.textContent.trim() !== "1") fail(`starter initial computed output was ${next.textContent}`);
+  if (getComputedStyle(button).cursor !== "pointer") fail("starter button styling was not applied");
+  button.click();
+  await waitFor(() => output.textContent.includes("Count: 1"), "starter counter update");
+  await waitFor(() => next.textContent.trim() === "2", "starter computed update");
+  const counter = window.__PRESOLVE__.components.find((component) => component.state && "count" in component.state);
+  if (counter?.state.count !== 1) fail("starter compiler state did not update");
+  if (window.__PRESOLVE__.diagnostics.length !== 0) fail("starter runtime reported diagnostics");
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_SCAFFOLD_BROWSER_TEST_PASS</div>");
+})().catch((error) => {
+  document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_SCAFFOLD_BROWSER_TEST_FAIL: ${error.message}</div>`);
+  console.error(error);
+});
+</script>
+</body>"#,
+    );
+    fs::write(out_dir.join("probe.html"), probe)
+        .expect("failed to write scaffold browser probe page");
 }
 
 fn write_v2_action_resume_probe_page(out_dir: &Path) {
