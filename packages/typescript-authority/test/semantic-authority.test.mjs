@@ -207,8 +207,9 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
 test("the V2 authoring bridge proves exact named-import package invocations", async () => {
   const packageFile = resolve(root, "tests/framework-public-api/src/V2Package.tsx");
   const packageSource = readFileSync(packageFile, "utf8");
-  const importedCall = packageSource.lastIndexOf("emitMetric()");
-  const localCall = packageSource.lastIndexOf("recordMetric()");
+  const importedCall = packageSource.lastIndexOf("emitMetric(category");
+  const importedAsyncCall = packageSource.lastIndexOf("emitMetricAsync(category");
+  const localCall = packageSource.lastIndexOf("recordMetric(category");
   const result = await analyzeV2Authoring({
     schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
     configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
@@ -220,8 +221,9 @@ test("the V2 authoring bridge proves exact named-import package invocations", as
     components: [{ id: "package", file: packageFile, position: packageSource.indexOf("V2Package extends") }],
     states: [],
     actions: [
-      { id: "send", file: packageFile, position: packageSource.indexOf("action(()") },
-      { id: "local", file: packageFile, position: packageSource.lastIndexOf("action(()") },
+      { id: "send", file: packageFile, position: packageSource.indexOf("action((category") },
+      { id: "async", file: packageFile, position: packageSource.indexOf("action(async") },
+      { id: "local", file: packageFile, position: packageSource.lastIndexOf("action((") },
     ],
     effects: [],
     slots: [],
@@ -237,6 +239,29 @@ test("the V2 authoring bridge proves exact named-import package invocations", as
         importPosition: packageSource.indexOf("emitMetric"),
         moduleSpecifier: "./V2PackageHelper.js",
         exportName: "recordMetric",
+        argumentTypes: ["string", "number"],
+        completion: "synchronous",
+      },
+      {
+        id: "wrong-signature",
+        file: packageFile,
+        position: importedCall,
+        importPosition: packageSource.indexOf("emitMetric"),
+        moduleSpecifier: "./V2PackageHelper.js",
+        exportName: "recordMetric",
+        argumentTypes: ["string", "boolean"],
+        completion: "synchronous",
+      },
+      {
+        id: "imported-async",
+        file: packageFile,
+        position: importedAsyncCall,
+        importPosition: packageSource.indexOf("recordMetricAsync as emitMetricAsync"),
+        moduleSpecifier: "./V2PackageHelper.js",
+        exportName: "recordMetricAsync",
+        argumentTypes: ["string"],
+        completion: "promise",
+        signalPosition: packageSource.indexOf("AbortSignal"),
       },
       {
         id: "lookalike",
@@ -245,14 +270,22 @@ test("the V2 authoring bridge proves exact named-import package invocations", as
         importPosition: packageSource.indexOf("emitMetric"),
         moduleSpecifier: "./V2PackageHelper.js",
         exportName: "recordMetric",
+        argumentTypes: ["string", "number"],
+        completion: "synchronous",
       },
     ],
     environmentPublic: [],
   });
   assert.equal(result.diagnostics.length, 0);
-  assert.deepEqual(result.packageInvocations.map(entry => entry.id), ["imported"]);
+  assert.deepEqual(result.packageInvocations.map(entry => entry.id), ["imported", "imported-async"]);
   assert.equal(result.packageInvocations[0].identity.name, "recordMetric");
   assert.equal(result.packageInvocations[0].moduleSpecifier, "./V2PackageHelper.js");
+  assert.deepEqual(result.packageInvocations[0].argumentTypes, ["string", "number"]);
+  assert.equal(result.packageInvocations[0].completion, "synchronous");
+  assert.equal(result.packageInvocations[0].injectAbortSignal, false);
+  assert.deepEqual(result.packageInvocations[1].argumentTypes, ["string"]);
+  assert.equal(result.packageInvocations[1].completion, "promise");
+  assert.equal(result.packageInvocations[1].injectAbortSignal, true);
 });
 
 test("the V2 authoring bridge resolves canonical decorator-free Form evidence", async () => {

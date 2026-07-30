@@ -357,10 +357,12 @@ function normalizeProjectPath(projectRoot, path) {
 
 async function serializeType(project, type) {
   if (!type) return undefined;
+  const symbol = await type.getSymbol();
   const serialized = {
     text: await project.checker.typeToString(type),
     flags: type.flags,
     error: type.isErrorType(),
+    ...(symbol ? { symbol: await serializeSymbol(project, symbol) } : {}),
   };
   if (type.isTypeReference()) {
     const typeArguments = await project.checker.getTypeArguments(type);

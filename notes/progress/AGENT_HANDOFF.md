@@ -2,11 +2,10 @@
 
 ## Current objective
 
-Broaden decorator-free V2 Action package invocation beyond the beta.17
-zero-argument subset with compiler-transported serializable arguments and
-Promise-aware completion. The amendment must define dependency, cancellation,
-failure, teardown, and resume products without retaining or evaluating handler
-source.
+Reconcile `create-presolve` with the canonical beta authoring model documented
+on Presolve.dev. The generated project, generated README, CLI guidance, public
+project-structure guide, styling/Vite guide, runnable examples, and site
+showcases must describe and prove one exact ownership model.
 
 ## Completed slices
 
@@ -166,13 +165,43 @@ The `0.2.0-beta.17` public release and site adoption are complete:
   scrolling, opaque menus, menu close-on-navigation, and `Count: 0` to
   `Count: 1` with no console diagnostics.
 
+Decorator-free terminal package Actions now cover the frozen primitive and
+Promise completion surface:
+
+- TypeScript authority schema v11 proves the exact named import, ordered
+  `string`/`number`/`boolean`/`null` signature, synchronous non-Promise return
+  or `Promise<void>` completion, and canonical DOM `AbortSignal` identity;
+- authored-semantics schema v7 and package-invocation artifact schema v2 retain
+  exact argument codecs, completion, injection, concurrency, cancellation, and
+  restore-without-replay facts;
+- the public `action` type hides the final compiler-owned signal from event
+  callers while retaining its exact package handler signature;
+- the Action event JSON boundary now emits canonical numbers as numbers rather
+  than strings, closing a shared runtime transport defect;
+- Promise invocations replace prior work per component instance, abort on
+  structural teardown or `pagehide`, suppress stale settlement, preserve
+  package failures, and never serialize or replay pending work;
+- the package interoperability example proves every primitive codec plus
+  fulfillment, rejection, replacement, pagehide cancellation, and compatible
+  resume; and
+- deterministic double builds retained identical invocation-artifact and
+  registry hashes. The full workspace gate passes with 58 browser tests and
+  662 compiler tests; the audited runtime baseline is 301,905 bytes and remains
+  within its production budgets.
+
 ## Next slice
 
-Amend the package-usage contract for compiler-transported serializable Action
-arguments and Promise-aware completion, then implement it through the existing
-TypeScript authority, canonical authored model, invocation artifact, Vite
-registry, browser runtime, resume, diagnostics, example, and real-browser
-proof. Do not infer arbitrary handler-source execution.
+Diff the generated `create-presolve` project against the current Presolve.dev
+beta concepts. Correct the scaffold, its embedded README/help, and clean-room
+tests so new applications use the canonical `app/index.html`, `app/app.tsx`,
+`app/app.css`, route, component, and `public/` ownership model.
+
+Then add a comprehensive public project-structure guide explaining how and why
+each boundary exists, plus an evidence-backed styling and Vite guide covering
+automatic global CSS, ordinary imports, Tailwind/PostCSS, public and imported
+assets, hashing/publication, diagnostic ownership, supported forms, and
+fail-closed boundaries. Runnable examples and Presolve.dev itself must
+demonstrate those claims.
 
 Then continue the remaining beta gates: broader Actions, Effect
 execution/cleanup/resume, slot-projected structural hosts, Context,
@@ -203,5 +232,5 @@ frozen handoff contracts gain an explicit executor product.
 
 The previous “100%” statements referred to completing individual beta.14-16
 release trains and production regressions, not the final beta product scope.
-The current full-beta completion estimate is 40% after beta.17 publication and
-production documentation adoption.
+The current full-beta completion estimate is 45% after the typed and
+Promise-aware package Action gate.

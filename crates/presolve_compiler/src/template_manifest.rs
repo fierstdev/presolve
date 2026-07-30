@@ -84,7 +84,11 @@ pub struct ManifestOrdinaryEvent {
     pub event_type: String,
     pub handler_method_id: String,
     pub action_batch_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        serialize_with = "crate::component_graph::runtime_arguments_serde::serialize"
+    )]
     pub arguments: Vec<SerializableValue>,
     pub program_id: String,
 }
@@ -188,7 +192,11 @@ pub struct ManifestEvent {
     pub kind: Option<ManifestEventKind>,
     pub event: String,
     pub handler: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        serialize_with = "crate::component_graph::runtime_arguments_serde::serialize"
+    )]
     pub arguments: Vec<SerializableValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub method_id: Option<String>,
@@ -875,9 +883,33 @@ fn collect_conditional(conditional: &ConditionalNode, nodes: &mut Vec<ManifestNo
 #[cfg(test)]
 mod tests {
     use super::{
-        build_template_manifest_from_asm, ManifestEventKind, TEMPLATE_MANIFEST_SCHEMA_VERSION,
+        build_template_manifest_from_asm, ManifestEvent, ManifestEventKind,
+        TEMPLATE_MANIFEST_SCHEMA_VERSION,
     };
     use crate::build_application_semantic_model;
+
+    #[test]
+    fn action_event_arguments_encode_exact_runtime_primitive_types() {
+        let event = ManifestEvent {
+            node: "n1".into(),
+            kind: Some(ManifestEventKind::Action),
+            event: "click".into(),
+            handler: "this.record".into(),
+            arguments: vec![
+                crate::SerializableValue::String("checkout".into()),
+                crate::SerializableValue::Number("2".into()),
+                crate::SerializableValue::Boolean(true),
+                crate::SerializableValue::Null,
+            ],
+            method_id: Some("action:record".into()),
+            action_batch_id: Some("batch:record".into()),
+        };
+        let value = serde_json::to_value(event).expect("event JSON");
+        assert_eq!(
+            value["arguments"],
+            serde_json::json!(["checkout", 2, true, null])
+        );
+    }
 
     #[test]
     fn emits_canonical_f8_action_batch_ids_on_every_action_binding() {

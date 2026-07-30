@@ -1212,7 +1212,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const sourceAt = site => readFileSync(site.file, "utf8").slice(site.position);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 10,
+  schemaVersion: 11,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states
@@ -3029,7 +3029,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 10,
+  schemaVersion: 11,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
@@ -3415,7 +3415,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 10,
+  schemaVersion: 11,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
@@ -4442,7 +4442,7 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 10,
+  schemaVersion: 11,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
@@ -8942,13 +8942,42 @@ fn decorator_free_package_invocations_bundle_execute_resume_and_fail_closed_in_a
 if (runtime.resume.mode !== "resume" || runtime.resume.failure !== null) fail("package Action did not preserve compatible resume");
 const button = document.getElementById("record-visit");
 const output = document.getElementById("visit-count");
+const detail = document.getElementById("visit-detail");
+const slow = document.getElementById("record-slow");
+const fast = document.getElementById("record-fast");
+const failing = document.getElementById("record-fail");
+const asyncResult = document.getElementById("async-result");
+if (output.textContent !== "0" || detail.textContent !== "idle" || asyncResult.textContent !== "idle"
+  || window.__PACKAGE_ASYNC_STARTS__ !== undefined || runtime.package_invocations.length !== 0) {
+  fail("resume replayed package work");
+}
 button.click();
-await waitFor(() => output.textContent === "1", "first package invocation");
+await waitFor(() => output.textContent === "2" && detail.textContent === "checkout:2:true:null", "typed package arguments");
 await waitFor(() => runtime.package_invocations.length === 1 && runtime.package_invocations[0].status === "complete", "first invocation evidence");
-button.click();
-await waitFor(() => output.textContent === "2", "second package invocation");
-await waitFor(() => runtime.package_invocations.length === 2 && runtime.package_invocations[1].status === "complete", "second invocation evidence");
-if (runtime.diagnostics.length !== 0) fail("package invocation emitted unexpected diagnostics");"#,
+slow.click();
+await waitFor(() => runtime.package_invocations.length === 2 && runtime.package_invocations[1].status === "running", "slow Promise invocation");
+fast.click();
+await waitFor(() => runtime.package_invocations.length === 3
+  && runtime.package_invocations[1].status === "cancelled"
+  && runtime.package_invocations[2].status === "complete"
+  && asyncResult.textContent === "fast", "replace-previous Promise completion");
+if (window.__PACKAGE_ASYNC_STARTS__ !== 2) fail("package Promise invocation count was not exact");
+failing.click();
+await waitFor(() => runtime.package_invocations.length === 4
+  && runtime.package_invocations[3].status === "failed", "package Promise failure");
+if (!runtime.diagnostics.some((diagnostic) =>
+  diagnostic.code === "PSR_PACKAGE_INVOCATION_FAILURE"
+  && diagnostic.detail?.message === "analytics rejected fail")) {
+  fail("package Promise failure did not preserve its error");
+}
+slow.click();
+await waitFor(() => runtime.package_invocations.length === 5
+  && runtime.package_invocations[4].status === "running", "pagehide package invocation");
+window.dispatchEvent(new PageTransitionEvent("pagehide"));
+await waitFor(() => runtime.package_invocations[4].status === "cancelled", "pagehide package cancellation");
+if (runtime.diagnostics.filter((diagnostic) => diagnostic.code === "PSR_PACKAGE_INVOCATION_FAILURE").length !== 1) {
+  fail("package cancellation emitted a failure diagnostic");
+}"#,
         "PRESOLVE_PACKAGE_INVOCATION_RESUME_PASS",
     );
     fs::write(route_root.join("package-resume.html"), accepted)

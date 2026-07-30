@@ -1144,8 +1144,20 @@ struct PackageInvocationRuntimeRecordV1 {
     export: String,
     owner_source: String,
     declaration_modules: Vec<String>,
+    arguments: Vec<PackageInvocationRuntimeArgumentV1>,
+    completion: String,
+    inject_abort_signal: bool,
+    concurrency: String,
+    cancellation: String,
     execution_boundary: String,
     resume_policy: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PackageInvocationRuntimeArgumentV1 {
+    event_argument_index: usize,
+    codec: String,
 }
 
 fn attach_package_invocation_runtime_module(
@@ -7067,8 +7079,13 @@ mod tests {
             export: "recordVisit".into(),
             owner_source: "app/routes/index.tsx".into(),
             declaration_modules: vec!["node_modules/analytics-kit/index.d.ts".into()],
+            arguments: Vec::new(),
+            completion: "synchronous".into(),
+            inject_abort_signal: false,
+            concurrency: "none".into(),
+            cancellation: "none".into(),
             execution_boundary: "client".into(),
-            resume_policy: "event_restore".into(),
+            resume_policy: "restore_event_without_replay".into(),
         };
         assert_eq!(
             package_invocation_bundle_specifier(&package).unwrap(),
@@ -7094,8 +7111,13 @@ mod tests {
             export: "recordVisit".into(),
             owner_source: "app/routes/index.tsx".into(),
             declaration_modules: vec!["outside.d.ts".into()],
+            arguments: Vec::new(),
+            completion: "synchronous".into(),
+            inject_abort_signal: false,
+            concurrency: "none".into(),
+            cancellation: "none".into(),
             execution_boundary: "client".into(),
-            resume_policy: "event_restore".into(),
+            resume_policy: "restore_event_without_replay".into(),
         };
         assert!(package_invocation_bundle_specifier(&invocation)
             .unwrap_err()

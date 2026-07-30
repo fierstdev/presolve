@@ -14,7 +14,7 @@ use crate::{
     slot_field_sites_v1, AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 10;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 11;
 const V2_VALIDATION_RULE_NAMES: &[&str] = &[
     "required",
     "min",
@@ -73,6 +73,28 @@ pub struct V2AuthorityStandardValidationSiteV1 {
     pub export_name: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum V2AuthorityPackageInvocationCompletionV1 {
+    Synchronous,
+    Promise,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct V2AuthorityPackageInvocationSiteV1 {
+    pub id: String,
+    pub file: PathBuf,
+    pub position: usize,
+    pub import_position: usize,
+    pub module_specifier: String,
+    pub export_name: String,
+    pub argument_types: Vec<String>,
+    pub completion: V2AuthorityPackageInvocationCompletionV1,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signal_position: Option<usize>,
+}
+
 /// A syntactic member-call candidate.  Rust deliberately records only the
 /// structural object and property positions; the TypeScript authority decides
 /// whether either resolved symbol has framework meaning.
@@ -122,7 +144,7 @@ pub struct V2AuthorityRequestV1 {
     pub form_fields: Vec<V2AuthorityFormFieldSiteV1>,
     pub validations: Vec<V2AuthoritySiteV1>,
     pub standard_validations: Vec<V2AuthorityStandardValidationSiteV1>,
-    pub package_invocations: Vec<V2AuthorityStandardValidationSiteV1>,
+    pub package_invocations: Vec<V2AuthorityPackageInvocationSiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
 
@@ -484,20 +506,58 @@ pub fn build_v2_environment_authority_request_v1(
 /// import. This is syntax-only nomination; TypeScript must prove the symbol.
 fn terminal_package_invocation_sites(
     parsed: &ParsedFile,
-) -> Result<Vec<V2AuthorityStandardValidationSiteV1>, V2AuthorityRequestErrorV1> {
+) -> Result<Vec<V2AuthorityPackageInvocationSiteV1>, V2AuthorityRequestErrorV1> {
     let mut sites = parsed
         .classes
         .iter()
         .flat_map(|class| &class.properties)
         .filter_map(|property| {
-            let invocation = property
+            let handler = property
                 .initializer_call
                 .as_ref()?
                 .inline_handler
-                .as_ref()?
-                .direct_call
                 .as_ref()?;
-            if invocation.awaited || !invocation.arguments.is_empty() {
+            let invocation = handler.direct_call.as_ref()?;
+            let (completion, forwarded_parameters, signal_parameter) =
+                if handler.is_async && invocation.awaited {
+                    let (signal, forwarded) = handler.parameters.split_last()?;
+                    let annotation = signal.type_annotation.as_ref()?;
+                    if signal.name != "signal" || annotation.text.trim() != "AbortSignal" {
+                        return None;
+                    }
+                    (
+                        V2AuthorityPackageInvocationCompletionV1::Promise,
+                        forwarded,
+                        Some(signal),
+                    )
+                } else if !handler.is_async && !invocation.awaited {
+                    (
+                        V2AuthorityPackageInvocationCompletionV1::Synchronous,
+                        handler.parameters.as_slice(),
+                        None,
+                    )
+                } else {
+                    return None;
+                };
+            let argument_types = forwarded_parameters
+                .iter()
+                .map(|parameter| {
+                    let annotation = parameter.type_annotation.as_ref()?.text.trim();
+                    matches!(annotation, "string" | "number" | "boolean" | "null")
+                        .then(|| annotation.to_owned())
+                })
+                .collect::<Option<Vec<_>>>()?;
+            let expected_argument_names = forwarded_parameters
+                .iter()
+                .map(|parameter| parameter.name.as_str())
+                .chain(signal_parameter.map(|parameter| parameter.name.as_str()))
+                .collect::<Vec<_>>();
+            if invocation
+                .arguments
+                .iter()
+                .map(|argument| argument.name.as_str())
+                .ne(expected_argument_names)
+            {
                 return None;
             }
             let (module_specifier, export_name, import_span) = parsed
@@ -528,10 +588,23 @@ fn terminal_package_invocation_sites(
                 module_specifier,
                 export_name,
                 import_span,
+                argument_types,
+                completion,
+                signal_parameter
+                    .and_then(|parameter| parameter.type_annotation.as_ref())
+                    .map(|annotation| annotation.span),
             ))
         })
         .map(
-            |(callee_source, module_specifier, export_name, import_span)| {
+            |(
+                callee_source,
+                module_specifier,
+                export_name,
+                import_span,
+                argument_types,
+                completion,
+                signal_span,
+            )| {
                 let selected = site_for(
                     "package-invocation",
                     AuthoredSourceRangeV1 {
@@ -543,16 +616,18 @@ fn terminal_package_invocation_sites(
                     &parsed.path,
                     &parsed.syntax.source,
                 )?;
-                Ok(V2AuthorityStandardValidationSiteV1 {
+                Ok(V2AuthorityPackageInvocationSiteV1 {
                     id: selected.id,
                     file: selected.file,
                     position: selected.position,
-                    import_position: Some(utf16_position(
-                        &parsed.syntax.source,
-                        import_span.start,
-                    )?),
+                    import_position: utf16_position(&parsed.syntax.source, import_span.start)?,
                     module_specifier,
                     export_name,
+                    argument_types,
+                    completion,
+                    signal_position: signal_span
+                        .map(|span| utf16_position(&parsed.syntax.source, span.start))
+                        .transpose()?,
                 })
             },
         )
@@ -964,5 +1039,58 @@ const lookalike = localConfig.public("PRESOLVE_PUBLIC_LOOKALIKE");
             Path::new("app/routes/index.tsx"),
             "analytics-kit"
         ));
+    }
+
+    #[test]
+    fn nominates_only_exact_primitive_and_abortable_package_action_shapes() {
+        let source = r#"
+import { action, Component } from "presolve";
+import { recordMetric, recordMetricAsync } from "analytics-kit";
+class Metrics extends Component {
+  record = action((category: string, value: number, enabled: boolean, empty: null) => {
+    recordMetric(category, value, enabled, empty);
+  });
+  recordAsync = action(async (category: string, signal: AbortSignal) => {
+    await recordMetricAsync(category, signal);
+  });
+  reordered = action((category: string, value: number) => {
+    recordMetric(value, category);
+  });
+}
+"#;
+        let parsed = parse_file("app/routes/index.tsx", source);
+        let heritage = component_inheritance_sites_v1(&parsed).pop().unwrap();
+        let components = lower_component_inheritance_v1(
+            &parsed,
+            [ResolvedComponentInheritanceV1 {
+                heritage_source: heritage.heritage_source,
+                component_identity: ResolvedIntrinsicIdentityV1 {
+                    name: "Component".into(),
+                    flags: 32,
+                    declaration_modules: vec!["presolve".into()],
+                },
+            }],
+        )
+        .unwrap()
+        .model;
+        let request =
+            build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &components)
+                .unwrap();
+        assert_eq!(request.package_invocations.len(), 2);
+        assert_eq!(
+            request.package_invocations[0].argument_types,
+            ["string", "number", "boolean", "null"]
+        );
+        assert_eq!(
+            request.package_invocations[0].completion,
+            super::V2AuthorityPackageInvocationCompletionV1::Synchronous
+        );
+        assert!(request.package_invocations[0].signal_position.is_none());
+        assert_eq!(request.package_invocations[1].argument_types, ["string"]);
+        assert_eq!(
+            request.package_invocations[1].completion,
+            super::V2AuthorityPackageInvocationCompletionV1::Promise
+        );
+        assert!(request.package_invocations[1].signal_position.is_some());
     }
 }

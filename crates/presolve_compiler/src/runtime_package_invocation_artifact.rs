@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ApplicationSemanticModel;
 
-pub const RUNTIME_PACKAGE_INVOCATION_ARTIFACT_SCHEMA_VERSION: u32 = 1;
+pub const RUNTIME_PACKAGE_INVOCATION_ARTIFACT_SCHEMA_VERSION: u32 = 2;
 pub const PACKAGE_INVOCATION_REGISTRY_PATH: &str = "/presolve.package-invocations.js";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,8 +27,20 @@ pub struct RuntimePackageInvocation {
     pub export: String,
     pub owner_source: String,
     pub declaration_modules: Vec<String>,
+    pub arguments: Vec<RuntimePackageInvocationArgument>,
+    pub completion: String,
+    pub inject_abort_signal: bool,
+    pub concurrency: String,
+    pub cancellation: String,
     pub execution_boundary: String,
     pub resume_policy: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimePackageInvocationArgument {
+    pub event_argument_index: usize,
+    pub codec: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,8 +71,34 @@ pub fn build_runtime_package_invocation_artifact(
                 export: fact.export_name.clone(),
                 owner_source: fact.provenance.path.to_string_lossy().into_owned(),
                 declaration_modules,
+                arguments: fact
+                    .argument_types
+                    .iter()
+                    .enumerate()
+                    .map(
+                        |(event_argument_index, codec)| RuntimePackageInvocationArgument {
+                            event_argument_index,
+                            codec: codec.clone(),
+                        },
+                    )
+                    .collect(),
+                completion: match fact.completion {
+                    crate::PackageInvocationCompletionV1::Synchronous => "synchronous".into(),
+                    crate::PackageInvocationCompletionV1::Promise => "promise".into(),
+                },
+                inject_abort_signal: fact.inject_abort_signal,
+                concurrency: if fact.completion == crate::PackageInvocationCompletionV1::Promise {
+                    "replace_previous_per_component_instance".into()
+                } else {
+                    "none".into()
+                },
+                cancellation: if fact.completion == crate::PackageInvocationCompletionV1::Promise {
+                    "abort_on_replacement_teardown_or_pagehide".into()
+                } else {
+                    "none".into()
+                },
                 execution_boundary: "client".into(),
-                resume_policy: "event_restore".into(),
+                resume_policy: "restore_event_without_replay".into(),
             }
         })
         .collect::<Vec<_>>();
@@ -118,7 +156,34 @@ pub fn validate_runtime_package_invocation_artifact(
                 },
             );
         }
-        if invocation.execution_boundary != "client" || invocation.resume_policy != "event_restore"
+        let valid_arguments = invocation
+            .arguments
+            .iter()
+            .enumerate()
+            .all(|(index, argument)| {
+                argument.event_argument_index == index
+                    && matches!(
+                        argument.codec.as_str(),
+                        "string" | "number" | "boolean" | "null"
+                    )
+            });
+        let valid_completion = match invocation.completion.as_str() {
+            "synchronous" => {
+                !invocation.inject_abort_signal
+                    && invocation.concurrency == "none"
+                    && invocation.cancellation == "none"
+            }
+            "promise" => {
+                invocation.inject_abort_signal
+                    && invocation.concurrency == "replace_previous_per_component_instance"
+                    && invocation.cancellation == "abort_on_replacement_teardown_or_pagehide"
+            }
+            _ => false,
+        };
+        if invocation.execution_boundary != "client"
+            || invocation.resume_policy != "restore_event_without_replay"
+            || !valid_arguments
+            || !valid_completion
         {
             errors.push(
                 RuntimePackageInvocationArtifactValidationError::InvalidLifecycle {
@@ -134,9 +199,9 @@ pub fn validate_runtime_package_invocation_artifact(
 mod tests {
     use super::{
         runtime_package_invocation_artifact_json, validate_runtime_package_invocation_artifact,
-        RuntimePackageInvocation, RuntimePackageInvocationArtifact,
-        RuntimePackageInvocationArtifactValidationError, PACKAGE_INVOCATION_REGISTRY_PATH,
-        RUNTIME_PACKAGE_INVOCATION_ARTIFACT_SCHEMA_VERSION,
+        RuntimePackageInvocation, RuntimePackageInvocationArgument,
+        RuntimePackageInvocationArtifact, RuntimePackageInvocationArtifactValidationError,
+        PACKAGE_INVOCATION_REGISTRY_PATH, RUNTIME_PACKAGE_INVOCATION_ARTIFACT_SCHEMA_VERSION,
     };
 
     fn artifact() -> RuntimePackageInvocationArtifact {
@@ -151,8 +216,16 @@ mod tests {
                 export: "recordVisit".into(),
                 owner_source: "app/routes/index.tsx".into(),
                 declaration_modules: vec!["node_modules/analytics-kit/index.d.ts".into()],
+                arguments: vec![RuntimePackageInvocationArgument {
+                    event_argument_index: 0,
+                    codec: "string".into(),
+                }],
+                completion: "synchronous".into(),
+                inject_abort_signal: false,
+                concurrency: "none".into(),
+                cancellation: "none".into(),
                 execution_boundary: "client".into(),
-                resume_policy: "event_restore".into(),
+                resume_policy: "restore_event_without_replay".into(),
             }],
         }
     }
@@ -173,6 +246,7 @@ mod tests {
         artifact.registry_path = "relative.js".into();
         artifact.invocations[0].module_specifier.clear();
         artifact.invocations[0].resume_policy = "snapshot".into();
+        artifact.invocations[0].arguments[0].codec = "object".into();
         artifact.invocations.push(artifact.invocations[0].clone());
         let errors = validate_runtime_package_invocation_artifact(&artifact);
         assert!(errors.iter().any(|error| matches!(

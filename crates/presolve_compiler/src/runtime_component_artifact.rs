@@ -104,7 +104,11 @@ pub struct SerializedOrdinaryTemplateEvent {
     pub event_type: String,
     pub handler_method_id: String,
     pub action_batch_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        with = "crate::component_graph::runtime_arguments_serde"
+    )]
     pub arguments: Vec<crate::component_graph::SerializableValue>,
     pub program_id: String,
 }

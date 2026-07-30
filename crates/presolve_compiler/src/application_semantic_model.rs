@@ -1939,6 +1939,7 @@ fn retain_v2_runtime_import_bindings(
                     module_specifier,
                     export_name,
                     declaration_modules,
+                    ..
                 } => (module_specifier, export_name, declaration_modules),
                 _ => continue,
             };
@@ -4935,6 +4936,9 @@ mod tests {
                             declaration_modules: vec![
                                 "node_modules/analytics-kit/index.d.ts".into()
                             ],
+                            argument_types: Vec::new(),
+                            completion: crate::PackageInvocationCompletionV1::Synchronous,
+                            inject_abort_signal: false,
                         },
                     ),
                 },

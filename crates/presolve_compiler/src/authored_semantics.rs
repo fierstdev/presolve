@@ -10,7 +10,14 @@ use std::path::PathBuf;
 use presolve_parser::ParsedFile;
 use serde::{Deserialize, Serialize};
 
-pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 6;
+pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 7;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PackageInvocationCompletionV1 {
+    Synchronous,
+    Promise,
+}
 
 /// A serializable source range shared by the syntax and semantic boundaries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -113,6 +120,9 @@ pub enum DerivedAuthoredEvidenceV2 {
         module_specifier: String,
         export_name: String,
         declaration_modules: Vec<String>,
+        argument_types: Vec<String>,
+        completion: PackageInvocationCompletionV1,
+        inject_abort_signal: bool,
     },
 }
 
@@ -472,7 +482,7 @@ mod tests {
             normalize_authored_semantics_v1(&parsed, [state.clone(), component.clone(), state])
                 .expect("valid resolved candidates");
 
-        assert_eq!(model.schema_version, 6);
+        assert_eq!(model.schema_version, 7);
         assert_eq!(model.declarations.len(), 2);
         assert_eq!(model.declarations[0].subject, "Card");
         assert_eq!(
@@ -495,7 +505,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&model).expect("serializable model"),
             serde_json::json!({
-                "schema_version": 6,
+                "schema_version": 7,
                 "source_path": "src/Card.tsx",
                 "declarations": [
                     {

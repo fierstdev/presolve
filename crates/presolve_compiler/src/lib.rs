@@ -252,8 +252,8 @@ pub use authored_semantics::{
     AuthoredSemanticNormalizationErrorV1, AuthoredSourceRangeV1,
     CanonicalAuthoredDeclarationKindV1, CanonicalAuthoredDeclarationV1,
     CanonicalAuthoredSemanticModelV1, CanonicalIntrinsicKindV1, DerivedAuthoredEvidenceV2,
-    ResolvedAuthoredSemanticCandidateV1, ResolvedIntrinsicIdentityV1,
-    CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
+    PackageInvocationCompletionV1, ResolvedAuthoredSemanticCandidateV1,
+    ResolvedIntrinsicIdentityV1, CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION,
 };
 pub use binding_table::{
     build_binding_table, build_binding_table_with_packages, BindingDiagnostic, BindingTable,
@@ -940,8 +940,9 @@ pub use runtime_opaque_artifact::{
 pub use runtime_package_invocation_artifact::{
     build_runtime_package_invocation_artifact, runtime_package_invocation_artifact_json,
     validate_runtime_package_invocation_artifact, RuntimePackageInvocation,
-    RuntimePackageInvocationArtifact, RuntimePackageInvocationArtifactValidationError,
-    PACKAGE_INVOCATION_REGISTRY_PATH, RUNTIME_PACKAGE_INVOCATION_ARTIFACT_SCHEMA_VERSION,
+    RuntimePackageInvocationArgument, RuntimePackageInvocationArtifact,
+    RuntimePackageInvocationArtifactValidationError, PACKAGE_INVOCATION_REGISTRY_PATH,
+    RUNTIME_PACKAGE_INVOCATION_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_resource_artifact::{
     build_runtime_resource_artifact, build_runtime_resource_artifact_with_modules,

@@ -43,16 +43,16 @@ multiple classes without receiving blanket authority.
 
 ## Decorator-free terminal source form
 
-The first executable adoption slice admits a synchronous decorator-free Action
-whose complete body is one direct call to a named import:
+The executable beta surface admits a synchronous decorator-free Action whose
+complete body is one direct call to a named import:
 
 ```tsx
 import { trackPurchase } from "@acme/analytics";
 import { action, Component } from "presolve";
 
 export class Checkout extends Component {
-  track = action(() => {
-    trackPurchase();
+  track = action((category: string, value: number) => {
+    trackPurchase(category, value);
   });
 }
 ```
@@ -60,17 +60,17 @@ export class Checkout extends Component {
 TypeScript authority must resolve the call site to the exact named import and
 declaration module. Default imports, namespace-member calls, computed members,
 dynamic import, `eval`, `Function`, free captures, and server-owned modules are
-not part of the first slice. The call result must be discarded. The admitted
-first argument surface is empty; serializable arguments require an explicit
-artifact amendment rather than retaining or evaluating handler source.
+not admitted. The call result must be discarded. The exact argument and
+completion forms are frozen below; Presolve never retains or evaluates handler
+source at runtime.
 
 The legacy `@action() @opaque(package, export)` form remains compatibility-only
 and is not evidence for this source form.
 
 ## Serializable Action arguments and Promise completion amendment
 
-The next executable slice extends only the terminal Action form above. It does
-not grant package-wide semantics or admit arbitrary Action source.
+This amendment extends only the terminal Action form above. It does not grant
+package-wide semantics or admit arbitrary Action source.
 
 ### Synchronous parameter forwarding
 
@@ -179,8 +179,8 @@ entry that imports only the authority-proven module/export pair and publishes
 one callable registry through the ordinary file-route digest inventory.
 
 The registry coordinate, compiler build identity, module specifier, named
-export, call-site provenance, client execution boundary, and stateless
-event-restore policy are exact artifact facts. Package source is never serialized
+export, call-site provenance, client execution boundary, and
+restore-without-replay policy are exact artifact facts. Package source is never serialized
 into a compiler semantic contract, inspected for framework behavior, or
 executed during compilation.
 
@@ -192,11 +192,10 @@ client renderer is permitted.
 ## Runtime and lifecycle
 
 The terminal invocation runs once after the owning Action batch completes. It
-cannot read or write compiler-owned State except through arguments admitted by
-a later contract. It owns no reactive dependency and no snapshot codec.
+cannot read or write compiler-owned State except through its compiler-admitted
+primitive arguments. It owns no reactive dependency and no snapshot codec.
 Component teardown does not attempt to reverse a completed external side
-effect. A pending asynchronous value is not awaited by this synchronous first
-slice; Promise-aware cancellation requires its own capability contract.
+effect, but it aborts pending Promise work through the runtime-owned signal.
 
 The runtime records completion or failure evidence and reports a stable runtime
 diagnostic for a rejected invocation. It never interprets package internals.
@@ -224,22 +223,22 @@ diagnostic, without claiming compiler knowledge of package implementation.
 
 The first slice is complete only when:
 
-1. the decorator-free source above passes without `@component`, `@action`, or
-   `@opaque`;
+1. the decorator-free synchronous and Promise sources pass without
+   `@component`, `@action`, or `@opaque`;
 2. aliases resolve and same-spelled local functions do not acquire package
    authority;
 3. default/namespace/dynamic/server calls and used return values fail with
    stable diagnostics;
 4. deterministic double builds produce identical terminal records and registry
    bytes;
-5. a real browser proves the package export executes once per accepted Action,
-   remains interactive after compatible resume, and reports missing/rejecting
-   exports without corrupting compiler-owned State; and
+5. a real browser proves exact primitive argument transport, Promise
+   fulfillment, replace-previous and pagehide cancellation, preserved package
+   failures, resume without replay, and missing-registry failure without
+   corrupting compiler-owned State; and
 6. `presolve explain --capabilities` reports terminal package invocation as an
    admitted bounded capability while retaining broader value-producing package
    use as explicitly contract-required.
 
-Later slices may add serializable arguments, Promise cancellation, pure return
-values, codecs, or component adapters only by amending the relevant
-compiler/artifact/lifecycle products. They may not broaden this terminal call
-implicitly.
+Later slices may add pure return values, structural codecs, or component
+adapters only by amending the relevant compiler/artifact/lifecycle products.
+They may not broaden this terminal call implicitly.

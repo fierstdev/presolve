@@ -39,6 +39,9 @@ pub struct ResolvedTerminalPackageInvocationV1 {
     pub module_specifier: String,
     pub export_name: String,
     pub declaration_modules: Vec<String>,
+    pub argument_types: Vec<String>,
+    pub completion: crate::PackageInvocationCompletionV1,
+    pub inject_abort_signal: bool,
 }
 
 /// A validated canonical V2 Action-recognition product.
@@ -195,6 +198,9 @@ pub fn lower_action_fields_v1(
                 module_specifier: invocation.module_specifier.clone(),
                 export_name: invocation.export_name.clone(),
                 declaration_modules: invocation.declaration_modules.clone(),
+                argument_types: invocation.argument_types.clone(),
+                completion: invocation.completion,
+                inject_abort_signal: invocation.inject_abort_signal,
             },
         );
     }

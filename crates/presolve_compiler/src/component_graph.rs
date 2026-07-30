@@ -158,6 +158,9 @@ pub struct AuthoredTerminalPackageInvocationFact {
     pub module_specifier: String,
     pub export_name: String,
     pub declaration_modules: Vec<String>,
+    pub argument_types: Vec<String>,
+    pub completion: crate::PackageInvocationCompletionV1,
+    pub inject_abort_signal: bool,
     pub provenance: SourceProvenance,
 }
 
@@ -1206,6 +1209,90 @@ impl SerializableValue {
     }
 }
 
+/// Event arguments carry executable primitive values. Canonical numeric source
+/// text is retained in the semantic model, but the runtime JSON boundary must
+/// encode numbers as JSON numbers rather than indistinguishable strings.
+pub mod runtime_arguments_serde {
+    use std::collections::BTreeMap;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::SerializableValue;
+
+    pub fn serialize<S>(values: &[SerializableValue], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        values
+            .iter()
+            .map(to_json)
+            .collect::<Result<Vec<_>, _>>()?
+            .serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<SerializableValue>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Vec::<serde_json::Value>::deserialize(deserializer)?
+            .into_iter()
+            .map(from_json)
+            .collect()
+    }
+
+    fn to_json<S>(value: &SerializableValue) -> Result<serde_json::Value, S>
+    where
+        S: serde::ser::Error,
+    {
+        Ok(match value {
+            SerializableValue::Null => serde_json::Value::Null,
+            SerializableValue::Number(value) => serde_json::Value::Number(
+                value
+                    .parse()
+                    .map_err(|_| S::custom("invalid canonical event number"))?,
+            ),
+            SerializableValue::String(value) => serde_json::Value::String(value.clone()),
+            SerializableValue::Boolean(value) => serde_json::Value::Bool(*value),
+            SerializableValue::Array(values) => serde_json::Value::Array(
+                values
+                    .iter()
+                    .map(to_json::<S>)
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+            SerializableValue::Object(values) => serde_json::Value::Object(
+                values
+                    .iter()
+                    .map(|(key, value)| Ok((key.clone(), to_json::<S>(value)?)))
+                    .collect::<Result<serde_json::Map<_, _>, S>>()?,
+            ),
+        })
+    }
+
+    fn from_json<E>(value: serde_json::Value) -> Result<SerializableValue, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(match value {
+            serde_json::Value::Null => SerializableValue::Null,
+            serde_json::Value::Number(value) => SerializableValue::Number(value.to_string()),
+            serde_json::Value::String(value) => SerializableValue::String(value),
+            serde_json::Value::Bool(value) => SerializableValue::Boolean(value),
+            serde_json::Value::Array(values) => SerializableValue::Array(
+                values
+                    .into_iter()
+                    .map(from_json::<E>)
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+            serde_json::Value::Object(values) => SerializableValue::Object(
+                values
+                    .into_iter()
+                    .map(|(key, value)| Ok((key, from_json::<E>(value)?)))
+                    .collect::<Result<BTreeMap<_, _>, E>>()?,
+            ),
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentMethod {
     pub id: SemanticId,
@@ -1691,7 +1778,17 @@ pub fn build_v2_component_graph_for_module(
                     module_specifier,
                     export_name,
                     declaration_modules,
-                }) => Some((module_specifier, export_name, declaration_modules)),
+                    argument_types,
+                    completion,
+                    inject_abort_signal,
+                }) => Some((
+                    module_specifier,
+                    export_name,
+                    declaration_modules,
+                    argument_types,
+                    *completion,
+                    *inject_abort_signal,
+                )),
                 _ => None,
             };
             let imported_package_call = handler.direct_call.as_ref().and_then(|call| {
@@ -1712,7 +1809,7 @@ pub fn build_v2_component_graph_for_module(
                     diagnostics.push(ComponentDiagnostic::error(
                         "PSV2P1001",
                         format!(
-                            "package call `{}()` in canonical V2 Action `{}` was not admitted: the beta supports only a TypeScript-resolved named import, invoked synchronously with zero arguments as the action's sole result-discarded statement; `{}` from `{}` remains ordinary Vite input outside that closed shape",
+                            "package call `{}()` in canonical V2 Action `{}` was not admitted: package Actions require an exact TypeScript-resolved named import, primitive parameters forwarded once in order, and either a synchronous discarded call or the sole awaited Promise<void> call with a final runtime-owned AbortSignal; `{}` from `{}` remains ordinary Vite input outside that closed shape",
                             handler
                                 .direct_call
                                 .as_ref()
@@ -1727,16 +1824,12 @@ pub fn build_v2_component_graph_for_module(
                 }
             }
             let terminal_call_admitted = terminal_evidence.is_some()
-                && handler
-                    .direct_call
-                    .as_ref()
-                    .is_some_and(|call| !call.awaited && call.arguments.is_empty())
-                && handler.parameters.is_empty()
+                && handler.direct_call.is_some()
                 && handler.local_variables.is_empty()
                 && handler.state_updates.is_empty()
                 && handler.unsupported_statement_spans.len() == 1;
             if handler.is_expression_body
-                || handler.is_async
+                || (handler.is_async && !terminal_call_admitted)
                 || (!handler.unsupported_statement_spans.is_empty() && !terminal_call_admitted)
                 || handler
                     .state_updates
@@ -1752,22 +1845,31 @@ pub fn build_v2_component_graph_for_module(
                 ));
                 continue;
             }
-            let Some(operands) = v2_action_operands(handler, class) else {
-                diagnostics.push(ComponentDiagnostic::error(
-                    "PSV2A1004",
-                    format!(
-                        "canonical V2 Action `{}` has unsupported handler parameter or State ownership evidence",
-                        candidate.subject
-                    ),
-                ));
-                continue;
+            let operands = if terminal_call_admitted {
+                BTreeMap::new()
+            } else {
+                let Some(operands) = v2_action_operands(handler, class) else {
+                    diagnostics.push(ComponentDiagnostic::error(
+                        "PSV2A1004",
+                        format!(
+                            "canonical V2 Action `{}` has unsupported handler parameter or State ownership evidence",
+                            candidate.subject
+                        ),
+                    ));
+                    continue;
+                };
+                operands
             };
             let endpoint_id = id.action_endpoint(name);
             let authority = crate::build_action_authority_v1(&[crate::ActionFactV1 {
                 id: endpoint_id.to_string(),
                 component: id.to_string(),
                 asynchronous: handler.is_async,
-                accepts_abort_signal: false,
+                accepts_abort_signal: terminal_evidence.as_ref().is_some_and(
+                    |(_, _, _, _, completion, inject)| {
+                        *completion == crate::PackageInvocationCompletionV1::Promise && *inject
+                    },
+                ),
                 capture_coverage: crate::ActionCaptureCoverageV1::Complete,
                 environment: crate::ActionEnvironmentV1::Browser,
             }]);
@@ -1794,7 +1896,15 @@ pub fn build_v2_component_graph_for_module(
                 owner: SemanticOwner::entity(id.clone()),
                 name: name.to_owned(),
             });
-            if let Some((module_specifier, export_name, declaration_modules)) = terminal_evidence {
+            if let Some((
+                module_specifier,
+                export_name,
+                declaration_modules,
+                argument_types,
+                completion,
+                inject_abort_signal,
+            )) = terminal_evidence
+            {
                 terminal_package_invocations.push(AuthoredTerminalPackageInvocationFact {
                     id: id.package_invocation(name),
                     owner_component: id.clone(),
@@ -1803,6 +1913,9 @@ pub fn build_v2_component_graph_for_module(
                     module_specifier: module_specifier.clone(),
                     export_name: export_name.clone(),
                     declaration_modules: declaration_modules.clone(),
+                    argument_types: argument_types.clone(),
+                    completion,
+                    inject_abort_signal,
                     provenance: SourceProvenance::new(
                         &parsed.path,
                         handler
@@ -1818,6 +1931,18 @@ pub fn build_v2_component_graph_for_module(
                 handler
                     .parameters
                     .iter()
+                    .take(
+                        if terminal_evidence.as_ref().is_some_and(
+                            |(_, _, _, _, completion, inject)| {
+                                *completion == crate::PackageInvocationCompletionV1::Promise
+                                    && *inject
+                            },
+                        ) {
+                            handler.parameters.len().saturating_sub(1)
+                        } else {
+                            handler.parameters.len()
+                        },
+                    )
                     .map(|parameter| {
                         declared_state_type_kind(
                             &parameter

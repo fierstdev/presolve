@@ -25,6 +25,9 @@ export declare function component(): PresolveClassDecorator;
  * Creates a V2 action instance field.  The overload without a handler is
  * retained solely for alpha decorator compatibility.
  */
+export declare function action<This, Args extends readonly unknown[]>(
+  handler: (this: This, ...args: [...Args, AbortSignal]) => Promise<void>
+): (this: This, ...args: Args) => Promise<void>;
 export declare function action<This, Args extends readonly unknown[], Value>(
   handler: (this: This, ...args: Args) => Value
 ): (this: This, ...args: Args) => Value;

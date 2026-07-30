@@ -15,7 +15,7 @@ use crate::{
     ResolvedTerminalPackageInvocationV1, V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 10;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 11;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -37,7 +37,7 @@ pub struct V2AuthorityResponseV1 {
     #[serde(default)]
     pub standard_validations: Vec<V2AuthorityStandardValidationResolutionV1>,
     #[serde(default)]
-    pub package_invocations: Vec<V2AuthorityStandardValidationResolutionV1>,
+    pub package_invocations: Vec<V2AuthorityPackageInvocationResolutionV1>,
     pub environment_public: Vec<V2AuthorityResolutionV1>,
 }
 
@@ -74,6 +74,25 @@ pub struct V2AuthorityStandardValidationResolutionV1 {
     pub input_type: Option<String>,
     #[serde(default)]
     pub output_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum V2AuthorityPackageInvocationCompletionV1 {
+    Synchronous,
+    Promise,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct V2AuthorityPackageInvocationResolutionV1 {
+    pub id: String,
+    pub identity: V2AuthorityIdentityV1,
+    pub module_specifier: String,
+    pub export_name: String,
+    pub argument_types: Vec<String>,
+    pub completion: V2AuthorityPackageInvocationCompletionV1,
+    pub inject_abort_signal: bool,
 }
 
 /// Exact TypeScript-authoritative evidence for one environment member call.
@@ -147,7 +166,7 @@ pub fn validate_v2_authority_response_v1(
         &request.standard_validations,
         &response.standard_validations,
     )?;
-    validate_standard_validation_family(
+    validate_package_invocation_family(
         &request.package_invocations,
         &response.package_invocations,
     )?;
@@ -184,6 +203,16 @@ pub fn v2_authoring_resolutions_from_response_v1(
                     module_specifier: resolution.module_specifier.clone(),
                     export_name: resolution.export_name.clone(),
                     declaration_modules: resolution.identity.declaration_modules.clone(),
+                    argument_types: resolution.argument_types.clone(),
+                    completion: match resolution.completion {
+                        V2AuthorityPackageInvocationCompletionV1::Synchronous => {
+                            crate::PackageInvocationCompletionV1::Synchronous
+                        }
+                        V2AuthorityPackageInvocationCompletionV1::Promise => {
+                            crate::PackageInvocationCompletionV1::Promise
+                        }
+                    },
+                    inject_abort_signal: resolution.inject_abort_signal,
                 },
             ))
         })
@@ -330,6 +359,52 @@ fn validate_standard_validation_family(
             || resolution.export_name != site.export_name
             || resolution.identity.name != site.export_name
             || resolution.identity.declaration_modules.is_empty()
+        {
+            return Err(V2AuthorityResponseErrorV1::IncompatibleSite(
+                resolution.id.clone(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_package_invocation_family(
+    request: &[crate::v2_authority_request::V2AuthorityPackageInvocationSiteV1],
+    response: &[V2AuthorityPackageInvocationResolutionV1],
+) -> Result<(), V2AuthorityResponseErrorV1> {
+    let allowed = request
+        .iter()
+        .map(|site| (site.id.as_str(), site))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let mut seen = BTreeSet::new();
+    for resolution in response {
+        let Some(site) = allowed.get(resolution.id.as_str()) else {
+            return Err(V2AuthorityResponseErrorV1::UnknownSite(
+                resolution.id.clone(),
+            ));
+        };
+        if !seen.insert(resolution.id.as_str()) {
+            return Err(V2AuthorityResponseErrorV1::DuplicateSite(
+                resolution.id.clone(),
+            ));
+        }
+        let completion_matches = matches!(
+            (site.completion, resolution.completion),
+            (
+                crate::v2_authority_request::V2AuthorityPackageInvocationCompletionV1::Synchronous,
+                V2AuthorityPackageInvocationCompletionV1::Synchronous
+            ) | (
+                crate::v2_authority_request::V2AuthorityPackageInvocationCompletionV1::Promise,
+                V2AuthorityPackageInvocationCompletionV1::Promise
+            )
+        );
+        if resolution.module_specifier != site.module_specifier
+            || resolution.export_name != site.export_name
+            || resolution.identity.name != site.export_name
+            || resolution.identity.declaration_modules.is_empty()
+            || resolution.argument_types != site.argument_types
+            || !completion_matches
+            || resolution.inject_abort_signal != site.signal_position.is_some()
         {
             return Err(V2AuthorityResponseErrorV1::IncompatibleSite(
                 resolution.id.clone(),
@@ -512,7 +587,7 @@ mod tests {
         v2_authoring_resolutions_from_response_v1,
         v2_environment_public_resolutions_from_response_v1, validate_v2_authority_response_v1,
         V2AuthorityIdentityV1, V2AuthorityResolutionV1, V2AuthorityResponseErrorV1,
-        V2AuthorityResponseV1,
+        V2AuthorityResponseV1, V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
     };
 
     fn identity(name: &str) -> V2AuthorityIdentityV1 {
@@ -558,7 +633,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 10,
+            schema_version: V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -678,7 +753,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             crate::build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &model)
                 .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 10,
+            schema_version: V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),
@@ -739,7 +814,7 @@ export class Profile extends Component {
         )
         .unwrap();
         let response = V2AuthorityResponseV1 {
-            schema_version: 10,
+            schema_version: V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
             diagnostics: Vec::new(),
             components: vec![V2AuthorityResolutionV1 {
                 id: request.components[0].id.clone(),

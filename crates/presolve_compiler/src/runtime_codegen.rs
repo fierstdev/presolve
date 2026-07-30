@@ -26,7 +26,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 6;
   const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
-  const SUPPORTED_PACKAGE_INVOCATIONS_ARTIFACT_SCHEMA_VERSION = 1;
+  const SUPPORTED_PACKAGE_INVOCATIONS_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
   const SUPPORTED_RESUME_SNAPSHOT_SCHEMA_VERSION = 2;
   const SUPPORTED_RESUME_RUNTIME_PROTOCOL_VERSION = 1;
@@ -798,8 +798,21 @@ const RUNTIME_STUB: &str = r#"(() => {
         || typeof invocation?.owner_source !== "string"
         || !Array.isArray(invocation?.declaration_modules)
         || invocation.declaration_modules.length === 0
+        || !Array.isArray(invocation.arguments)
+        || !invocation.arguments.every((argument, index) =>
+          argument?.event_argument_index === index
+          && ["string", "number", "boolean", "null"].includes(argument?.codec))
+        || !["synchronous", "promise"].includes(invocation.completion)
+        || typeof invocation.inject_abort_signal !== "boolean"
+        || (invocation.completion === "synchronous"
+          ? invocation.inject_abort_signal
+            || invocation.concurrency !== "none"
+            || invocation.cancellation !== "none"
+          : !invocation.inject_abort_signal
+            || invocation.concurrency !== "replace_previous_per_component_instance"
+            || invocation.cancellation !== "abort_on_replacement_teardown_or_pagehide")
         || invocation.execution_boundary !== "client"
-        || invocation.resume_policy !== "event_restore") {
+        || invocation.resume_policy !== "restore_event_without_replay") {
         reportDiagnostic(diagnostics, "PSR_INVALID_PACKAGE_INVOCATIONS_ARTIFACT", "Package invocation metadata did not retain one exact compiler-authorized call boundary", { invocation }, true);
         throw new PresolveBootError("PSR_INVALID_PACKAGE_INVOCATIONS_ARTIFACT");
       }
@@ -2395,6 +2408,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       return Object.freeze({ ...staged, attachment, registration, dispose: () => {
         for (const child of [...children].reverse()) child.dispose();
         cancelFormSubmissionsForComponent(store, identity);
+        cancelPackageInvocationsForComponent(store, identity);
         effects?.dispose();
         registration.rollback();
         attachment.rollback();
@@ -3260,6 +3274,8 @@ const RUNTIME_STUB: &str = r#"(() => {
         (packageInvocationsArtifact?.invocations ?? []).map((invocation) => [invocation.method, invocation])
       ),
       packageInvocationRuns: [],
+      pendingPackageInvocations: new Map(),
+      packageInvocationGenerations: new Map(),
       eventsByType: new Map(),
       elementsByNode,
       diagnostics,
@@ -4477,7 +4493,7 @@ const RUNTIME_STUB: &str = r#"(() => {
       const methodId = executionContext?.method_id;
       if (typeof methodId === "string") {
         executeOpaqueTerminal(store, methodId);
-        executePackageInvocation(store, methodId);
+        executePackageInvocation(store, component, methodId, executionContext);
       }
     } finally {
       store.activeActionBatch = null;
@@ -4504,7 +4520,35 @@ const RUNTIME_STUB: &str = r#"(() => {
       });
   }
 
-  function executePackageInvocation(store, methodId) {
+  function packageInvocationArgument(value, codec) {
+    if (codec === "null") {
+      if (value !== null) throw new Error("package argument did not match compiler codec null");
+      return value;
+    }
+    if (typeof value !== codec) {
+      throw new Error(`package argument did not match compiler codec ${codec}`);
+    }
+    return value;
+  }
+
+  function packageInvocationInstanceKey(component, executionContext, invocation) {
+    const componentInstanceId = executionContext?.component_instance_id ?? component?.instance_id;
+    if (typeof componentInstanceId !== "string" || componentInstanceId.length === 0) {
+      throw new Error("package invocation has no compiler-issued component instance");
+    }
+    return `${componentInstanceId}\u001f${invocation.id}`;
+  }
+
+  function cancelPackageInvocationsForComponent(store, componentInstanceId) {
+    for (const [key, pending] of [...store.pendingPackageInvocations]) {
+      if (componentInstanceId !== null && pending.component_instance_id !== componentInstanceId) continue;
+      pending.evidence.status = "cancelled";
+      pending.controller.abort();
+      store.pendingPackageInvocations.delete(key);
+    }
+  }
+
+  function executePackageInvocation(store, component, methodId, executionContext) {
     const invocation = store.packageInvocationsByMethod.get(methodId);
     if (invocation === undefined) return;
     const evidence = { invocation: invocation.id, method: methodId, status: "running" };
@@ -4514,11 +4558,60 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (typeof callable !== "function") {
         throw new Error("compiler-issued registry callable is missing");
       }
-      Promise.resolve(callable())
-        .then(() => { evidence.status = "complete"; })
+      const runtimeArguments = invocation.arguments.map((argument) =>
+        packageInvocationArgument(
+          executionContext?.arguments?.[argument.event_argument_index],
+          argument.codec
+        )
+      );
+      if (invocation.completion === "synchronous") {
+        const result = callable(...runtimeArguments);
+        if (result !== null && (typeof result === "object" || typeof result === "function")
+          && typeof result.then === "function") {
+          throw new Error("synchronous package invocation returned a Promise");
+        }
+        evidence.status = "complete";
+        return;
+      }
+      const key = packageInvocationInstanceKey(component, executionContext, invocation);
+      const previous = store.pendingPackageInvocations.get(key);
+      if (previous !== undefined) {
+        previous.evidence.status = "cancelled";
+        previous.controller.abort();
+      }
+      const controller = new AbortController();
+      const generation = (store.packageInvocationGenerations.get(key) ?? 0) + 1;
+      store.packageInvocationGenerations.set(key, generation);
+      const pending = {
+        component_instance_id: executionContext?.component_instance_id ?? component?.instance_id,
+        controller,
+        evidence,
+        generation
+      };
+      store.pendingPackageInvocations.set(key, pending);
+      Promise.resolve()
+        .then(() => callable(...runtimeArguments, controller.signal))
+        .then(() => {
+          if (controller.signal.aborted
+            || store.packageInvocationGenerations.get(key) !== generation) {
+            evidence.status = "cancelled";
+            return;
+          }
+          evidence.status = "complete";
+        })
         .catch((error) => {
+          if (controller.signal.aborted) {
+            evidence.status = "cancelled";
+            return;
+          }
           evidence.status = "failed";
           reportDiagnostic(store.diagnostics, "PSR_PACKAGE_INVOCATION_FAILURE", "A compiler-authorized package invocation failed", { invocation: invocation.id, message: error instanceof Error ? error.message : String(error) });
+        })
+        .finally(() => {
+          const current = store.pendingPackageInvocations.get(key);
+          if (current?.generation === generation) {
+            store.pendingPackageInvocations.delete(key);
+          }
         });
     } catch (error) {
       evidence.status = "failed";
@@ -5432,6 +5525,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       null,
       packageInvocationsArtifact
     );
+    window.addEventListener("pagehide", () => {
+      cancelPackageInvocationsForComponent(store, null);
+    }, { once: true });
     store.componentArtifact = componentArtifact;
     store.componentInstances = new Map();
     store.slotBindings = new Map();
@@ -6387,6 +6483,9 @@ const RUNTIME_STUB: &str = r#"(() => {
     const listAnchors = collectListAnchors();
     const elementsByNode = collectElementAnchors();
     const store = createRuntimeStore(elementsByNode, diagnostics, computedArtifact, contextArtifact, effectArtifact, componentArtifact, opaqueArtifact, packageInvocationsArtifact);
+    window.addEventListener("pagehide", () => {
+      cancelPackageInvocationsForComponent(store, null);
+    }, { once: true });
     store.componentArtifact = componentArtifact;
     store.componentInstances = new Map((componentArtifact?.instances ?? []).map((instance) => [instance.instance, { ...instance, status: "created" }]));
     store.slotBindings = new Map((componentArtifact?.slot_binding_programs ?? []).map((binding) => [binding.binding, binding]));

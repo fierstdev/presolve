@@ -5,7 +5,7 @@ import {
   createCanonicalIntrinsicRegistry,
 } from "./index.js";
 
-export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 10;
+export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 11;
 
 /**
  * Resolves explicit source positions for the implemented decorator-free V2
@@ -56,12 +56,18 @@ export async function analyzeV2Authoring(request) {
       file: site.file,
       position: site.position,
     })),
-    signatures: request.formFields
-      .map(site => ({
+    signatures: [
+      ...request.formFields.map(site => ({
         id: `form-field-call:${site.id}`,
         file: site.file,
         position: site.position,
       })),
+      ...request.packageInvocations.map(site => ({
+        id: `package-invocation-call:${site.id}`,
+        file: site.file,
+        position: site.position,
+      })),
+    ],
     standardSchemas: request.standardValidations.map(site => ({
       id: `standard-validation:${site.id}`,
       file: site.file,
@@ -154,15 +160,37 @@ export async function analyzeV2Authoring(request) {
     packageInvocations: request.packageInvocations.flatMap(site => {
       const identity = resolvedIdentity(symbols.get(`package-invocation:${site.id}`));
       const importedIdentity = resolvedIdentity(symbols.get(`package-import:${site.id}`));
+      const signature = fieldSignatures.get(`package-invocation-call:${site.id}`);
+      const parameterTypes = signature?.parameterTypes?.map(parameter => parameter.type);
+      const expectedParameterTypes = [
+        ...site.argumentTypes,
+        ...(site.completion === "promise" ? ["AbortSignal"] : []),
+      ];
+      const exactParameters = Array.isArray(parameterTypes)
+        && parameterTypes.length === expectedParameterTypes.length
+        && parameterTypes.every((type, index) => type?.text === expectedParameterTypes[index]);
+      const returnType = signature?.returnType;
+      const promiseReturn = isCanonicalPromiseVoid(returnType);
+      const completionMatches = site.completion === "promise"
+        ? promiseReturn
+          && parameterTypes?.at(-1)?.symbol?.identity?.name === "AbortSignal"
+          && parameterTypes.at(-1).symbol.identity.declarationModules
+            .some(module => /(?:^|\/)lib\.dom\.d\.ts$/.test(module))
+        : !isCanonicalPromise(returnType);
       return identity?.name === site.exportName
         && importedIdentity?.name === site.exportName
         && sameDeclarationModules(identity, importedIdentity)
         && identity.declarationModules.length > 0
+        && exactParameters
+        && completionMatches
         ? [{
             id: site.id,
             identity,
             moduleSpecifier: site.moduleSpecifier,
             exportName: site.exportName,
+            argumentTypes: site.argumentTypes,
+            completion: site.completion,
+            injectAbortSignal: site.completion === "promise",
           }]
         : [];
     }),
@@ -255,7 +283,11 @@ function validateV2AuthoringRequest(request) {
       || packageInvocationIds.has(site.id)
       || typeof site.moduleSpecifier !== "string" || !site.moduleSpecifier
       || typeof site.exportName !== "string" || !site.exportName
-      || !Number.isInteger(site.importPosition)) {
+      || !Number.isInteger(site.importPosition)
+      || !Array.isArray(site.argumentTypes)
+      || !site.argumentTypes.every(type => ["string", "number", "boolean", "null"].includes(type))
+      || !["synchronous", "promise"].includes(site.completion)
+      || (site.completion === "promise") !== Number.isInteger(site.signalPosition)) {
       throw new TypeError("V2 authoring package invocation sites require unique ids and named module exports");
     }
     packageInvocationIds.add(site.id);
@@ -313,4 +345,17 @@ function sameDeclarationModules(left, right) {
   if (!left || !right) return false;
   return JSON.stringify([...left.declarationModules].sort())
     === JSON.stringify([...right.declarationModules].sort());
+}
+
+function isCanonicalPromise(type) {
+  const identity = type?.symbol?.identity;
+  return identity?.name === "Promise"
+    && identity.declarationModules.some(module => /(?:^|\/)lib\.es\d+\.promise\.d\.ts$/.test(module));
+}
+
+function isCanonicalPromiseVoid(type) {
+  return isCanonicalPromise(type)
+    && type.text === "Promise<void>"
+    && type.typeArguments?.length === 1
+    && type.typeArguments[0]?.text === "void";
 }
