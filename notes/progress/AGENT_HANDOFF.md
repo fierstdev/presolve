@@ -223,14 +223,23 @@ TypeScript 7.0.2 compatibility, and all 90 public documentation files pass.
 The audited runtime baseline is 302,247 bytes and remains within the committed
 budgets.
 
+`0.2.0-beta.18` and VS Code prerelease `0.2.18` are prepared in lockstep. The
+complete uninterrupted release dry run passes at those versions: all Rust and
+package tests, 59 real-browser cases, TypeScript compatibility, documentation,
+clean-room installation from newly packed scaffold/packages, Rust packaging,
+VSIX packaging, and deterministic hashes for all ten release packages. The
+compiler-contract version change regenerated the canonical tooling query
+snapshot and its validation identity.
+
 ## Next slice
 
-Complete the uninterrupted release gate, prepare and publish
-`0.2.0-beta.18` through `fierstdev/presolve`, then install that exact public
-release in Presolve.dev. The deployed Examples route must prove every preview,
-Preview/Code switch, package-free Action, Computed value, conditional pipeline
-panel, Form validation/submission path, mobile layout, and zero runtime
-diagnostics against production HTTPS.
+Commit the reviewed beta.18 preparation, push it through
+`fierstdev/presolve` `main`, and publish the `v0.2.0-beta.18` tag through
+GitHub Actions. Then install that exact public release in Presolve.dev. The
+deployed Examples route must prove every preview, Preview/Code switch,
+package-free Action, Computed value, conditional pipeline panel, Form
+validation/submission path, mobile layout, and zero runtime diagnostics against
+production HTTPS.
 
 Then continue the remaining beta gates: broader Actions, Effect
 execution/cleanup/resume, slot-projected structural hosts, Context,

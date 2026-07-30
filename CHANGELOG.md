@@ -8,6 +8,35 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.18 - 2026-07-29
+
+### Added
+
+- Package Actions now forward exact `string`, `number`, `boolean`, and `null`
+  arguments and support compiler-owned cancellable `Promise<void>` completion,
+  replacement, teardown/pagehide abort, stale-settlement suppression, stable
+  failure evidence, and restore without replay.
+- `create-presolve` now generates the complete canonical document, application
+  shell, global stylesheet, public asset, and interactive route structure with
+  CLI help/version behavior, accessible mobile-first presentation, and
+  comprehensive ownership and Vite guidance.
+- Public project-structure, styling, Tailwind, Vite, asset, and third-party
+  package guides define the exact automatic, adapter-owned, and unsupported
+  boundaries.
+
+### Changed
+
+- Atomic application and file-route publication now retains only the active
+  hidden release directory while preserving failed-build rollback and
+  caller-owned lookalike directories.
+
+### Fixed
+
+- Instance-qualified Computed initialization now evaluates only programs owned
+  by the active component definition. A shared application shell can no longer
+  abort a route containing Computed values with
+  `PSR_INVALID_COMPONENT_ARTIFACT`.
+
 ## 0.2.0-beta.17 - 2026-07-28
 
 ### Added
