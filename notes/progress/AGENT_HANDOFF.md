@@ -273,11 +273,14 @@ spill, rather than an 835,288-byte contaminated code sample.
 
 ## Next slice
 
-Publish the instance-name and document-template corrections immediately as
-`0.2.0-beta.19`, install that exact public release in Presolve.dev, then
-characterize and close the dev-server HMR contract and expand the Examples
-information architecture and production-grade example library before rerunning
-the complete local and production acceptance matrix for Cloudflare deployment.
+Commit and push the clean beta.20 release candidate for the canonical
+development watch/rebuild/CSS-hot-swap/recovery implementation. Require hosted
+main CI and release-dry-run success, publish it only through the verified GitHub
+Actions tag workflow, then install that exact public release in Presolve.dev.
+Update the site styling, Vite, project-structure, and development guides with
+the proven CSS ownership and live-update behavior before expanding the Examples
+information architecture and production-grade example library and rerunning the
+complete local and Cloudflare production acceptance matrix.
 
 The complete beta.19 release dry run passes after the audited runtime baseline
 decreased by six bytes from the identity spelling correction: strict formatting
@@ -315,6 +318,35 @@ frozen handoff contracts gain an explicit executor product.
 
 The previous “100%” statements referred to completing individual beta.14-16
 release trains and production regressions, not the final beta product scope.
-The current full-beta completion estimate is 48%. Beta.18 publication is
-complete, but the initial Computed identity correction and expanded showcase
-must be published and deployed before this authored gate can close.
+Hosted CI `30516684036`, release dry run `30516684048`, and Publish beta
+`30517196543` completed successfully for beta.19. npm `beta` tags for the
+framework, CLI, and creator resolve to `0.2.0-beta.19`; the GitHub release is a
+non-draft prerelease and VS Code `0.2.19` was published. Full-beta completion is
+now 49%.
+
+The next framework gate closes the canonical `pnpm dev` gap. The CLI now
+watches authored inputs, reruns compiler publication atomically, refreshes the
+compiler-issued route manifest, hot-swaps CSS through stable development
+coordinates without losing page state, and uses a safe full reload for edits
+without narrower compatibility evidence. Failed rebuilds retain the last good
+publication and display compiler stderr in an accessible external development
+client; recovery reloads automatically. Compiler-owned hidden stages are
+excluded from observation, preventing rebuild loops.
+
+Focused loopback integration passes for initial serving, CSS update,
+stylesheet bytes, semantic route reload, invalid-edit retention, diagnostic
+publication, and recovery. Real Chrome passes the exact state-preservation
+matrix: red to blue CSS with a preserved marker and
+`/app.css?presolve-dev=1`, semantic content reload, retained last-good content
+under `PSROUTE2002_FILE_ROUTE_SET_EMPTY`, and clean recovery. Strict touched
+crate clippy, creator tests, and all 90 public documentation files pass before
+the beta.20 full release gate.
+
+The uninterrupted beta.20 release dry run is now green. It includes strict
+formatting and clippy, all 59 browser cases, 663 compiler tests, the complete
+Rust/package/TypeScript suites, 90 documentation files, clean-room scaffold
+verification, Rust and VSIX packaging, deterministic production budgets, and
+ten deterministic release artifacts. One earlier full run lost the V2 Form
+Chrome probe to SIGKILL; the isolated test passed immediately and the
+uninterrupted rerun passed the complete browser matrix. Full-beta completion is
+50%.

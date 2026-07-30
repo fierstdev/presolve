@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     build_application_publication_product_from_asm_v1,
@@ -57,7 +57,7 @@ impl fmt::Display for FileRoutePublicationErrorV1 {
 
 impl std::error::Error for FileRoutePublicationErrorV1 {}
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct FileRoutePublicationManifestV1 {
     pub schema_version: u32,
     pub compiler_contract: String,
@@ -66,7 +66,7 @@ pub struct FileRoutePublicationManifestV1 {
     pub artifacts: Vec<ApplicationPublicationArtifactV1>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct FileRoutePublicationRouteV1 {
     pub path: String,
     pub entry_component_id: String,

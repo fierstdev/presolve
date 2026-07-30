@@ -8,6 +8,29 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.20 - 2026-07-29
+
+### Added
+
+- `presolve dev` now watches authored project inputs and republishes from the
+  compiler. CSS-only edits hot-swap the rebuilt canonical stylesheet while
+  preserving browser state, focus, scroll position, and the current document.
+- Semantic edits rebuild the file-route manifest and use the fail-closed full
+  reload boundary until a narrower compiler HMR product proves state
+  compatibility.
+- Failed development builds keep the last successful publication available and
+  render the compiler diagnostic in an accessible browser alert. Correcting the
+  source reloads the recovered publication automatically.
+
+### Changed
+
+- Development responses use `Cache-Control: no-store`, the injected development
+  client is a CSP-compatible same-origin script, and compiler-owned publication
+  stages are excluded from file observation.
+- Scaffold and public styling documentation now trace the exact connection from
+  component/route classes through `app/app.css`, the compiler-owned document
+  head link, content-addressed production output, and development CSS hot swap.
+
 ## 0.2.0-beta.19 - 2026-07-29
 
 ### Fixed

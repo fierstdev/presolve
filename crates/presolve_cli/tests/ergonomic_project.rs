@@ -36,6 +36,16 @@ fn publication_stage_count(root: &PathBuf) -> usize {
         .count()
 }
 
+fn development_get(port: u16, path: &str) -> Option<String> {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).ok()?;
+    stream
+        .write_all(format!("GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n").as_bytes())
+        .ok()?;
+    let mut response = String::new();
+    stream.read_to_string(&mut response).ok()?;
+    Some(response)
+}
+
 #[cfg(unix)]
 #[test]
 fn decorator_free_v2_source_uses_installed_authority_for_file_route_assembly() {
@@ -1157,5 +1167,168 @@ fn dev_serves_the_compiler_published_page() {
     let response = String::from_utf8(response).unwrap();
     assert!(response.starts_with("HTTP/1.1 200 OK"));
     assert!(response.contains("Served"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn dev_rebuilds_routes_and_hot_swaps_css_from_compiler_publications() {
+    let root = project_root("dev-live-update");
+    fs::write(
+        root.join("app/index.html"),
+        "<!doctype html><html><head>{{ head }}</head><body>{{ app }}{{ runtime }}</body></html>",
+    )
+    .unwrap();
+    fs::write(root.join("app/app.css"), "body { color: red; }\n").unwrap();
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <main>Before edit</main>; } }"#,
+    )
+    .unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["dev", "--port", &port.to_string()])
+        .current_dir(&root)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+
+    let initial = (0..200)
+        .find_map(|_| {
+            let response = development_get(port, "/");
+            if response
+                .as_ref()
+                .is_some_and(|value| value.contains("Before edit"))
+            {
+                response
+            } else {
+                thread::sleep(Duration::from_millis(25));
+                None
+            }
+        })
+        .expect("development page became available");
+    assert!(initial.contains("Cache-Control: no-store"));
+    assert!(initial.contains("/__presolve/dev-client.js?revision=0"));
+    assert!(development_get(port, "/__presolve/dev-client.js")
+        .is_some_and(|response| response.contains("document.currentScript.src")
+            && response.contains("/__presolve/dev-state")));
+
+    fs::write(root.join("app/app.css"), "body { color: blue; }\n").unwrap();
+    let style_update = (0..240)
+        .find_map(|_| {
+            let response = development_get(port, "/__presolve/dev-state")?;
+            let body = response.split("\r\n\r\n").nth(1)?;
+            let update: serde_json::Value = serde_json::from_str(body).ok()?;
+            if update["revision"].as_u64().is_some_and(|value| value > 0)
+                && update["updateKind"] == "style-update"
+                && update["status"] == "ready"
+            {
+                Some(update)
+            } else {
+                thread::sleep(Duration::from_millis(25));
+                None
+            }
+        })
+        .expect("CSS edit produced a style update");
+    let style_revision = style_update["revision"].as_u64().unwrap();
+    assert!(
+        development_get(port, "/app.css").is_some_and(|response| response.contains("color: blue"))
+    );
+    thread::sleep(Duration::from_millis(400));
+    let settled_style_state = development_get(port, "/__presolve/dev-state").unwrap();
+    let settled_style_state: serde_json::Value = serde_json::from_str(
+        settled_style_state
+            .split("\r\n\r\n")
+            .nth(1)
+            .expect("development state body"),
+    )
+    .unwrap();
+    assert_eq!(settled_style_state["revision"], style_revision);
+    assert_eq!(settled_style_state["updateKind"], "style-update");
+
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <main>After edit</main>; } }"#,
+    )
+    .unwrap();
+    let semantic_update = (0..240)
+        .find_map(|_| {
+            let response = development_get(port, "/__presolve/dev-state")?;
+            let body = response.split("\r\n\r\n").nth(1)?;
+            let update: serde_json::Value = serde_json::from_str(body).ok()?;
+            if update["revision"]
+                .as_u64()
+                .is_some_and(|value| value > style_revision)
+                && update["updateKind"] == "full-reload"
+                && update["status"] == "ready"
+            {
+                Some(update)
+            } else {
+                thread::sleep(Duration::from_millis(25));
+                None
+            }
+        })
+        .expect("TSX edit produced a safe full reload");
+    let semantic_revision = semantic_update["revision"].as_u64().unwrap();
+    assert!(development_get(port, "/").is_some_and(|response| response.contains("After edit")));
+
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        "@component() class Home extends Component { render(",
+    )
+    .unwrap();
+    let failed_update = (0..240)
+        .find_map(|_| {
+            let response = development_get(port, "/__presolve/dev-state")?;
+            let body = response.split("\r\n\r\n").nth(1)?;
+            let update: serde_json::Value = serde_json::from_str(body).ok()?;
+            if update["revision"]
+                .as_u64()
+                .is_some_and(|value| value > semantic_revision)
+                && update["updateKind"] == "diagnostic-update"
+                && update["status"] == "error"
+                && update["error"]
+                    .as_str()
+                    .is_some_and(|value| !value.is_empty())
+            {
+                Some(update)
+            } else {
+                thread::sleep(Duration::from_millis(25));
+                None
+            }
+        })
+        .expect("invalid edit produced a development diagnostic");
+    let failed_revision = failed_update["revision"].as_u64().unwrap();
+    assert!(development_get(port, "/").is_some_and(|response| response.contains("After edit")));
+
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"@component() class Home extends Component { render() { return <main>Recovered</main>; } }"#,
+    )
+    .unwrap();
+    (0..240)
+        .find_map(|_| {
+            let response = development_get(port, "/__presolve/dev-state")?;
+            let body = response.split("\r\n\r\n").nth(1)?;
+            let update: serde_json::Value = serde_json::from_str(body).ok()?;
+            if update["revision"]
+                .as_u64()
+                .is_some_and(|value| value > failed_revision)
+                && update["updateKind"] == "full-reload"
+                && update["status"] == "ready"
+            {
+                Some(())
+            } else {
+                thread::sleep(Duration::from_millis(25));
+                None
+            }
+        })
+        .expect("valid edit recovered the development server");
+    assert!(development_get(port, "/").is_some_and(|response| response.contains("Recovered")));
+
+    child.kill().unwrap();
+    child.wait().unwrap();
     fs::remove_dir_all(root).unwrap();
 }

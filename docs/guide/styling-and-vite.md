@@ -152,6 +152,40 @@ deterministic:
 Do not construct partial utility names such as `"text-" + this.color`; Tailwind
 cannot discover values that do not appear as complete candidates in source.
 
+## How CSS reaches a component or route
+
+Presolve does not attach a stylesheet to a component instance. The connection
+is the browser's ordinary document cascade:
+
+1. A component or route renders a literal `class` or compatible `className`
+   attribute into its static HTML.
+2. The application owns matching selectors in `app/app.css`, or runs Tailwind,
+   PostCSS, Sass, or another transformer that writes finished CSS to that file.
+3. Presolve reads the final bytes, publishes byte-identical `dist/app.css` and
+   immutable `dist/app.<sha256>.css` artifacts, and records both in the
+   deployment inventory.
+4. Every generated route document receives one compiler-owned
+   `<link rel="stylesheet">` in its `<head>` pointing at the immutable file.
+5. The browser applies those selectors to the complete application shell,
+   layouts, routes, and nested components through normal inheritance,
+   specificity, cascade layers, media queries, and container queries.
+
+This is global CSS. A route does not need to import `app.css`, and a component
+must not render its own global `<link>`. Presolve does not rename selectors,
+scope class names, or remove the stylesheet when a component subtree changes.
+
+During `pnpm dev`, a change to finished CSS triggers a compiler rebuild and a
+CSS hot swap through `/app.css?presolve-dev=<revision>`. Component state, focus,
+scroll position, and the current document remain intact. A TSX, document, route,
+public-file, package, or configuration edit rebuilds from compiler authority
+and uses a full reload unless a narrower HMR product proves state compatibility.
+Compilation errors keep the last good page visible and appear in an accessible
+development alert; correcting the source reloads the recovered publication.
+
+For Tailwind or another transformer, keep its watch process writing
+`app/app.css`. Presolve observes that completed output—not the transformer's
+private source graph—and hot-swaps the resulting browser CSS.
+
 ## Why Vite is installed
 
 The standard scaffold includes project-local Vite because Presolve uses it as a

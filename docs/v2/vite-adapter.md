@@ -46,6 +46,13 @@ therefore not invented by the Vite package. Vite's native watcher remains live
 across ordinary asset edits; semantic HMR classification is compiler-owned and
 fails closed when the callback does not provide a valid product.
 
+The standard CLI owns the conventional host lifecycle directly: it serves the
+compiler's file-route manifest, rebuilds on authored input changes, hot-swaps
+canonical CSS, and selects a full reload for semantic edits without narrower
+compatibility evidence. `startPresolveDevServer` remains the public seam for a
+custom Vite host that supplies compiler callbacks; it is not a second route
+server and is not required in application source.
+
 ## Production build
 
 `buildPresolveProduction` runs Vite for one explicit compiler artifact and

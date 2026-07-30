@@ -7,6 +7,9 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, UNIX_EPOCH};
 
 use presolve_cli::cloudflare_deployment::{
     build_cloudflare_workers_static_deployment_plan_v1, cloudflare_workers_static_plan_json_v1,
@@ -1449,15 +1452,21 @@ fn run_ergonomic_dev(args: &[String]) {
             ),
         }
     }
+    let project_root = Path::new(".").canonicalize().unwrap_or_else(|error| {
+        application_cli_error(
+            "PSDEV1004_PROJECT_ROOT_UNAVAILABLE",
+            &format!("failed to resolve the project root: {error}"),
+        )
+    });
     let manifest = run_ergonomic_build(
-        Path::new("."),
+        &project_root,
         ApplicationPublicationProfileV1::Development,
         None,
     );
     if once {
         return;
     }
-    serve_ergonomic_development_output(&Path::new(".").join("dist"), port, manifest);
+    serve_ergonomic_development_output(&project_root, port, manifest);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1812,10 +1821,20 @@ fn write_cloudflare_adapter_file(path: &Path, contents: &[u8]) {
 }
 
 fn serve_ergonomic_development_output(
-    output_root: &Path,
+    project_root: &Path,
     port: u16,
     manifest: FileRoutePublicationManifestV1,
 ) -> ! {
+    let output_root = project_root.join("dist");
+    let state = Arc::new(Mutex::new(DevelopmentServerStateV1 {
+        revision: 0,
+        update_kind: "ready",
+        status: "ready",
+        error: None,
+        manifest,
+    }));
+    let snapshot = development_input_snapshot(project_root);
+    spawn_development_watcher(project_root.to_path_buf(), snapshot, state.clone());
     let listener = TcpListener::bind(("127.0.0.1", port)).unwrap_or_else(|error| {
         application_cli_error(
             "PSDEV1002_LISTEN_FAILED",
@@ -1828,17 +1847,189 @@ fn serve_ergonomic_development_output(
     println!("Presolve dev ready at http://{address}");
     for connection in listener.incoming() {
         match connection {
-            Ok(stream) => serve_ergonomic_development_connection(stream, output_root, &manifest),
+            Ok(stream) => {
+                serve_ergonomic_development_connection(stream, &output_root, &state);
+            }
             Err(error) => eprintln!("PSDEV1003_CONNECTION_FAILED: {error}"),
         }
     }
     unreachable!("a TcpListener incoming iterator never completes")
 }
 
+#[derive(Debug, Clone)]
+struct DevelopmentServerStateV1 {
+    revision: u64,
+    update_kind: &'static str,
+    status: &'static str,
+    error: Option<String>,
+    manifest: FileRoutePublicationManifestV1,
+}
+
+fn spawn_development_watcher(
+    project_root: PathBuf,
+    mut snapshot: BTreeMap<PathBuf, (u64, Option<Duration>)>,
+    state: Arc<Mutex<DevelopmentServerStateV1>>,
+) {
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_millis(150));
+        let observed = development_input_snapshot(&project_root);
+        if observed == snapshot {
+            continue;
+        }
+        thread::sleep(Duration::from_millis(100));
+        let settled = development_input_snapshot(&project_root);
+        let changed = development_changed_paths(&snapshot, &settled);
+        snapshot = settled;
+        let output = Command::new(
+            env::current_exe()
+                .unwrap_or_else(|error| panic!("current Presolve executable: {error}")),
+        )
+        .args(["dev", "--once"])
+        .current_dir(&project_root)
+        .output();
+        match output {
+            Ok(output) if output.status.success() => {
+                let manifest_path = project_root.join("dist/file-routes.manifest.json");
+                match fs::read(&manifest_path)
+                    .map_err(|error| error.to_string())
+                    .and_then(|bytes| {
+                        serde_json::from_slice::<FileRoutePublicationManifestV1>(&bytes)
+                            .map_err(|error| error.to_string())
+                    }) {
+                    Ok(manifest) => {
+                        let update_kind = if changed
+                            .iter()
+                            .all(|path| path.extension().is_some_and(|value| value == "css"))
+                        {
+                            "style-update"
+                        } else {
+                            "full-reload"
+                        };
+                        let mut current = state.lock().expect("development state lock");
+                        current.revision += 1;
+                        current.update_kind = update_kind;
+                        current.status = "ready";
+                        current.error = None;
+                        current.manifest = manifest;
+                        println!(
+                            "Rebuilt {} ({update_kind}, revision {})",
+                            project_root.join("dist").display(),
+                            current.revision
+                        );
+                    }
+                    Err(error) => {
+                        publish_development_error(
+                            &state,
+                            format!(
+                                "PSDEV1005_MANIFEST_RELOAD_FAILED: {}: {error}",
+                                manifest_path.display()
+                            ),
+                        );
+                    }
+                }
+            }
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                publish_development_error(
+                    &state,
+                    if stderr.is_empty() {
+                        format!("Presolve rebuild failed with status {}", output.status)
+                    } else {
+                        stderr
+                    },
+                );
+            }
+            Err(error) => {
+                publish_development_error(
+                    &state,
+                    format!("PSDEV1006_REBUILD_PROCESS_FAILED: {error}"),
+                );
+            }
+        }
+    });
+}
+
+fn publish_development_error(state: &Arc<Mutex<DevelopmentServerStateV1>>, message: String) {
+    eprintln!("{message}");
+    let mut current = state.lock().expect("development state lock");
+    current.revision += 1;
+    current.update_kind = "diagnostic-update";
+    current.status = "error";
+    current.error = Some(message);
+}
+
+fn development_input_snapshot(root: &Path) -> BTreeMap<PathBuf, (u64, Option<Duration>)> {
+    let mut snapshot = BTreeMap::new();
+    collect_development_inputs(root, root, &mut snapshot);
+    snapshot
+}
+
+fn collect_development_inputs(
+    root: &Path,
+    directory: &Path,
+    snapshot: &mut BTreeMap<PathBuf, (u64, Option<Duration>)>,
+) {
+    let Ok(entries) = fs::read_dir(directory) else {
+        return;
+    };
+    let mut entries = entries.flatten().collect::<Vec<_>>();
+    entries.sort_by_key(fs::DirEntry::file_name);
+    for entry in entries {
+        let path = entry.path();
+        let Ok(relative) = path.strip_prefix(root) else {
+            continue;
+        };
+        if relative.components().next().is_some_and(|component| {
+            component.as_os_str().to_str().is_some_and(|name| {
+                matches!(
+                    name,
+                    ".git" | ".presolve" | "dist" | "node_modules" | "target"
+                ) || name.starts_with(".dist.presolve-release-")
+            })
+        }) {
+            continue;
+        }
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if metadata.file_type().is_symlink() {
+            continue;
+        }
+        if metadata.is_dir() {
+            collect_development_inputs(root, &path, snapshot);
+        } else if metadata.is_file() {
+            snapshot.insert(
+                relative.to_path_buf(),
+                (
+                    metadata.len(),
+                    metadata
+                        .modified()
+                        .ok()
+                        .and_then(|value| value.duration_since(UNIX_EPOCH).ok()),
+                ),
+            );
+        }
+    }
+}
+
+fn development_changed_paths(
+    before: &BTreeMap<PathBuf, (u64, Option<Duration>)>,
+    after: &BTreeMap<PathBuf, (u64, Option<Duration>)>,
+) -> Vec<PathBuf> {
+    before
+        .keys()
+        .chain(after.keys())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .filter(|path| before.get(*path) != after.get(*path))
+        .cloned()
+        .collect()
+}
+
 fn serve_ergonomic_development_connection(
     mut stream: TcpStream,
     output_root: &Path,
-    manifest: &FileRoutePublicationManifestV1,
+    state: &Arc<Mutex<DevelopmentServerStateV1>>,
 ) {
     let mut request = [0_u8; 16 * 1024];
     let Ok(length) = stream.read(&mut request) else {
@@ -1859,18 +2050,46 @@ fn serve_ergonomic_development_connection(
         return;
     };
     let path = target.split('?').next().unwrap_or(target);
-    let Some(target) = resolve_file_route_request_v1(manifest, path) else {
+    if path == "/__presolve/dev-client.js" {
+        write_development_response(
+            &mut stream,
+            "200 OK",
+            "text/javascript; charset=utf-8",
+            DEVELOPMENT_CLIENT_V1.as_bytes(),
+        );
+        return;
+    }
+    if path == "/__presolve/dev-state" {
+        let current = state.lock().expect("development state lock").clone();
+        let body = serde_json::to_vec(&serde_json::json!({
+            "schemaVersion": 1,
+            "revision": current.revision,
+            "updateKind": current.update_kind,
+            "status": current.status,
+            "error": current.error,
+        }))
+        .expect("development state serializes");
+        write_development_response(
+            &mut stream,
+            "200 OK",
+            "application/json; charset=utf-8",
+            &body,
+        );
+        return;
+    }
+    let (manifest, revision) = {
+        let current = state.lock().expect("development state lock");
+        (current.manifest.clone(), current.revision)
+    };
+    let Some(target) = resolve_file_route_request_v1(&manifest, path) else {
         let Some(relative) = development_static_relative_path(path) else {
             write_development_response(&mut stream, "404 Not Found", "text/plain", b"Not found\n");
             return;
         };
         match fs::read(output_root.join(&relative)) {
-            Ok(bytes) => write_development_response(
-                &mut stream,
-                "200 OK",
-                development_content_type(&relative),
-                &bytes,
-            ),
+            Ok(bytes) => {
+                write_development_file_response(&mut stream, &relative, bytes, revision);
+            }
             Err(_) => write_development_response(
                 &mut stream,
                 "404 Not Found",
@@ -1888,21 +2107,11 @@ fn serve_ergonomic_development_connection(
         FileRouteRequestTargetV1::Artifact { path } => path,
     };
     match fs::read(output_root.join(&relative)) {
-        Ok(bytes) => write_development_response(
-            &mut stream,
-            "200 OK",
-            development_content_type(&relative),
-            &bytes,
-        ),
+        Ok(bytes) => write_development_file_response(&mut stream, &relative, bytes, revision),
         Err(_) => {
             if let Some(static_relative) = development_static_relative_path(path) {
                 if let Ok(bytes) = fs::read(output_root.join(&static_relative)) {
-                    write_development_response(
-                        &mut stream,
-                        "200 OK",
-                        development_content_type(&static_relative),
-                        &bytes,
-                    );
+                    write_development_file_response(&mut stream, &static_relative, bytes, revision);
                     return;
                 }
             }
@@ -1910,6 +2119,94 @@ fn serve_ergonomic_development_connection(
         }
     }
 }
+
+fn write_development_file_response(
+    stream: &mut TcpStream,
+    path: &Path,
+    bytes: Vec<u8>,
+    revision: u64,
+) {
+    if path
+        .extension()
+        .is_some_and(|extension| extension == "html")
+    {
+        let page = String::from_utf8_lossy(&bytes);
+        let client = format!(
+            r#"<script src="/__presolve/dev-client.js?revision={revision}" defer></script>"#
+        );
+        let page = if page.contains("</body>") {
+            page.replacen("</body>", &format!("{client}</body>"), 1)
+        } else {
+            format!("{page}{client}")
+        };
+        write_development_response(
+            stream,
+            "200 OK",
+            "text/html; charset=utf-8",
+            page.as_bytes(),
+        );
+    } else {
+        write_development_response(stream, "200 OK", development_content_type(path), &bytes);
+    }
+}
+
+const DEVELOPMENT_CLIENT_V1: &str = r#"(() => {
+  let revision = Number(new URL(document.currentScript.src).searchParams.get("revision"));
+  let failed = false;
+  const removeDiagnostic = () => {
+    document.getElementById("presolve-dev-diagnostic")?.remove();
+  };
+  const showDiagnostic = message => {
+    let diagnostic = document.getElementById("presolve-dev-diagnostic");
+    if (!diagnostic) {
+      diagnostic = document.createElement("pre");
+      diagnostic.id = "presolve-dev-diagnostic";
+      diagnostic.setAttribute("role", "alert");
+      diagnostic.style.cssText = "position:fixed;inset:auto 1rem 1rem;z-index:2147483647;max-height:45vh;overflow:auto;margin:0;padding:1rem;border:1px solid #ff8b8b;border-radius:.75rem;background:#230b12;color:#fff;font:13px/1.5 ui-monospace,monospace;white-space:pre-wrap;box-shadow:0 1rem 3rem #0008";
+      document.body.append(diagnostic);
+    }
+    diagnostic.textContent = message;
+  };
+  const replaceStyles = nextRevision => {
+    const links = [...document.querySelectorAll('link[rel="stylesheet"]')];
+    for (const link of links) {
+      const next = link.cloneNode();
+      const url = new URL(link.href, location.href);
+      if (/^\/app(?:\.[a-f0-9]{64})?\.css$/.test(url.pathname)) {
+        url.pathname = "/app.css";
+      }
+      url.searchParams.set("presolve-dev", String(nextRevision));
+      next.href = url.href;
+      next.addEventListener("load", () => link.remove(), { once: true });
+      link.after(next);
+    }
+  };
+  const poll = async () => {
+    try {
+      const response = await fetch("/__presolve/dev-state", { cache: "no-store" });
+      const update = await response.json();
+      if (update.revision === revision) return;
+      revision = update.revision;
+      if (update.status === "error") {
+        failed = true;
+        showDiagnostic(update.error || "Presolve rebuild failed");
+        return;
+      }
+      removeDiagnostic();
+      if (!failed && update.updateKind === "style-update") {
+        replaceStyles(update.revision);
+      } else {
+        location.reload();
+      }
+      failed = false;
+    } catch (error) {
+      console.warn("Presolve dev update check failed", error);
+    }
+  };
+  setInterval(poll, 250);
+  void poll();
+})();
+"#;
 
 fn development_static_relative_path(path: &str) -> Option<PathBuf> {
     let relative = path.strip_prefix('/').filter(|value| !value.is_empty())?;
@@ -1921,7 +2218,7 @@ fn development_static_relative_path(path: &str) -> Option<PathBuf> {
 fn write_development_redirect(stream: &mut TcpStream, location: &str) {
     let _ = write!(
         stream,
-        "HTTP/1.1 308 Permanent Redirect\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        "HTTP/1.1 308 Permanent Redirect\r\nLocation: {location}\r\nCache-Control: no-store\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
     );
 }
 
@@ -1949,7 +2246,7 @@ fn write_development_response(
 ) {
     let _ = write!(
         stream,
-        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     );
     let _ = stream.write_all(body);

@@ -11,7 +11,7 @@ use std::fmt;
 use std::fmt::Write as _;
 use std::path::{Component, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::platform::{
     validate_workspace_configuration_v1, workspace_configuration_fingerprint_v1, Digest,
@@ -121,7 +121,7 @@ impl fmt::Display for ApplicationPublicationErrorV1 {
 
 impl std::error::Error for ApplicationPublicationErrorV1 {}
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ApplicationPublicationArtifactV1 {
     pub path: String,
     pub digest: String,
