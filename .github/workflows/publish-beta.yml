@@ -40,7 +40,7 @@ jobs:
         with:
           node-version: 26.5.0
           registry-url: https://registry.npmjs.org
-      - name: Make the framework public and apply beta dist-tags
+      - name: Make the framework public and apply release dist-tags
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -62,6 +62,8 @@ jobs:
           do
             npm dist-tag add "$package@${RELEASE_VERSION#v}" beta
           done
+          npm dist-tag add "create-presolve@${RELEASE_VERSION#v}" latest
+          test "$(npm view create-presolve@latest version)" = "${RELEASE_VERSION#v}"
 
   verify:
     name: Verify release inputs
@@ -213,6 +215,37 @@ jobs:
           node scripts/publish-npm-if-missing.mjs pnpm framework/packages/presolve --no-git-checks --provenance --access public --tag beta
           node scripts/publish-npm-if-missing.mjs pnpm packages/cli --no-git-checks --provenance --tag beta
           node scripts/publish-npm-if-missing.mjs pnpm packages/create-presolve --no-git-checks --provenance --tag beta
+          npm dist-tag add "create-presolve@${RELEASE_VERSION#v}" latest
+          for attempt in $(seq 1 12); do
+            if [ "$(npm view create-presolve@latest version)" = "${RELEASE_VERSION#v}" ]; then
+              break
+            fi
+            if [ "$attempt" = 12 ]; then
+              echo "create-presolve@latest did not converge to ${RELEASE_VERSION#v}." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+      - name: Verify the unqualified create command
+        run: |
+          temporary="$(mktemp -d)"
+          (
+            cd "$temporary"
+            pnpm create presolve my-app
+          )
+          node -e '
+            const manifest = require(process.argv[1]);
+            const expected = process.argv[2];
+            if (manifest.dependencies.presolve !== `npm:@presolve/framework@${expected}`) {
+              throw new Error(`unqualified creator emitted ${manifest.dependencies.presolve}; expected ${expected}`);
+            }
+            if (manifest.devDependencies["@presolve/cli"] !== expected) {
+              throw new Error(`unqualified creator emitted CLI ${manifest.devDependencies["@presolve/cli"]}; expected ${expected}`);
+            }
+            if (manifest.devDependencies["@presolve/typescript-authority"] !== expected) {
+              throw new Error(`unqualified creator emitted TypeScript authority ${manifest.devDependencies["@presolve/typescript-authority"]}; expected ${expected}`);
+            }
+          ' "$temporary/my-app/package.json" "${RELEASE_VERSION#v}"
 
   publish-vscode:
     name: Publish VS Code extension
