@@ -2,12 +2,12 @@
 
 ## Current objective
 
-Publish the reconciled `create-presolve` and application-publication contract,
-then adopt that release in Presolve.dev and prove every production-shaped
-showcase in a rendered browser. The generated project, generated README, CLI
-guidance, public project-structure guide, styling/Vite guide, runnable
-examples, and site showcases must describe and prove one exact ownership
-model.
+Publish `0.2.0-beta.21` to correct the immutable beta.20 `create-presolve`
+tarball, prove the unqualified `pnpm create presolve` command from the public
+registry, then adopt that exact release in Presolve.dev. The creator must be
+published under npm's `latest` tag and its generated framework, CLI, and
+TypeScript-authority pins must all equal the release version before the
+publication workflow can continue.
 
 ## Completed slices
 
@@ -273,14 +273,13 @@ spill, rather than an 835,288-byte contaminated code sample.
 
 ## Next slice
 
-Commit and push the clean beta.20 release candidate for the canonical
-development watch/rebuild/CSS-hot-swap/recovery implementation. Require hosted
-main CI and release-dry-run success, publish it only through the verified GitHub
-Actions tag workflow, then install that exact public release in Presolve.dev.
-Update the site styling, Vite, project-structure, and development guides with
-the proven CSS ownership and live-update behavior before expanding the Examples
-information architecture and production-grade example library and rerunning the
-complete local and Cloudflare production acceptance matrix.
+Commit and push the clean beta.21 release candidate. Require hosted main CI and
+release-dry-run success, publish it only through the verified GitHub Actions tag
+workflow, and independently prove that a fresh unqualified
+`pnpm create presolve my-app` generates beta.21 pins and passes install, check,
+build, and deployment preparation. Then install that exact public release in
+Presolve.dev, update its visible release metadata, rerun local and Cloudflare
+production acceptance, and resume the remaining authored beta gates.
 
 The complete beta.19 release dry run passes after the audited runtime baseline
 decreased by six bytes from the identity spelling correction: strict formatting

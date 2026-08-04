@@ -23,7 +23,7 @@ writeFileSync(join(root, "tsconfig.json"), "{}\n");
 assert.match(inspectWorkspace(vscode).message, /canonical Presolve app/);
 mkdirSync(join(root, "app"));
 writeFileSync(join(root, "package.json"), JSON.stringify({
-  dependencies: { presolve: "npm:@presolve/framework@0.2.0-beta.20" },
+  dependencies: { presolve: "npm:@presolve/framework@0.2.0-beta.21" },
 }));
 assert.match(inspectWorkspace(vscode).message, /@presolve\/cli/);
 mkdirSync(join(root, "node_modules", ".bin"), { recursive: true });
@@ -32,13 +32,13 @@ writeFileSync(executable, process.platform === "win32" ? "@echo off\r\n" : "#!/b
 if (process.platform !== "win32") chmodSync(executable, 0o755);
 
 assert.equal(resolveCompiler(root), executable);
-assert.equal(readPresolveVersion(root), "0.2.0-beta.20");
+assert.equal(readPresolveVersion(root), "0.2.0-beta.21");
 assert.deepEqual(inspectWorkspace(vscode), {
   configured: true,
   root,
   cli: executable,
-  version: "0.2.0-beta.20",
-  message: "Presolve 0.2.0-beta.20 · compiler-owned diagnostics and explanations are available.",
+  version: "0.2.0-beta.21",
+  message: "Presolve 0.2.0-beta.21 · compiler-owned diagnostics and explanations are available.",
 });
 
 assert.deepEqual(parseJsonOutput('{"ok":true}'), { ok: true });

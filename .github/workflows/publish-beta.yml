@@ -9,14 +9,9 @@ on:
       release_version:
         description: Existing beta version to resume, with or without the v prefix
         required: true
-        default: "0.2.0-beta.11"
+        default: "0.2.0-beta.21"
       crates_already_published:
         description: Skip crates.io only after confirming all three crates exist
-        required: true
-        type: boolean
-        default: false
-      repair_npm_metadata:
-        description: Repair npm visibility and beta dist-tags without republishing
         required: true
         type: boolean
         default: false
@@ -29,45 +24,8 @@ env:
   RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_version || github.ref_name }}
 
 jobs:
-  repair-npm-metadata:
-    name: Repair npm release metadata
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.repair_npm_metadata }}
-    runs-on: ubuntu-latest
-    environment:
-      name: npm
-    steps:
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26.5.0
-          registry-url: https://registry.npmjs.org
-      - name: Make the framework public and apply release dist-tags
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          npm access set status=public @presolve/framework
-          for package in \
-            @presolve/framework \
-            @presolve/cli \
-            create-presolve \
-            @presolve/cli-darwin-arm64 \
-            @presolve/cli-darwin-x64 \
-            @presolve/cli-linux-x64 \
-            @presolve/cli-win32-x64 \
-            @presolve/compiler-wasm \
-            @presolve/language-service \
-            @presolve/lsp \
-            @presolve/testing \
-            @presolve/typescript-authority \
-            @presolve/vite
-          do
-            npm dist-tag add "$package@${RELEASE_VERSION#v}" beta
-          done
-          npm dist-tag add "create-presolve@${RELEASE_VERSION#v}" latest
-          test "$(npm view create-presolve@latest version)" = "${RELEASE_VERSION#v}"
-
   verify:
     name: Verify release inputs
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.repair_npm_metadata) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -214,8 +172,7 @@ jobs:
         run: |
           node scripts/publish-npm-if-missing.mjs pnpm framework/packages/presolve --no-git-checks --provenance --access public --tag beta
           node scripts/publish-npm-if-missing.mjs pnpm packages/cli --no-git-checks --provenance --tag beta
-          node scripts/publish-npm-if-missing.mjs pnpm packages/create-presolve --no-git-checks --provenance --tag beta
-          npm dist-tag add "create-presolve@${RELEASE_VERSION#v}" latest
+          node scripts/publish-npm-if-missing.mjs pnpm packages/create-presolve --no-git-checks --provenance --tag latest
           for attempt in $(seq 1 12); do
             if [ "$(npm view create-presolve@latest version)" = "${RELEASE_VERSION#v}" ]; then
               break

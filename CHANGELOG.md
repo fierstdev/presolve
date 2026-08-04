@@ -8,6 +8,24 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.21 - 2026-08-02
+
+### Fixed
+
+- The unqualified `pnpm create presolve my-app` command now resolves the current
+  creator release instead of the stale `0.2.0-beta.1` npm `latest` tag. The
+  generated framework, CLI, and TypeScript-authority dependencies remain exact
+  and lockstep with the creator.
+
+### Changed
+
+- GitHub Actions publishes `create-presolve` directly with the `latest` tag,
+  avoiding a separate post-publication dist-tag mutation and its registry
+  convergence race.
+- The release workflow now executes the unqualified create command in a clean
+  temporary directory and verifies all generated Presolve dependency versions
+  before the VS Code extension and GitHub prerelease can publish.
+
 ## 0.2.0-beta.20 - 2026-07-29
 
 ### Added
