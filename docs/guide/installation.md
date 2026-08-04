@@ -3,11 +3,15 @@
 Use a current pnpm installation to create a new application:
 
 ```sh
-pnpm create presolve my-app
+pnpm create presolve@0.2.0-beta.21 my-app
 cd my-app
 pnpm install
 pnpm dev
 ```
+
+The explicit beta version avoids pnpm 11's one-day safety delay for newly
+published unversioned packages. It guarantees that a new project uses the
+release documented here even during the first day of publication.
 
 The generated project already includes the public `presolve` authoring package,
 the `@presolve/cli` command, TypeScript 7, project-local Vite, canonical

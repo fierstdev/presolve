@@ -12,19 +12,20 @@ not publish or imply a release.
 
 ### Fixed
 
-- The unqualified `pnpm create presolve my-app` command now resolves the current
-  creator release instead of the stale `0.2.0-beta.1` npm `latest` tag. The
-  generated framework, CLI, and TypeScript-authority dependencies remain exact
-  and lockstep with the creator.
+- The npm `latest` tag now names the current creator instead of the stale
+  `0.2.0-beta.1` release. The beta.21 creator tarball generates exact,
+  lockstep beta.21 framework, CLI, and TypeScript-authority dependencies.
 
 ### Changed
 
 - GitHub Actions publishes `create-presolve` directly with the `latest` tag,
   avoiding a separate post-publication dist-tag mutation and its registry
   convergence race.
-- The release workflow now executes the unqualified create command in a clean
-  temporary directory and verifies all generated Presolve dependency versions
-  before the VS Code extension and GitHub prerelease can publish.
+- The release workflow now verifies npm's `latest` tag and executes the exact
+  published creator in a clean temporary directory before the VS Code extension
+  and GitHub prerelease can publish. This keeps the proof deterministic while
+  pnpm 11's default one-day minimum release age intentionally delays
+  unversioned resolution of a newly published package.
 
 ## 0.2.0-beta.20 - 2026-07-29
 

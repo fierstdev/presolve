@@ -15,7 +15,7 @@ semantics remain deliberately unsupported.
 ## Create an application
 
 ```sh
-pnpm create presolve my-app
+pnpm create presolve@0.2.0-beta.21 my-app
 cd my-app
 pnpm install
 pnpm dev

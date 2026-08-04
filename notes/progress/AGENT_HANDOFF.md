@@ -2,12 +2,12 @@
 
 ## Current objective
 
-Publish `0.2.0-beta.21` to correct the immutable beta.20 `create-presolve`
-tarball, prove the unqualified `pnpm create presolve` command from the public
-registry, then adopt that exact release in Presolve.dev. The creator must be
-published under npm's `latest` tag and its generated framework, CLI, and
-TypeScript-authority pins must all equal the release version before the
-publication workflow can continue.
+Finish the `0.2.0-beta.21` recovery publication, prove the exact public creator
+from the registry, then adopt that release in Presolve.dev. npm's `latest` tag
+and the immutable beta.21 creator tarball are correct. pnpm 11 intentionally
+selects the newest package older than one day for an unversioned invocation, so
+first-day beta guidance and release proof must use the exact version while
+still asserting that npm's `latest` tag names it.
 
 ## Completed slices
 
@@ -273,12 +273,13 @@ spill, rather than an 835,288-byte contaminated code sample.
 
 ## Next slice
 
-Commit and push the clean beta.21 release candidate. Require hosted main CI and
-release-dry-run success, publish it only through the verified GitHub Actions tag
-workflow, and independently prove that a fresh unqualified
-`pnpm create presolve my-app` generates beta.21 pins and passes install, check,
-build, and deployment preparation. Then install that exact public release in
-Presolve.dev, update its visible release metadata, rerun local and Cloudflare
+Commit and push the pnpm-11-aware publication proof, then resume beta.21 through
+the verified GitHub Actions workflow with crates explicitly marked as already
+published. Require the exact public `pnpm create presolve@0.2.0-beta.21 my-app`
+command to generate beta.21 pins and pass install, check, build, and deployment
+preparation; require the VS Code prerelease and GitHub prerelease to finish.
+Then install that exact public release in Presolve.dev, update its visible
+release metadata and first-day install commands, rerun local and Cloudflare
 production acceptance, and resume the remaining authored beta gates.
 
 The complete beta.19 release dry run passes after the audited runtime baseline

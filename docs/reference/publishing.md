@@ -27,8 +27,9 @@ versioned compatibility train, not a set of independently published packages.
 2. Run the full Rust, package, browser, artifact, formatter, and release-check
    matrix from a clean checkout.
 3. Pack every npm package, install the tarballs in a fresh external directory,
-   run `pnpm create presolve`, install, open/check it with the supported
-   TypeScript configuration, then build it.
+   verify `create-presolve@latest`, execute the exact published creator, install,
+   then open and check it with the supported TypeScript configuration before
+   building it.
 4. Publish platform-specific CLI packages before `@presolve/cli`; publish
    `@presolve/framework`, the scaffold, and supported tooling packages at the
    exact same version and beta tag. Recovery publication must query the exact

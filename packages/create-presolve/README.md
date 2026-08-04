@@ -3,11 +3,15 @@
 Create a new Presolve application with pnpm:
 
 ```sh
-pnpm create presolve my-app
+pnpm create presolve@0.2.0-beta.21 my-app
 cd my-app
 pnpm install
 pnpm dev
 ```
+
+The explicit beta version is intentional: pnpm 11 protects unversioned installs
+with a one-day minimum package age. After a release has matured, `pnpm create
+presolve my-app` resolves the same `latest` creator.
 
 Run the command without a directory in an interactive terminal to choose the
 destination from a prompt. Use `--help` for the complete invocation and
