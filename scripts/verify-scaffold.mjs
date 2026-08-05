@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -29,6 +29,7 @@ try {
     [`@presolve/${platformPackage()}`]: `file:${tarballs.platform}`,
   };
   const workspaceConfiguration = [
+    readFileSync(join(app, "pnpm-workspace.yaml"), "utf8").trimEnd(),
     "overrides:",
     ...Object.entries(overrides).map(
       ([packageName, specifier]) =>
@@ -38,7 +39,7 @@ try {
   ].join("\n");
   writeFileSync(join(app, "pnpm-workspace.yaml"), workspaceConfiguration);
 
-  run("pnpm", ["install", "--ignore-scripts"], app);
+  run("pnpm", ["install"], app);
   run("pnpm", ["check"], app);
   run("pnpm", ["build"], app);
   run("pnpm", ["deploy:prepare"], app);

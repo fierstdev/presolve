@@ -2,12 +2,12 @@
 
 ## Current objective
 
-Finish the `0.2.0-beta.21` recovery publication, prove the exact public creator
-from the registry, then adopt that release in Presolve.dev. npm's `latest` tag
-and the immutable beta.21 creator tarball are correct. pnpm 11 intentionally
-selects the newest package older than one day for an unversioned invocation, so
-first-day beta guidance and release proof must use the exact version while
-still asserting that npm's `latest` tag names it.
+Publish `0.2.0-beta.22` to repair the fresh scaffold's pnpm 11 dependency-build
+policy, prove the exact public creator from the registry, then adopt that
+release in Presolve.dev. Beta.21 published successfully, but a public generated
+app could not proceed beyond install because `esbuild` and `workerd` were not
+declared in `allowBuilds`. The scaffold and clean-room verifier must preserve
+and enforce that policy rather than bypass lifecycle scripts.
 
 ## Completed slices
 
@@ -273,14 +273,13 @@ spill, rather than an 835,288-byte contaminated code sample.
 
 ## Next slice
 
-Commit and push the pnpm-11-aware publication proof, then resume beta.21 through
-the verified GitHub Actions workflow with crates explicitly marked as already
-published. Require the exact public `pnpm create presolve@0.2.0-beta.21 my-app`
-command to generate beta.21 pins and pass install, check, build, and deployment
-preparation; require the VS Code prerelease and GitHub prerelease to finish.
-Then install that exact public release in Presolve.dev, update its visible
-release metadata and first-day install commands, rerun local and Cloudflare
-production acceptance, and resume the remaining authored beta gates.
+Commit and push the verified beta.22 release candidate, then require hosted
+main CI, the hosted release dry run, and GitHub Actions publication. The exact public
+`pnpm create presolve@0.2.0-beta.22 my-app` command must generate beta.22 pins
+and pass install, check, build, and deployment preparation. Then install that
+exact public release in Presolve.dev, update its visible release metadata and
+first-day install commands, rerun local and Cloudflare production acceptance,
+and resume the remaining authored beta gates.
 
 The complete beta.19 release dry run passes after the audited runtime baseline
 decreased by six bytes from the identity spelling correction: strict formatting

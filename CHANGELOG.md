@@ -8,6 +8,26 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.22 - 2026-08-02
+
+### Fixed
+
+- Newly generated applications declare the audited `esbuild` and `workerd`
+  installation scripts in `pnpm-workspace.yaml`, so pnpm 11's strict
+  dependency-build policy admits the Vite and Cloudflare toolchains instead of
+  blocking `pnpm check`, `pnpm build`, and deployment preparation.
+- Clean-room scaffold verification now preserves the generated pnpm policy and
+  installs with lifecycle enforcement enabled before check, build, and
+  Cloudflare preparation. The release gate can no longer hide this failure with
+  `--ignore-scripts`.
+
+### Changed
+
+- Immediate beta installation guidance uses the exact published creator
+  version. npm's `latest` tag is still verified independently because pnpm 11's
+  default one-day minimum package age intentionally delays unversioned
+  resolution of a just-published release.
+
 ## 0.2.0-beta.21 - 2026-08-02
 
 ### Fixed

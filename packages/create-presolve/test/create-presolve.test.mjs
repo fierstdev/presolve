@@ -43,17 +43,22 @@ for (const route of ["app/app.tsx", "app/routes/index.tsx", "app/routes/docs/ind
   assert.match(source, /extends Component/);
   assert.doesNotMatch(source, /@component|@action|@computed|@form|@resource|@slot|@loader|@serverAction/);
 }
-for (const path of ["app/components/README.md", "server/README.md", "app/app.css", "app/index.html", "assets/README.md", "public/favicon.svg", "public/robots.txt", "tests/README.md", ".env.example"]) {
+for (const path of ["app/components/README.md", "server/README.md", "app/app.css", "app/index.html", "assets/README.md", "public/favicon.svg", "public/robots.txt", "tests/README.md", ".env.example", "pnpm-workspace.yaml"]) {
   assert.ok(existsSync(join(target, path)), `missing conventional platform path ${path}`);
 }
 assert.match(readFileSync(join(target, ".env.example"), "utf8"), /PRESOLVE_PUBLIC_APP_NAME/);
 assert.match(readFileSync(join(target, ".gitignore"), "utf8"), /!\.env\.example/);
 const manifest = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
 assert.equal(manifest.packageManager, "pnpm@11.17.0");
-assert.equal(manifest.dependencies.presolve, "npm:@presolve/framework@0.2.0-beta.21");
-assert.equal(manifest.devDependencies["@presolve/cli"], "0.2.0-beta.21");
-assert.equal(manifest.devDependencies["@presolve/typescript-authority"], "0.2.0-beta.21");
+assert.equal(manifest.dependencies.presolve, "npm:@presolve/framework@0.2.0-beta.22");
+assert.equal(manifest.devDependencies["@presolve/cli"], "0.2.0-beta.22");
+assert.equal(manifest.devDependencies["@presolve/typescript-authority"], "0.2.0-beta.22");
 assert.equal(manifest.devDependencies.vite, "^7.0.0");
+const workspace = readFileSync(join(target, "pnpm-workspace.yaml"), "utf8");
+assert.match(workspace, /allowBuilds:/);
+assert.match(workspace, /Vite and Wrangler/);
+assert.match(workspace, /esbuild: true/);
+assert.match(workspace, /workerd: true/);
 assert.ok(manifest.scripts["deploy:prepare"]);
 assert.equal(manifest.scripts["deploy:node:prepare"], "presolve deploy node --prepare");
 assert.match(readFileSync(join(target, "README.md"), "utf8"), /deploy:node:prepare/);
