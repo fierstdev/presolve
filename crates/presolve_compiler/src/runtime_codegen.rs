@@ -3983,14 +3983,18 @@ const RUNTIME_STUB: &str = r#"(() => {
       return;
     }
 
+    const componentInstanceId = store.activeExecutionContext?.component_instance_id ?? null;
+    const component = componentInstanceId === null
+      ? null
+      : store.components.get(componentInstanceId);
+    if (componentInstanceId !== null && component === undefined) {
+      throw new PresolveBootError("PSR_INVALID_COMPONENT_ARTIFACT");
+    }
+
     let executed = false;
 
     for (const batch of store.computedArtifact.update_batches ?? []) {
       for (const computed of batch) {
-        if (!isComputedDirty(store, computed)) {
-          continue;
-        }
-
         const evaluation = store.computedEvaluations.get(computed);
 
         if (evaluation === undefined) {
@@ -4002,6 +4006,9 @@ const RUNTIME_STUB: &str = r#"(() => {
           );
           continue;
         }
+
+        if (component !== null && evaluation.component !== component.name) continue;
+        if (!isComputedDirty(store, computed)) continue;
 
         storeComputedValue(store, evaluation, executeComputedProgram(store, evaluation));
         setComputedDirty(store, computed, false);

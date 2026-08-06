@@ -3,7 +3,7 @@
 Create a new Presolve application with pnpm:
 
 ```sh
-pnpm create presolve@0.2.0-beta.22 my-app
+pnpm create presolve@0.2.0-beta.23 my-app
 cd my-app
 pnpm install
 pnpm dev

@@ -923,6 +923,12 @@ fn repeated_component_state_and_computed_updates_stay_instance_qualified_in_a_re
   @action() increment() { this.count += 1; }
   render() { return <button onClick={this.increment}>{this.count}</button>; }
 }
+@component("x-unmounted-computed") class UnmountedComputed extends Component {
+  value = state(1);
+  @computed() get doubled() { return this.value * 2; }
+  @action() increment() { this.value += 1; }
+  render() { return <output>{this.doubled}</output>; }
+}
 @component("x-repeated-page") @route("/") class RepeatedPage extends Component {
   render() { return <main><RepeatedCounter /><RepeatedCounter /></main>; }
 }"#,
@@ -4044,8 +4050,16 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
   if (buttons.length !== 2 || buttons[0].textContent !== "1" || buttons[1].textContent !== "1") {
     fail("repeated State bindings did not initialize independently");
   }
+  let dispatchedRuntimeError = null;
+  window.addEventListener("error", (event) => {
+    dispatchedRuntimeError = event.error ?? event.message;
+  }, { once: true });
   buttons[0].click();
   await waitFor(() => buttons[0].textContent === "2", "first instance update");
+  await Promise.resolve();
+  if (dispatchedRuntimeError !== null) {
+    fail(`component action dispatched a runtime error: ${String(dispatchedRuntimeError)}`);
+  }
   if (buttons[1].textContent !== "1") fail("first action updated the second instance binding");
   if (Number(runtime.store.storageValues.get(firstState.slot_id)) !== 2
     || Number(runtime.store.storageValues.get(secondState.slot_id)) !== 1) {

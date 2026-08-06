@@ -2,12 +2,12 @@
 
 ## Current objective
 
-Publish `0.2.0-beta.22` to repair the fresh scaffold's pnpm 11 dependency-build
-policy, prove the exact public creator from the registry, then adopt that
-release in Presolve.dev. Beta.21 published successfully, but a public generated
-app could not proceed beyond install because `esbuild` and `workerd` were not
-declared in `allowBuilds`. The scaffold and clean-room verifier must preserve
-and enforce that policy rather than bypass lifecycle scripts.
+Publish `0.2.0-beta.23` to repair component-scoped computed update execution,
+prove the exact public creator from the registry, then adopt that release in
+Presolve.dev. Beta.22 and its generated pnpm build-admission policy are public
+and a fresh exact scaffold passes install, check, build, and Cloudflare
+preparation. Presolve.dev acceptance then exposed an unrelated computed plan
+being resolved against the active route instance after an Action.
 
 ## Completed slices
 
@@ -273,13 +273,13 @@ spill, rather than an 835,288-byte contaminated code sample.
 
 ## Next slice
 
-Commit and push the verified beta.22 release candidate, then require hosted
-main CI, the hosted release dry run, and GitHub Actions publication. The exact public
-`pnpm create presolve@0.2.0-beta.22 my-app` command must generate beta.22 pins
-and pass install, check, build, and deployment preparation. Then install that
-exact public release in Presolve.dev, update its visible release metadata and
-first-day install commands, rerun local and Cloudflare production acceptance,
-and resume the remaining authored beta gates.
+Finish the beta.23 release dry run, commit and push the verified candidate, and
+require hosted main CI, hosted release dry run, and GitHub Actions publication.
+The exact public `pnpm create presolve@0.2.0-beta.23 my-app` command must
+generate beta.23 pins and pass install, check, build, and deployment
+preparation. Then install that exact public release in Presolve.dev, rerun its
+local mobile/runtime acceptance with zero console errors, commit and deploy the
+site through Cloudflare, and resume the remaining authored beta gates.
 
 The complete beta.19 release dry run passes after the audited runtime baseline
 decreased by six bytes from the identity spelling correction: strict formatting

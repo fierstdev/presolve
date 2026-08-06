@@ -8,6 +8,19 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.23 - 2026-08-02
+
+### Fixed
+
+- Component-scoped Action updates now filter the application-wide computed plan
+  by the active component before resolving instance-qualified computed slots.
+  An interactive route no longer raises `PSR_INVALID_COMPONENT_ARTIFACT` merely
+  because another route or unmounted component contributes a computed update
+  batch to the same application publication.
+- The real-browser instance-qualification proof now includes an unmounted
+  component with its own State, Action, and computed plan and rejects any
+  runtime error dispatched by an otherwise unrelated component action.
+
 ## 0.2.0-beta.22 - 2026-08-02
 
 ### Fixed
