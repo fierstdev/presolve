@@ -33,5 +33,11 @@ pnpm deploy:prepare
 pnpm deploy
 ```
 
+The JSON copies embedded in route documents are compact browser transports.
+The matching pretty-printed files in `dist/` remain the canonical,
+digest-bound compiler artifacts for inspection and deployment verification.
+Do not compare their presentation whitespace; Presolve validates their schema
+and value equivalence while avoiding repeated formatting bytes in every page.
+
 See the complete [Cloudflare reference](../reference/cloudflare.md). The first
 adapter is static-only and rejects executable server capabilities.

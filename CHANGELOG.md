@@ -8,6 +8,20 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.24 - 2026-08-07
+
+### Changed
+
+- Compiler-owned JSON embedded in route documents now uses a compact transport
+  encoding while the canonical pretty-printed artifact files and schemas remain
+  unchanged. On the production-shaped Presolve.dev corpus this reduces route
+  HTML from 33.7 MB to 13.6 MB and the complete publication from 82.3 MB to
+  62.3 MB without removing any deployment artifact.
+- Application-publication tests prove the compact template-manifest value is
+  exactly equivalent to the canonical digest-bound artifact, including safe
+  embedded-script escaping. Real-browser proof covers cold boot, Actions,
+  Computed updates, and structural tabs from the compact publication.
+
 ## 0.2.0-beta.23 - 2026-08-02
 
 ### Fixed

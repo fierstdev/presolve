@@ -4415,11 +4415,17 @@ fn build_command_writes_page_manifest_and_runtime_artifacts() {
     assert!(actual_html.contains("<!--presolve-ti-binding-end:"));
     assert!(actual_html.contains("id=\"presolve-template-manifest\""));
     assert!(actual_html.contains("id=\"presolve-resume-runtime\""));
-    assert!(actual_html.contains("\"name\": \"NestedCounter\""));
     assert!(actual_html.contains("<script src=\"./runtime.js\" defer></script>"));
 
     let actual_manifest = std::fs::read_to_string(out_dir.join("template.manifest.json"))
         .expect("failed to read built manifest");
+    let embedded_manifest = actual_html
+        .split_once("id=\"presolve-template-manifest\">")
+        .and_then(|(_, suffix)| suffix.split_once("</script>"))
+        .map(|(payload, _)| payload.trim())
+        .expect("embedded template manifest");
+    assert_eq!(embedded_manifest.lines().count(), 1);
+    assert_json_eq(embedded_manifest, &actual_manifest);
     let expected_manifest =
         std::fs::read_to_string(repo_root.join("fixtures/0004-nested-jsx/expected/manifest.json"))
             .expect("failed to read expected nested manifest");

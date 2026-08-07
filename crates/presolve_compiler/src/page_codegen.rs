@@ -1,6 +1,6 @@
+use serde::Serialize;
+
 use crate::{
-    runtime_component_artifact_json, runtime_computed_artifact_json, runtime_context_artifact_json,
-    runtime_effect_artifact_json, runtime_forms_artifact_json, template_manifest_json,
     ResumeManifest, RuntimeComponentArtifact, RuntimeComputedArtifact, RuntimeContextArtifact,
     RuntimeEffectArtifact, RuntimeFormsArtifact, RuntimeOpaqueArtifact,
     RuntimePackageInvocationArtifact, RuntimeResourceArtifact, TemplateManifest,
@@ -181,14 +181,7 @@ pub fn generate_standalone_page_with_resume_runtime_and_resources(
     let page = generate_standalone_page_with_resume_runtime(
         title, body_html, manifest, computed, context, effects, components, forms, resume,
     );
-    let mut resource_script =
-        "    <script type=\"application/json\" id=\"presolve-resources-runtime\">\n".to_string();
-    for line in crate::runtime_resource_artifact_json(resources).lines() {
-        resource_script.push_str("      ");
-        resource_script.push_str(&escape_script_json_line(line));
-        resource_script.push('\n');
-    }
-    resource_script.push_str("    </script>\n");
+    let resource_script = embedded_runtime_json_script("presolve-resources-runtime", resources);
     page.replacen(
         "    <script src=\"./runtime.js\" defer></script>",
         &(resource_script + "    <script src=\"./runtime.js\" defer></script>"),
@@ -201,14 +194,7 @@ pub fn generate_standalone_page_with_resume_runtime_and_resources(
 /// products; the function never inspects application source.
 #[must_use]
 pub fn embed_opaque_runtime_artifact(page: String, opaque: &RuntimeOpaqueArtifact) -> String {
-    let mut opaque_script =
-        "    <script type=\"application/json\" id=\"presolve-opaque-runtime\">\n".to_string();
-    for line in crate::runtime_opaque_artifact_json(opaque).lines() {
-        opaque_script.push_str("      ");
-        opaque_script.push_str(&escape_script_json_line(line));
-        opaque_script.push('\n');
-    }
-    opaque_script.push_str("    </script>\n");
+    let opaque_script = embedded_runtime_json_script("presolve-opaque-runtime", opaque);
     page.replacen(
         "    <script src=\"./runtime.js\" defer></script>",
         &(opaque_script + "    <script src=\"./runtime.js\" defer></script>"),
@@ -223,15 +209,8 @@ pub fn embed_package_invocation_runtime_artifact(
     page: String,
     package_invocations: &RuntimePackageInvocationArtifact,
 ) -> String {
-    let mut artifact_script =
-        "    <script type=\"application/json\" id=\"presolve-package-invocations-runtime\">\n"
-            .to_string();
-    for line in crate::runtime_package_invocation_artifact_json(package_invocations).lines() {
-        artifact_script.push_str("      ");
-        artifact_script.push_str(&escape_script_json_line(line));
-        artifact_script.push('\n');
-    }
-    artifact_script.push_str("    </script>\n");
+    let artifact_script =
+        embedded_runtime_json_script("presolve-package-invocations-runtime", package_invocations);
     page.replacen(
         "    <script src=\"./runtime.js\" defer></script>",
         &(artifact_script + "    <script src=\"./runtime.js\" defer></script>"),
@@ -251,8 +230,6 @@ fn generate_page(
     forms: Option<&RuntimeFormsArtifact>,
     resume: Option<&ResumeManifest>,
 ) -> String {
-    let manifest_json = template_manifest_json(manifest);
-
     let mut output = String::new();
 
     output.push_str("<!doctype html>\n");
@@ -271,61 +248,39 @@ fn generate_page(
         output.push('\n');
     }
 
-    output.push_str("    <script type=\"application/json\" id=\"presolve-template-manifest\">\n");
-
-    for line in manifest_json.lines() {
-        output.push_str("      ");
-        output.push_str(&escape_script_json_line(line));
-        output.push('\n');
-    }
-
-    output.push_str("    </script>\n");
+    output.push_str(&embedded_runtime_json_script(
+        "presolve-template-manifest",
+        manifest,
+    ));
     if let Some(computed) = computed {
-        output
-            .push_str("    <script type=\"application/json\" id=\"presolve-computed-runtime\">\n");
-        for line in runtime_computed_artifact_json(computed).lines() {
-            output.push_str("      ");
-            output.push_str(&escape_script_json_line(line));
-            output.push('\n');
-        }
-        output.push_str("    </script>\n");
+        output.push_str(&embedded_runtime_json_script(
+            "presolve-computed-runtime",
+            computed,
+        ));
     }
     if let Some(context) = context {
-        output.push_str("    <script type=\"application/json\" id=\"presolve-context-runtime\">\n");
-        for line in runtime_context_artifact_json(context).lines() {
-            output.push_str("      ");
-            output.push_str(&escape_script_json_line(line));
-            output.push('\n');
-        }
-        output.push_str("    </script>\n");
+        output.push_str(&embedded_runtime_json_script(
+            "presolve-context-runtime",
+            context,
+        ));
     }
     if let Some(effects) = effects {
-        output.push_str("    <script type=\"application/json\" id=\"presolve-effect-runtime\">\n");
-        for line in runtime_effect_artifact_json(effects).lines() {
-            output.push_str("      ");
-            output.push_str(&escape_script_json_line(line));
-            output.push('\n');
-        }
-        output.push_str("    </script>\n");
+        output.push_str(&embedded_runtime_json_script(
+            "presolve-effect-runtime",
+            effects,
+        ));
     }
     if let Some(components) = components {
-        output
-            .push_str("    <script type=\"application/json\" id=\"presolve-component-runtime\">\n");
-        for line in runtime_component_artifact_json(components).lines() {
-            output.push_str("      ");
-            output.push_str(&escape_script_json_line(line));
-            output.push('\n');
-        }
-        output.push_str("    </script>\n");
+        output.push_str(&embedded_runtime_json_script(
+            "presolve-component-runtime",
+            components,
+        ));
     }
     if let Some(forms) = forms {
-        output.push_str("    <script type=\"application/json\" id=\"presolve-forms-runtime\">\n");
-        for line in runtime_forms_artifact_json(forms).lines() {
-            output.push_str("      ");
-            output.push_str(&escape_script_json_line(line));
-            output.push('\n');
-        }
-        output.push_str("    </script>\n");
+        output.push_str(&embedded_runtime_json_script(
+            "presolve-forms-runtime",
+            forms,
+        ));
     }
     if let Some(resume) = resume {
         output.push_str("    <script type=\"application/json\" id=\"presolve-resume-runtime\">");
@@ -358,9 +313,24 @@ fn escape_script_json_line(value: &str) -> String {
     value.replace("</script", "<\\/script")
 }
 
+/// The canonical JSON artifacts remain pretty-printed, digest-bound files in
+/// the publication inventory. Their document copies are a browser transport,
+/// so compact serialization avoids repeating presentation whitespace in every
+/// route while retaining the exact schema and values the runtime validates.
+fn embedded_runtime_json_script<T: Serialize>(id: &str, value: &T) -> String {
+    let json = serde_json::to_string(value).expect("runtime artifact should serialize");
+    format!(
+        "    <script type=\"application/json\" id=\"{id}\">\n      {}\n    </script>\n",
+        escape_script_json_line(&json)
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{embed_opaque_runtime_artifact, escape_script_json_line, escape_text};
+    use super::{
+        embed_opaque_runtime_artifact, embedded_runtime_json_script, escape_script_json_line,
+        escape_text,
+    };
 
     #[test]
     fn escapes_title_text() {
@@ -370,6 +340,27 @@ mod tests {
     #[test]
     fn escapes_script_close_sequence() {
         assert_eq!(escape_script_json_line(r#""</script>""#), r#""<\/script>""#);
+    }
+
+    #[test]
+    fn embeds_runtime_json_compactly_without_changing_values() {
+        let value = serde_json::json!({
+            "schema_version": 1,
+            "records": [{ "id": "record:one", "value": "</script>" }]
+        });
+        let script = embedded_runtime_json_script("presolve-test-runtime", &value);
+        let payload = script
+            .split_once('>')
+            .and_then(|(_, suffix)| suffix.rsplit_once("</script>"))
+            .map(|(payload, _)| payload.trim())
+            .expect("embedded JSON script payload");
+
+        assert_eq!(payload.lines().count(), 1);
+        assert!(payload.contains(r#"<\/script>"#));
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(payload).unwrap(),
+            value
+        );
     }
 
     #[test]

@@ -2,12 +2,13 @@
 
 ## Current objective
 
-Publish `0.2.0-beta.23` to repair component-scoped computed update execution,
-prove the exact public creator from the registry, then adopt that release in
-Presolve.dev. Beta.22 and its generated pnpm build-admission policy are public
-and a fresh exact scaffold passes install, check, build, and Cloudflare
-preparation. Presolve.dev acceptance then exposed an unrelated computed plan
-being resolved against the active route instance after an Action.
+Commit and publish the fully rehearsed `0.2.0-beta.24` candidate, require hosted
+main CI and release-dry-run evidence, and prove the exact public creator. Then
+adopt beta.24 in Presolve.dev and require an unmodified Wrangler 4.119.0
+deployment. Beta.23 is public and deployed; its production proof exposed 20 MB
+of repeated pretty-print whitespace in route HTML and a three-request
+Cloudflare upload failure that disappeared only when transfer was serialized
+locally.
 
 ## Completed slices
 
@@ -378,3 +379,34 @@ inventory, local deployment preparation, and release-sized Cloudflare proof.
 Then continue the remaining authored beta gates and final compatibility,
 determinism, diagnostics, artifact, and product hardening. Full-beta completion
 is 73%.
+
+## Beta.24 compact publication candidate
+
+Document-embedded compiler JSON is now serialized as a compact browser
+transport while the matching pretty-printed, digest-bound files remain byte
+stable canonical artifacts. Unit and CLI publication tests parse both forms
+and require exact JSON-value equality. Script-closing text remains escaped.
+
+The production-shaped Presolve.dev build retains the complete 667-file
+compiler publication but falls from 82,324,637 to 62,269,120 bytes. Route HTML
+falls from 33,661,442 to 13,607,215 bytes; canonical JSON, JavaScript, CSS, and
+runtime bytes are unchanged. A local browser proof passed the homepage counter,
+computed example, tabs, and zero-diagnostic runtime with one-line embedded
+manifests.
+
+The uninterrupted beta.24 release dry run passes strict formatting and clippy,
+all 59 real-browser cases, 664 compiler tests, the complete Rust/package/
+TypeScript 7.0.2 suites, all 90 public documentation files, production
+determinism and budgets, a real-lifecycle packed scaffold install/check/build/
+Cloudflare preparation, crate and VSIX packaging, and all ten deterministic
+release artifacts. The principal package hashes are:
+
+- framework: `74b3d2b81d8c46b6ed30a491816464254a2ef108b725e426de539dce5627841c`;
+- CLI: `62d7c45f65f7dfaa398b9ede659b0967ed8dfd49a3b9cb4c84ab20db7f2bb577`;
+  and
+- creator: `a1b18b44de2effa71d8c99965e8e85a7c5d409bc751016d9f7e3cecf7f55c4ab`.
+
+The audited runtime remains 302,655 bytes. The action-counter HTML baseline is
+26,136 bytes and component-structural HTML is 180,165 bytes. Hosted gates,
+publication, exact public scaffold proof, Presolve.dev adoption, and the
+unmodified Wrangler deployment remain required. Full-beta completion is 75%.

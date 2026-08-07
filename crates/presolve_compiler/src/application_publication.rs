@@ -805,6 +805,21 @@ mod tests {
         assert_eq!(product.manifest.schema_version, 1);
         assert_eq!(product.manifest.profile, "development");
         assert!(product.artifacts.contains_key(&PathBuf::from("index.html")));
+        let page =
+            String::from_utf8(product.artifacts[&PathBuf::from("index.html")].clone()).unwrap();
+        let manifest_marker = "id=\"presolve-template-manifest\">";
+        let embedded_manifest = page
+            .split_once(manifest_marker)
+            .and_then(|(_, suffix)| suffix.split_once("</script>"))
+            .map(|(payload, _)| payload.trim())
+            .expect("embedded template manifest");
+        let canonical_manifest = &product.artifacts[&PathBuf::from("template.manifest.json")];
+        assert_eq!(embedded_manifest.lines().count(), 1);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(embedded_manifest).unwrap(),
+            serde_json::from_slice::<serde_json::Value>(canonical_manifest).unwrap(),
+            "compact document transport must preserve the canonical artifact value"
+        );
         let audit: serde_json::Value =
             serde_json::from_slice(&product.artifacts[&PathBuf::from("production-audit.json")])
                 .expect("production audit artifact JSON");

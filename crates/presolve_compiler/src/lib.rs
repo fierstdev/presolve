@@ -4451,7 +4451,16 @@ class Beta extends Component {
         assert!(page.contains("<title>NestedCounter</title>"));
         assert!(page.contains("<section data-presolve-node=\"n0\">"));
         assert!(page.contains("id=\"presolve-template-manifest\""));
-        assert!(page.contains("\"name\": \"NestedCounter\""));
+        let embedded_manifest = page
+            .split_once("id=\"presolve-template-manifest\">")
+            .and_then(|(_, suffix)| suffix.split_once("</script>"))
+            .map(|(payload, _)| payload.trim())
+            .expect("embedded template manifest");
+        assert_eq!(embedded_manifest.lines().count(), 1);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(embedded_manifest).unwrap(),
+            serde_json::to_value(&manifest).unwrap()
+        );
         assert!(page.contains("<script src=\"./runtime.js\" defer></script>"));
     }
 }
