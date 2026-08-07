@@ -349,3 +349,32 @@ ten deterministic release artifacts. One earlier full run lost the V2 Form
 Chrome probe to SIGKILL; the isolated test passed immediately and the
 uninterrupted rerun passed the complete browser matrix. Full-beta completion is
 50%.
+
+## Current beta.23 publication boundary
+
+`0.2.0-beta.23` is published and independently proven. Hosted main CI
+`31075333292`, hosted release dry run `31075333304`, and Publish beta
+`31144139320` passed. A fresh exact public creator invocation emitted beta.23
+framework, CLI, and TypeScript-authority pins with the audited pnpm installer
+policy, then passed install, check, build, and Cloudflare preparation.
+
+Presolve.dev is committed at site commits `0bf5589` and `19ffb7e` and deployed
+as Cloudflare Worker version `5eb64fc4-af8b-40f9-be96-24b4c9e5bcb7`, release
+SHA-256 `7a0dde41e5b80a7df5cf61d3b89c5f3a9a35fd1a3995dad8873d28d3eeef1203`.
+Production browser acceptance proves the canonical `/` URL, beta.23 title and
+favicons, content-addressed CSS across reload, zero 390px overflow, opaque
+close-on-navigation mobile menus, `Count: 0` to `Count: 1` with no runtime
+diagnostics, live Computed/tabs/Form examples, and intact code samples with the
+literal `{{ runtime }}` placeholder.
+
+The next hardening slice must remove the manual Cloudflare upload intervention.
+The exact site publication is about 80 MB across 740 assets; Wrangler 4.119.0's
+three concurrent bulk requests repeatedly failed with `EPIPE`, while a
+local-only concurrency of one uploaded all 258 changed assets successfully.
+Do not retain or document a patched dependency as the solution. Characterize
+which generated products are genuinely browser-public, measure route-document
+duplication, and implement a compiler/deploy-owned correction with deterministic
+inventory, local deployment preparation, and release-sized Cloudflare proof.
+Then continue the remaining authored beta gates and final compatibility,
+determinism, diagnostics, artifact, and product hardening. Full-beta completion
+is 73%.
