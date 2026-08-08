@@ -42,5 +42,14 @@ jobs:
         env:
           RELEASE_VERSION: ${{ inputs.release_version }}
         run: |
-          test "$(npm view create-presolve@latest version)" = "$RELEASE_VERSION"
-          test "$(npm view create-presolve@beta version)" = "$RELEASE_VERSION"
+          for attempt in $(seq 1 12); do
+            if [ "$(npm view create-presolve@latest version)" = "$RELEASE_VERSION" ] && \
+               [ "$(npm view create-presolve@beta version)" = "$RELEASE_VERSION" ]; then
+              exit 0
+            fi
+            if [ "$attempt" = 12 ]; then
+              echo "create-presolve latest/beta tags did not converge to $RELEASE_VERSION." >&2
+              exit 1
+            fi
+            sleep 5
+          done
