@@ -4,6 +4,7 @@ node_modules/
 dist/
 target/
 target/ezc-test-output/
+notes/
 /.turbo/
 .DS_Store
 *.log
