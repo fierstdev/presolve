@@ -15,7 +15,7 @@ use crate::{
     ResolvedTerminalPackageInvocationV1, V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 12;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 13;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -40,6 +40,8 @@ pub struct V2AuthorityResponseV1 {
     pub package_invocations: Vec<V2AuthorityPackageInvocationResolutionV1>,
     #[serde(default)]
     pub server_action_invocations: Vec<V2AuthorityServerActionInvocationResolutionV1>,
+    #[serde(default)]
+    pub route_loader_invocations: Vec<V2AuthorityRouteLoaderInvocationResolutionV1>,
     pub environment_public: Vec<V2AuthorityResolutionV1>,
 }
 
@@ -102,6 +104,16 @@ pub struct V2AuthorityPackageInvocationResolutionV1 {
 pub struct V2AuthorityServerActionInvocationResolutionV1 {
     pub id: String,
     pub identity: V2AuthorityIdentityV1,
+    pub module_specifier: String,
+    pub export_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct V2AuthorityRouteLoaderInvocationResolutionV1 {
+    pub id: String,
+    pub identity: V2AuthorityIdentityV1,
+    pub loader_identity: V2AuthorityIdentityV1,
     pub module_specifier: String,
     pub export_name: String,
 }
@@ -184,6 +196,10 @@ pub fn validate_v2_authority_response_v1(
     validate_server_action_invocation_family(
         &request.server_action_invocations,
         &response.server_action_invocations,
+    )?;
+    validate_route_loader_invocation_family(
+        &request.route_loader_invocations,
+        &response.route_loader_invocations,
     )?;
     validate_member_family(&request.environment_public, &response.environment_public)
 }
@@ -362,6 +378,23 @@ pub fn v2_authoring_resolutions_from_response_v1(
                 })
             })
             .collect::<Result<Vec<_>, V2AuthorityResponseErrorV1>>()?,
+        route_loader_invocations: response
+            .route_loader_invocations
+            .iter()
+            .map(|resolution| {
+                Ok(crate::ResolvedRouteLoaderInvocationV1 {
+                    callee_source: range_from_site_id(
+                        &resolution.id,
+                        "route-loader-invocation",
+                        &parsed.syntax.source,
+                    )?,
+                    loader_identity: identity_from_response(&resolution.loader_identity),
+                    module_specifier: resolution.module_specifier.clone(),
+                    export_name: resolution.export_name.clone(),
+                    declaration_modules: resolution.identity.declaration_modules.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, V2AuthorityResponseErrorV1>>()?,
     })
 }
 
@@ -473,6 +506,50 @@ fn validate_server_action_invocation_family(
                 resolution.id.clone(),
             ));
         }
+    }
+    Ok(())
+}
+
+fn validate_route_loader_invocation_family(
+    request: &[crate::v2_authority_request::V2AuthorityRouteLoaderInvocationSiteV1],
+    response: &[V2AuthorityRouteLoaderInvocationResolutionV1],
+) -> Result<(), V2AuthorityResponseErrorV1> {
+    let allowed = request
+        .iter()
+        .map(|site| (site.id.as_str(), site))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let mut seen = BTreeSet::new();
+    for resolution in response {
+        let Some(site) = allowed.get(resolution.id.as_str()) else {
+            return Err(V2AuthorityResponseErrorV1::UnknownSite(
+                resolution.id.clone(),
+            ));
+        };
+        if !seen.insert(resolution.id.as_str()) {
+            return Err(V2AuthorityResponseErrorV1::DuplicateSite(
+                resolution.id.clone(),
+            ));
+        }
+        if resolution.module_specifier != site.module_specifier
+            || resolution.export_name != site.export_name
+            || resolution.identity.name != site.export_name
+            || resolution.identity.declaration_modules.is_empty()
+            || resolution.loader_identity.name != "loader"
+            || resolution.loader_identity.declaration_modules.is_empty()
+        {
+            return Err(V2AuthorityResponseErrorV1::IncompatibleSite(
+                resolution.id.clone(),
+            ));
+        }
+    }
+    if seen.len() != allowed.len() {
+        let missing = allowed
+            .keys()
+            .find(|id| !seen.contains(**id))
+            .expect("different lengths imply one missing loader site");
+        return Err(V2AuthorityResponseErrorV1::IncompatibleSite(
+            (*missing).to_owned(),
+        ));
     }
     Ok(())
 }
@@ -718,6 +795,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
             standard_validations: Vec::new(),
             package_invocations: Vec::new(),
             server_action_invocations: Vec::new(),
+            route_loader_invocations: Vec::new(),
             environment_public: Vec::new(),
         };
         (parsed, request, response)
@@ -833,6 +911,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             standard_validations: Vec::new(),
             package_invocations: Vec::new(),
             server_action_invocations: Vec::new(),
+            route_loader_invocations: Vec::new(),
             environment_public: vec![V2AuthorityResolutionV1 {
                 id: request.environment_public[0].id.clone(),
                 identity: identity("public"),
@@ -916,6 +995,7 @@ export class Profile extends Component {
             }],
             package_invocations: Vec::new(),
             server_action_invocations: Vec::new(),
+            route_loader_invocations: Vec::new(),
             environment_public: Vec::new(),
         };
         let resolutions =

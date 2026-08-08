@@ -180,6 +180,19 @@ export interface Resource<Data, Error> {
   readonly state: ResourceState;
   readonly __presolveResourceBrand: unique symbol;
 }
+/** Canonical, decoded parameters for the current file route. */
+export type RouteParameters = Readonly<Record<string, string>>;
+/**
+ * Declares a route-owned server Resource. A supported server adapter executes
+ * the compiler-selected import per request, validates its result, and
+ * bootstraps this field without publishing server code to the browser.
+ */
+export declare function loader<Data, Error>(
+  handler: (
+    params: RouteParameters,
+    signal: AbortSignal
+  ) => Promise<Data>
+): Resource<Data, Error>;
 export type ServerActionJsonValue =
   | null
   | boolean
@@ -191,6 +204,7 @@ export type ServerActionResult =
   | ServerActionJsonValue
   | { readonly location: `/${string}` };
 export declare function resource(endpoint: string): PresolveFieldDecorator;
+/** @deprecated Alpha compatibility decorator. */
 export declare function loader(endpoint: string): PresolveFieldDecorator;
 export declare function serverAction(endpoint: string): PresolveMethodDecorator;
 export declare function opaque(

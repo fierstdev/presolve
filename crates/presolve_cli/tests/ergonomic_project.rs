@@ -190,7 +190,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 writeFileSync("authority-ran", "yes");
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 12,
+  schemaVersion: 13,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
@@ -748,31 +748,141 @@ fn default_build_publishes_compiler_joined_route_metadata() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[cfg(unix)]
 #[test]
-fn default_check_and_build_publish_a_compiler_route_loader_handoff() {
+fn canonical_route_loader_bundles_executes_caches_and_bootstraps_the_browser() {
     let root = project_root("route-loader");
+    let repository = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap();
+    let framework_types = repository.join("framework/packages/presolve/src/index.d.ts");
+    let authority_module = repository.join("packages/typescript-authority/src/index.js");
     let package = root.join("node_modules/post-service");
     fs::create_dir_all(package.join("dist")).unwrap();
     fs::create_dir_all(root.join("app/routes/posts")).unwrap();
+    fs::create_dir_all(root.join("app/routes/private")).unwrap();
+    fs::create_dir_all(root.join("app/routes/fresh")).unwrap();
     fs::write(
         root.join("app/routes/posts/[slug].tsx"),
         r#"
+import { Component, loader, type Resource, type RouteParameters } from "presolve";
 import { loadPost } from "post-service";
-@component() class Post {
-  @loader("loadPost") post!: Resource<Post, NotFound>;
-  render() { return <article />; }
+type PostRecord = { slug: string; title: string; };
+type NotFound = { code: "not_found"; };
+export class Post extends Component {
+  post: Resource<PostRecord, NotFound> = loader<PostRecord, NotFound>(
+    async (params: RouteParameters, signal: AbortSignal) => loadPost(params, signal),
+  );
+  render() { return <article>{this.post.data?.title ?? "Loading"}</article>; }
+}
+"#,
+    )
+    .unwrap();
+    for (directory, class, field, imported) in [
+        ("private", "PrivatePost", "privatePost", "loadPrivate"),
+        ("fresh", "FreshPost", "freshPost", "loadFresh"),
+    ] {
+        fs::write(
+            root.join(format!("app/routes/{directory}/[slug].tsx")),
+            format!(
+                r#"import {{ Component, loader, type Resource, type RouteParameters }} from "presolve";
+import {{ {imported} }} from "post-service";
+type PostRecord = {{ slug: string; title: string; }};
+type NotFound = {{ code: "not_found"; }};
+export class {class} extends Component {{
+  {field}: Resource<PostRecord, NotFound> = loader<PostRecord, NotFound>(
+    async (params: RouteParameters, signal: AbortSignal) => {imported}(params, signal),
+  );
+  render() {{ return <article />; }}
+}}
+"#
+            ),
+        )
+        .unwrap();
+    }
+    fs::write(
+        package.join("presolve.contract.json"),
+        r#"{"schema_version":1,"package":"post-service","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadFresh":{"kind":"resource","type_signature":"(RouteParameters, AbortSignal) -> Promise<RouteLoaderResult>","runtime_module":"dist/load-fresh.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"no_store"},"failure":"typed"}},"loadPost":{"kind":"resource","type_signature":"(RouteParameters, AbortSignal) -> Promise<RouteLoaderResult>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"public","max_age_seconds":60},"failure":"typed"}},"loadPrivate":{"kind":"resource","type_signature":"(RouteParameters, AbortSignal) -> Promise<RouteLoaderResult>","runtime_module":"dist/load-private.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"private","max_age_seconds":60},"failure":"typed"}}}}"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("dist/load-post.js"),
+        r#"const calls = new Map();
+export async function loadPost({ slug }, signal) {
+  if (slug === 'missing') throw { code: 'not_found' };
+  if (slug === 'invalid') return { slug, title: 42 };
+  if (slug === 'slow') return await new Promise((resolve, reject) => signal.addEventListener('abort', () => { console.error('PRESOLVE_TEST_LOADER_ABORTED'); reject(new Error('aborted')); }, { once: true }));
+  calls.set(slug, (calls.get(slug) ?? 0) + 1);
+  return { slug, title: `Post:${slug}:${calls.get(slug)}` };
 }
 "#,
     )
     .unwrap();
     fs::write(
-        package.join("presolve.contract.json"),
-        r#"{"schema_version":1,"package":"post-service","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"RouteParameters -> Resource<Post, NotFound>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"public","max_age_seconds":60},"failure":"typed"}}}}"#,
+        package.join("dist/load-private.js"),
+        r#"const calls = new Map();
+export async function loadPrivate({ slug }, signal) {
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+  calls.set(slug, (calls.get(slug) ?? 0) + 1);
+  return { slug, title: `Private:${slug}:${calls.get(slug)}` };
+}
+"#,
     )
     .unwrap();
     fs::write(
-        package.join("dist/load-post.js"),
-        "export const loadPost = () => {};\n",
+        package.join("dist/load-fresh.js"),
+        r#"const calls = new Map();
+export async function loadFresh({ slug }, signal) {
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+  calls.set(slug, (calls.get(slug) ?? 0) + 1);
+  return { slug, title: `Fresh:${slug}:${calls.get(slug)}` };
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("index.d.ts"),
+        r#"import type { RouteParameters } from "presolve";
+export interface PostRecord { slug: string; title: string; }
+export interface NotFound { code: "not_found"; }
+export declare function loadFresh(params: RouteParameters, signal: AbortSignal): Promise<PostRecord>;
+export declare function loadPost(params: RouteParameters, signal: AbortSignal): Promise<PostRecord>;
+export declare function loadPrivate(params: RouteParameters, signal: AbortSignal): Promise<PostRecord>;
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("package.json"),
+        r#"{"name":"post-service","version":"1.0.0","type":"module","types":"index.d.ts"}"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("tsconfig.json"),
+        format!(
+            r#"{{"compilerOptions":{{"noEmit":true,"strict":true,"jsx":"preserve","module":"NodeNext","moduleResolution":"NodeNext","paths":{{"presolve":["{}"]}}}}}}"#,
+            framework_types.display()
+        ),
+    )
+    .unwrap();
+    let executable = root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(
+        &executable,
+        format!(
+            r#"#!/usr/bin/env node
+import {{ analyzeV2Authoring }} from "{}";
+import {{ readFileSync }} from "node:fs";
+process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFileSync(0, "utf8")))));
+"#,
+            authority_module.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+    std::os::unix::fs::symlink(
+        repository.join("packages/vite/node_modules/vite"),
+        root.join("node_modules/vite"),
     )
     .unwrap();
 
@@ -799,6 +909,326 @@ import { loadPost } from "post-service";
     let plan = fs::read_to_string(root.join("dist/route-loaders.plan.json")).unwrap();
     assert!(plan.contains("post-service"));
     assert!(plan.contains("route_parameters"));
+    assert!(!plan.contains("@loader"));
+    let plan: serde_json::Value = serde_json::from_str(&plan).unwrap();
+    assert_eq!(plan["schema_version"], 2);
+    let loader = &plan["routes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|route| route["path"] == "/posts/:slug")
+        .unwrap()["loaders"][0];
+    assert_eq!(loader["parameters"][0]["name"], "slug");
+    assert_eq!(loader["parameters"][0]["segment_index"], 1);
+    assert_eq!(loader["normalization"]["percent_decoding"], "strict_utf8");
+    assert_eq!(loader["data_codec"]["kind"], "object_codec");
+    assert_eq!(loader["error_codec"]["kind"], "object_codec");
+    assert!(loader["resource_activation_id"]
+        .as_str()
+        .unwrap()
+        .contains("resource-activation"));
+    let resources: serde_json::Value = serde_json::from_slice(
+        &fs::read(root.join("dist/routes/segment-posts/parameter-slug/resources.runtime.json"))
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(resources["schema_version"], 4);
+    assert_eq!(resources["server_bootstraps"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        resources["server_bootstraps"][0]["loader_capability_id"],
+        loader["id"]
+    );
+    assert!(resources["declarations"][0]["endpoint"]
+        .get("runtime_location")
+        .is_none());
+
+    let deploy = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare", "--name", "presolve-loaders"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        deploy.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&deploy.stderr)
+    );
+    let adapter = root.join(".presolve/node");
+    assert!(adapter.join("presolve.route-loaders.mjs").is_file());
+    let deployment: serde_json::Value =
+        serde_json::from_slice(&fs::read(adapter.join("deployment.plan.json")).unwrap()).unwrap();
+    assert_eq!(deployment["schemaVersion"], 3);
+    assert_eq!(deployment["routeLoaders"].as_array().unwrap().len(), 3);
+    assert_eq!(
+        deployment["routeLoaderRegistry"]["path"],
+        "presolve.route-loaders.mjs"
+    );
+    let first_plan = fs::read(adapter.join("deployment.plan.json")).unwrap();
+    let first_host = fs::read(adapter.join("server.mjs")).unwrap();
+    let first_registry = fs::read(adapter.join("presolve.route-loaders.mjs")).unwrap();
+    let deterministic = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare", "--name", "presolve-loaders"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        deterministic.status.success(),
+        "deterministic deploy stderr: {}",
+        String::from_utf8_lossy(&deterministic.stderr)
+    );
+    assert_eq!(
+        fs::read(adapter.join("deployment.plan.json")).unwrap(),
+        first_plan,
+        "Node deployment plan changed across identical preparations"
+    );
+    assert_eq!(
+        fs::read(adapter.join("server.mjs")).unwrap(),
+        first_host,
+        "Node host changed across identical preparations"
+    );
+    assert_eq!(
+        fs::read(adapter.join("presolve.route-loaders.mjs")).unwrap(),
+        first_registry,
+        "route-loader registry changed across identical preparations"
+    );
+
+    let index_path = root.join("dist/routes/segment-posts/parameter-slug/index.html");
+    let index = fs::read_to_string(&index_path).unwrap();
+    fs::write(
+        &index_path,
+        index.replace(
+            "</body>",
+            r##"<script>
+const waitFor = (predicate, label) => new Promise((resolve, reject) => { const deadline = Date.now() + 4000; const tick = () => predicate() ? resolve() : Date.now() > deadline ? reject(new Error(`Timed out waiting for ${label}`)) : setTimeout(tick, 20); tick(); });
+(async () => {
+  await waitFor(() => ["ready", "error"].includes(document.documentElement.dataset.presolveRuntime), "runtime readiness");
+  if (document.documentElement.dataset.presolveRuntime !== "ready") throw new Error("runtime failed to boot");
+  const bootstrap = JSON.parse(document.querySelector("#presolve-resource-bootstrap")?.textContent ?? "null");
+  const resource = [...window.__PRESOLVE__.store.resources.values()][0];
+  if (bootstrap?.schema_version !== 1 || bootstrap.values?.[0]?.data?.title !== "Post:browser:1") throw new Error(`bootstrap mismatch: ${JSON.stringify(bootstrap)}`);
+  if (resource?.state !== "ready" || resource?.data?.title !== "Post:browser:1") throw new Error(`resource mismatch: ${JSON.stringify(resource)}`);
+  if (document.querySelector("article")?.textContent !== "Post:browser:1") throw new Error(`rendered data mismatch: ${document.querySelector("article")?.textContent}`);
+  if (window.__PRESOLVE__.diagnostics.length !== 0) throw new Error(`runtime diagnostics: ${JSON.stringify(window.__PRESOLVE__.diagnostics)}`);
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_NODE_ROUTE_LOADER_BROWSER_PASS</div>");
+})().catch((error) => document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_NODE_ROUTE_LOADER_BROWSER_FAIL: ${error.message}</div>`));
+</script></body>"##,
+        ),
+    )
+    .unwrap();
+    let syntax = Command::new("node")
+        .arg("--check")
+        .arg(adapter.join("server.mjs"))
+        .output()
+        .unwrap();
+    assert!(
+        syntax.status.success(),
+        "Node release syntax stderr: {}",
+        String::from_utf8_lossy(&syntax.stderr)
+    );
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    let mut host = Command::new("node")
+        .arg(adapter.join("server.mjs"))
+        .env("PORT", port.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let hello = raw_http_request(
+        port,
+        "GET /posts/hello/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(hello.starts_with("HTTP/1.1 200 OK"), "{hello}");
+    assert!(hello.contains("public, max-age=60"));
+    assert!(hello.contains(r#""title":"Post:hello:1""#));
+    let cached = raw_http_request(
+        port,
+        "GET /posts/hello/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(cached.contains(r#""title":"Post:hello:1""#));
+    let typed_failure = raw_http_request(
+        port,
+        "GET /posts/missing/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(typed_failure.starts_with("HTTP/1.1 200 OK"));
+    assert!(typed_failure.contains(r#""state":"failed""#));
+    assert!(typed_failure.contains(r#""code":"not_found""#));
+    let invalid = raw_http_request(
+        port,
+        "GET /posts/invalid/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(invalid.starts_with("HTTP/1.1 500 Internal Server Error"));
+    assert!(invalid.contains("PSNODE2016_ROUTE_LOADER_EXECUTION_FAILED"));
+    let private_first = raw_http_request(
+        port,
+        "GET /private/account/ HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer a\r\nConnection: close\r\n\r\n",
+    );
+    assert!(private_first.contains("private, max-age=60"));
+    assert!(private_first.contains("Vary: Authorization, Cookie"));
+    assert!(private_first.contains(r#""title":"Private:account:1""#));
+    let private_cached = raw_http_request(
+        port,
+        "GET /private/account/ HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer a\r\nConnection: close\r\n\r\n",
+    );
+    assert!(private_cached.contains(r#""title":"Private:account:1""#));
+    let private_partition = raw_http_request(
+        port,
+        "GET /private/account/ HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer b\r\nConnection: close\r\n\r\n",
+    );
+    assert!(private_partition.contains(r#""title":"Private:account:2""#));
+    let fresh_first = raw_http_request(
+        port,
+        "GET /fresh/news/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(fresh_first.contains("Cache-Control: no-store"));
+    assert!(fresh_first.contains(r#""title":"Fresh:news:1""#));
+    let fresh_second = raw_http_request(
+        port,
+        "GET /fresh/news/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(fresh_second.contains(r#""title":"Fresh:news:2""#));
+    let malformed = raw_http_request(
+        port,
+        "GET /posts/%ZZ/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(malformed.starts_with("HTTP/1.1 400 Bad Request"));
+
+    let profile = adapter.join("chrome-route-loader-profile");
+    fs::create_dir_all(&profile).unwrap();
+    let mut chrome_arguments = vec![
+        "--headless=new".to_string(),
+        "--disable-gpu".to_string(),
+        "--no-first-run".to_string(),
+        "--disable-background-networking".to_string(),
+        "--disable-component-update".to_string(),
+        "--disable-default-apps".to_string(),
+        "--disable-extensions".to_string(),
+        "--disable-sync".to_string(),
+        "--virtual-time-budget=5000".to_string(),
+        "--dump-dom".to_string(),
+        format!("--user-data-dir={}", profile.display()),
+        format!("http://127.0.0.1:{port}/posts/browser/"),
+    ];
+    if std::env::var_os("CI").is_some() {
+        chrome_arguments.insert(0, "--no-sandbox".to_string());
+        chrome_arguments.insert(1, "--disable-dev-shm-usage".to_string());
+    }
+    let chrome = run_chrome_with_timeout(chrome_bin(), &chrome_arguments, Duration::from_secs(20));
+    assert!(
+        String::from_utf8_lossy(&chrome.stdout).contains("PRESOLVE_NODE_ROUTE_LOADER_BROWSER_PASS"),
+        "browser route-loader probe failed\nstatus: {}\nstdout: {}\nstderr: {}",
+        chrome.status,
+        String::from_utf8_lossy(&chrome.stdout),
+        String::from_utf8_lossy(&chrome.stderr)
+    );
+
+    let mut disconnected = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    disconnected
+        .write_all(b"GET /posts/slow/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    drop(disconnected);
+    thread::sleep(Duration::from_millis(100));
+    host.kill().unwrap();
+    let output = host.wait_with_output().unwrap();
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("PRESOLVE_TEST_LOADER_ABORTED"),
+        "client disconnect did not abort the active loader capability\nhost stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let shutdown_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let shutdown_port = shutdown_listener.local_addr().unwrap().port();
+    drop(shutdown_listener);
+    let shutdown_host = Command::new("node")
+        .arg(adapter.join("server.mjs"))
+        .env("PORT", shutdown_port.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut active = loop {
+        if let Ok(stream) = TcpStream::connect(("127.0.0.1", shutdown_port)) {
+            break stream;
+        }
+        thread::sleep(Duration::from_millis(25));
+    };
+    active
+        .write_all(
+            b"GET /posts/slow/ HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n",
+        )
+        .unwrap();
+    thread::sleep(Duration::from_millis(100));
+    let terminated = Command::new("kill")
+        .args(["-TERM", &shutdown_host.id().to_string()])
+        .status()
+        .unwrap();
+    assert!(terminated.success());
+    thread::sleep(Duration::from_millis(100));
+    drop(active);
+    let shutdown_output = shutdown_host.wait_with_output().unwrap();
+    assert!(shutdown_output.status.success());
+    assert!(
+        String::from_utf8_lossy(&shutdown_output.stderr).contains("PRESOLVE_TEST_LOADER_ABORTED"),
+        "host shutdown did not abort the active loader capability: {}",
+        String::from_utf8_lossy(&shutdown_output.stderr)
+    );
+    let package_types = fs::read_to_string(package.join("index.d.ts")).unwrap();
+    fs::write(
+        package.join("index.d.ts"),
+        package_types.replace(
+            "loadPost(params: RouteParameters, signal: AbortSignal)",
+            "loadPost(params: any, signal: any)",
+        ),
+    )
+    .unwrap();
+    let unproven = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(!unproven.status.success());
+    assert!(
+        String::from_utf8_lossy(&unproven.stderr)
+            .contains("V2 TypeScript authority returned incompatible evidence"),
+        "non-exact TypeScript route loader was not rejected: {}",
+        String::from_utf8_lossy(&unproven.stderr)
+    );
+    fs::write(package.join("index.d.ts"), &package_types).unwrap();
+    let package_contract = fs::read_to_string(package.join("presolve.contract.json")).unwrap();
+    fs::write(
+        package.join("presolve.contract.json"),
+        package_contract.replace("dist/load-post.js", "dist/missing-load-post.js"),
+    )
+    .unwrap();
+    let missing_runtime = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare", "--name", "presolve-loaders"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(!missing_runtime.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing_runtime.stderr)
+            .contains("PSDISC1012_PACKAGE_RUNTIME_MISSING"),
+        "missing loader runtime was not rejected: {}",
+        String::from_utf8_lossy(&missing_runtime.stderr)
+    );
+    fs::write(package.join("presolve.contract.json"), &package_contract).unwrap();
+    fs::write(
+        package.join("dist/load-post.js"),
+        "export const wrongExport = true;\n",
+    )
+    .unwrap();
+    let missing_export = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare", "--name", "presolve-loaders"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(!missing_export.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing_export.stderr)
+            .contains("PSNODE1025_ROUTE_LOADER_BUNDLE_FAILED"),
+        "missing named loader export was not rejected: {}",
+        String::from_utf8_lossy(&missing_export.stderr)
+    );
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -980,7 +1410,7 @@ process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFile
     assert!(adapter.join("presolve.server-actions.mjs").is_file());
     let deployment: serde_json::Value =
         serde_json::from_slice(&fs::read(adapter.join("deployment.plan.json")).unwrap()).unwrap();
-    assert_eq!(deployment["schemaVersion"], 2);
+    assert_eq!(deployment["schemaVersion"], 3);
     let server_actions = deployment["serverActions"].as_array().unwrap();
     assert_eq!(server_actions.len(), 2);
     let request_path = server_actions
@@ -1650,7 +2080,7 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 12,
+  schemaVersion: 13,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),

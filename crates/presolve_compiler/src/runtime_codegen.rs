@@ -8,6 +8,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const COMPONENT_ARTIFACT_ELEMENT_ID = "presolve-component-runtime";
   const FORMS_ARTIFACT_ELEMENT_ID = "presolve-forms-runtime";
   const RESOURCES_ARTIFACT_ELEMENT_ID = "presolve-resources-runtime";
+  const RESOURCE_BOOTSTRAP_ELEMENT_ID = "presolve-resource-bootstrap";
   const OPAQUE_ARTIFACT_ELEMENT_ID = "presolve-opaque-runtime";
   const PACKAGE_INVOCATIONS_ARTIFACT_ELEMENT_ID = "presolve-package-invocations-runtime";
   const RESUME_MANIFEST_ELEMENT_ID = "presolve-resume-runtime";
@@ -24,7 +25,8 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 7;
-  const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 3;
+  const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 4;
+  const SUPPORTED_RESOURCE_BOOTSTRAP_SCHEMA_VERSION = 1;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_PACKAGE_INVOCATIONS_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_RESUME_MANIFEST_SCHEMA_VERSION = 7;
@@ -76,6 +78,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   let formSubmissionCapabilities = new Map();
   let serverActionCapabilities = new Map();
   let packageInvocationRegistry = new Map();
+  let resourceBootstrapValues = new Map();
 
   function exactObjectKeys(value, expected) {
     if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -728,6 +731,19 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
   }
 
+  function readResourceBootstrap(diagnostics) {
+    const element = document.getElementById(RESOURCE_BOOTSTRAP_ELEMENT_ID);
+    if (element === null) return null;
+    if (!(element instanceof HTMLScriptElement)) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCE_BOOTSTRAP", "Resource bootstrap was not stored in a script element", { artifactElementId: RESOURCE_BOOTSTRAP_ELEMENT_ID }, true);
+      throw new PresolveBootError("PSR_INVALID_RESOURCE_BOOTSTRAP");
+    }
+    try { return JSON.parse(element.textContent ?? ""); } catch (error) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCE_BOOTSTRAP", "Resource bootstrap JSON could not be parsed", { message: error instanceof Error ? error.message : String(error) }, true);
+      throw new PresolveBootError("PSR_INVALID_RESOURCE_BOOTSTRAP");
+    }
+  }
+
   function readOpaqueArtifact(diagnostics) {
     const element = document.getElementById(OPAQUE_ARTIFACT_ELEMENT_ID);
     if (element === null) return null;
@@ -855,7 +871,8 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (resourcesArtifact === null) return;
     if (resourcesArtifact.schema_version !== SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION
       || !Array.isArray(resourcesArtifact.declarations)
-      || !Array.isArray(resourcesArtifact.activations)) {
+      || !Array.isArray(resourcesArtifact.activations)
+      || !Array.isArray(resourcesArtifact.server_bootstraps)) {
       reportDiagnostic(diagnostics, "PSR_UNSUPPORTED_RESOURCES_ARTIFACT_SCHEMA", "Resource runtime metadata did not match the compiler artifact contract", { schema_version: resourcesArtifact.schema_version }, true);
       throw new PresolveBootError("PSR_UNSUPPORTED_RESOURCES_ARTIFACT_SCHEMA");
     }
@@ -865,7 +882,8 @@ const RUNTIME_STUB: &str = r#"(() => {
       if (typeof declaration?.id !== "string" || declarations.has(declaration.id)
         || typeof endpoint?.package !== "string" || typeof endpoint?.version !== "string"
         || typeof endpoint?.integrity !== "string" || typeof endpoint?.export !== "string"
-        || typeof endpoint?.runtime_module !== "string" || typeof endpoint?.runtime_location !== "string"
+        || typeof endpoint?.runtime_module !== "string"
+        || !(typeof endpoint?.runtime_location === "string" || endpoint?.runtime_location === undefined)
         || !isValidResourceValueCodec(declaration?.data_codec)
         || !isValidResourceValueCodec(declaration?.error_codec)) {
         reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource declaration did not retain one exact executable endpoint", { declaration }, true);
@@ -885,6 +903,65 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       activations.add(activation.id);
     }
+    const bootstrapActivations = new Set();
+    for (const bootstrap of resourcesArtifact.server_bootstraps) {
+      const activation = resourcesArtifact.activations.find(candidate => candidate.id === bootstrap?.activation);
+      if (!exactObjectKeys(bootstrap, ["activation", "declaration", "component_instance", "loader_capability_id", "bootstrap_key", "resume_policy"])
+        || activation === undefined || bootstrapActivations.has(bootstrap.activation)
+        || activation.declaration !== bootstrap.declaration
+        || activation.component_instance !== bootstrap.component_instance
+        || bootstrap.bootstrap_key !== bootstrap.activation
+        || typeof bootstrap.loader_capability_id !== "string" || !bootstrap.loader_capability_id
+        || bootstrap.resume_policy !== "reload") {
+        reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Server Resource bootstrap descriptor was not compiler-canonical", { bootstrap }, true);
+        throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+      }
+      const declaration = resourcesArtifact.declarations.find(candidate => candidate.id === bootstrap.declaration);
+      if (declaration?.execution_boundary !== "Server" || declaration.endpoint.runtime_location !== undefined) {
+        reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Server Resource bootstrap retained a browser endpoint", { bootstrap }, true);
+        throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+      }
+      bootstrapActivations.add(bootstrap.activation);
+    }
+    for (const declaration of resourcesArtifact.declarations) {
+      const bootstrapped = resourcesArtifact.server_bootstraps.some(bootstrap => bootstrap.declaration === declaration.id);
+      if ((!bootstrapped && typeof declaration.endpoint.runtime_location !== "string")
+        || (declaration.execution_boundary === "Server" && !bootstrapped)) {
+        reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCES_ARTIFACT", "Resource declaration had no executable browser or server-bootstrap boundary", { declaration }, true);
+        throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+      }
+    }
+  }
+
+  function validateResourceBootstrap(resourcesArtifact, bootstrap, diagnostics) {
+    const descriptors = resourcesArtifact?.server_bootstraps ?? [];
+    if (descriptors.length === 0) {
+      if (bootstrap !== null) throw new PresolveBootError("PSR_INVALID_RESOURCE_BOOTSTRAP");
+      return new Map();
+    }
+    if (bootstrap?.schema_version !== SUPPORTED_RESOURCE_BOOTSTRAP_SCHEMA_VERSION
+      || !Array.isArray(bootstrap.values)) {
+      reportDiagnostic(diagnostics, "PSR_RESOURCE_BOOTSTRAP_MISSING", "A route loader Resource bootstrap is required", {}, true);
+      throw new PresolveBootError("PSR_RESOURCE_BOOTSTRAP_MISSING");
+    }
+    const expected = new Set(descriptors.map(descriptor => descriptor.bootstrap_key));
+    const values = new Map();
+    for (const value of bootstrap.values) {
+      if (!exactObjectKeys(value, ["key", "state", "generation", "data", "error"])
+        || !expected.has(value.key) || values.has(value.key)
+        || !["ready", "failed"].includes(value.state)
+        || !Number.isInteger(value.generation) || value.generation < 1
+        || (value.state === "ready" ? value.error !== null : value.data !== null)) {
+        reportDiagnostic(diagnostics, "PSR_INVALID_RESOURCE_BOOTSTRAP", "A route loader Resource bootstrap value was invalid", { value }, true);
+        throw new PresolveBootError("PSR_INVALID_RESOURCE_BOOTSTRAP");
+      }
+      values.set(value.key, value);
+    }
+    if (values.size !== expected.size) {
+      reportDiagnostic(diagnostics, "PSR_RESOURCE_BOOTSTRAP_MISSING", "A route loader Resource bootstrap value was missing", {}, true);
+      throw new PresolveBootError("PSR_RESOURCE_BOOTSTRAP_MISSING");
+    }
+    return values;
   }
 
   function hasExactResourceResumeSlots(activation) {
@@ -6534,15 +6611,12 @@ const RUNTIME_STUB: &str = r#"(() => {
       for (const resource of store.resources.values()) resource.controller.abort();
     }, { once: true });
     const declarations = new Map(resourcesArtifact.declarations.map((declaration) => [declaration.id, declaration]));
+    const serverBootstraps = new Map(resourcesArtifact.server_bootstraps.map((bootstrap) => [bootstrap.activation, bootstrap]));
     const records = [];
     for (const activation of resourcesArtifact.activations) {
       const declaration = declarations.get(activation.declaration);
       if (declaration === undefined) throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
       if (resumePolicy !== null && declaration.endpoint.resume_policy !== resumePolicy) continue;
-      if (!["Client", "Shared"].includes(declaration.execution_boundary)) {
-        reportDiagnostic(diagnostics, "PSR_RESOURCE_SERVER_UNAVAILABLE", "A server-only Resource cannot activate in the browser runtime", { activation, declaration }, true);
-        throw new PresolveBootError("PSR_RESOURCE_SERVER_UNAVAILABLE");
-      }
       const controller = new AbortController();
       const record = { activation, declaration, controller, state: "pending", generation: 1, data: null, error: null };
       const activationKey = `${activation.component_instance}\u001f${activation.declaration}`;
@@ -6551,6 +6625,27 @@ const RUNTIME_STUB: &str = r#"(() => {
       }
       store.resources.set(activation.id, record);
       store.resourceActivationsByInstanceDeclaration.set(activationKey, activation.id);
+      if (declaration.execution_boundary === "Server") {
+        const descriptor = serverBootstraps.get(activation.id);
+        const value = descriptor === undefined ? undefined : resourceBootstrapValues.get(descriptor.bootstrap_key);
+        if (value === undefined) {
+          reportDiagnostic(diagnostics, "PSR_RESOURCE_BOOTSTRAP_MISSING", "A server-only Resource had no request bootstrap", { activation, declaration }, true);
+          throw new PresolveBootError("PSR_RESOURCE_BOOTSTRAP_MISSING");
+        }
+        try {
+          record.state = value.state;
+          record.generation = value.generation;
+          record.data = value.state === "ready" ? decodeResourceValue(value.data, declaration.data_codec) : null;
+          record.error = value.state === "failed" ? decodeResourceValue(value.error, declaration.error_codec) : null;
+        } catch (_) {
+          reportDiagnostic(diagnostics, "PSR_RESOURCE_BOOTSTRAP_CODEC_FAILURE", "A server-only Resource bootstrap did not match its compiler-issued codec", { activation }, true);
+          throw new PresolveBootError("PSR_RESOURCE_BOOTSTRAP_CODEC_FAILURE");
+        }
+        continue;
+      }
+      if (!["Client", "Shared"].includes(declaration.execution_boundary)) {
+        throw new PresolveBootError("PSR_INVALID_RESOURCES_ARTIFACT");
+      }
       records.push(record);
     }
     await Promise.all(records.map(async (record) => {
@@ -6817,6 +6912,11 @@ const RUNTIME_STUB: &str = r#"(() => {
       );
       const resourcesArtifact = readResourcesArtifact(diagnostics);
       validateResourcesArtifact(resourcesArtifact, diagnostics);
+      resourceBootstrapValues = validateResourceBootstrap(
+        resourcesArtifact,
+        readResourceBootstrap(diagnostics),
+        diagnostics
+      );
 
       const result = await bootstrapResume({
         diagnostics,

@@ -5,7 +5,7 @@ import {
   createCanonicalIntrinsicRegistry,
 } from "./index.js";
 
-export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 12;
+export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 13;
 
 /**
  * Resolves explicit source positions for the implemented decorator-free V2
@@ -23,6 +23,7 @@ export async function analyzeV2Authoring(request) {
       ...(request.canonical.slot ? [{ id: "canonical:slot", ...request.canonical.slot }] : []),
       ...(request.canonical.defineForm ? [{ id: "canonical:define-form", ...request.canonical.defineForm }] : []),
       ...(request.canonical.field ? [{ id: "canonical:field", ...request.canonical.field }] : []),
+      ...(request.canonical.loader ? [{ id: "canonical:loader", ...request.canonical.loader }] : []),
       ...request.canonical.validationRules.map(entry => ({
         id: `canonical-validation:${entry.name}`,
         file: entry.file,
@@ -55,6 +56,12 @@ export async function analyzeV2Authoring(request) {
         { id: `server-action-invocation:${site.id}`, file: site.file, position: site.position },
         { id: `server-action-import:${site.id}`, file: site.file, position: site.importPosition },
       ]),
+      ...request.routeLoaderInvocations.flatMap(site => [
+        { id: `route-loader:${site.id}`, file: site.file, position: site.position },
+        { id: `route-loader-invocation:${site.id}`, file: site.file, position: site.invocationPosition },
+        { id: `route-loader-import:${site.id}`, file: site.file, position: site.importPosition },
+        { id: `route-loader-parameters:${site.id}`, file: site.file, position: site.parametersTypePosition },
+      ]),
     ],
     componentHeritage: request.components.map(site => ({
       id: `component:${site.id}`,
@@ -76,6 +83,11 @@ export async function analyzeV2Authoring(request) {
         id: `server-action-invocation-call:${site.id}`,
         file: site.file,
         position: site.position,
+      })),
+      ...request.routeLoaderInvocations.map(site => ({
+        id: `route-loader-invocation-call:${site.id}`,
+        file: site.file,
+        position: site.invocationPosition,
       })),
     ],
     standardSchemas: request.standardValidations.map(site => ({
@@ -102,6 +114,7 @@ export async function analyzeV2Authoring(request) {
     ...(request.canonical.slot ? [{ kind: "slot", symbol: symbols.get("canonical:slot") }] : []),
     ...(request.canonical.defineForm ? [{ kind: "form", symbol: symbols.get("canonical:define-form") }] : []),
     ...(request.canonical.field ? [{ kind: "field", symbol: symbols.get("canonical:field") }] : []),
+    ...(request.canonical.loader ? [{ kind: "loader", symbol: symbols.get("canonical:loader") }] : []),
     ...request.canonical.validationRules.map(entry => ({
       kind: "validate",
       symbol: symbols.get(`canonical-validation:${entry.name}`),
@@ -231,6 +244,37 @@ export async function analyzeV2Authoring(request) {
           }]
         : [];
     }),
+    routeLoaderInvocations: request.routeLoaderInvocations.flatMap(site => {
+      const loaderIntrinsic = classifyResolvedIntrinsic(registry, symbols.get(`route-loader:${site.id}`));
+      const identity = resolvedIdentity(symbols.get(`route-loader-invocation:${site.id}`));
+      const importedIdentity = resolvedIdentity(symbols.get(`route-loader-import:${site.id}`));
+      const parametersIdentity = resolvedIdentity(symbols.get(`route-loader-parameters:${site.id}`));
+      const signature = fieldSignatures.get(`route-loader-invocation-call:${site.id}`);
+      const parameterTypes = signature?.parameterTypes?.map(parameter => parameter.type);
+      const exactParameters = Array.isArray(parameterTypes)
+        && parameterTypes.length === 2
+        && parameterTypes[0]?.text === "Readonly<Record<string, string>>"
+        && parameterTypes[1]?.text === "AbortSignal"
+        && isCanonicalDomType(parameterTypes[1], "AbortSignal");
+      return loaderIntrinsic?.kind === "loader"
+        && identity?.name === site.exportName
+        && importedIdentity?.name === site.exportName
+        && sameDeclarationModules(identity, importedIdentity)
+        && identity.declarationModules.length > 0
+        && parametersIdentity?.name === "RouteParameters"
+        && parametersIdentity.declarationModules
+          .some(module => /(?:^|\/)presolve\/(?:src\/)?index\.d\.ts$/.test(module))
+        && exactParameters
+        && isCanonicalPromise(signature?.returnType)
+        ? [{
+            id: site.id,
+            identity,
+            loaderIdentity: loaderIntrinsic.identity,
+            moduleSpecifier: site.moduleSpecifier,
+            exportName: site.exportName,
+          }]
+        : [];
+    }),
     environmentPublic: request.environmentPublic.flatMap(site => {
       const receiver = classifyResolvedIntrinsic(registry, symbols.get(`environment-object:${site.id}`));
       const member = resolvedIdentity(symbols.get(`environment-property:${site.id}`));
@@ -252,7 +296,7 @@ function validateV2AuthoringRequest(request) {
   if (request.schemaVersion !== V2_AUTHORED_AUTHORITY_SCHEMA_VERSION) {
     throw new TypeError(`unsupported V2 authoring authority schema version ${request.schemaVersion}`);
   }
-  for (const kind of ["component", "state", "action", "effect", "slot", "defineForm", "field", "environment"]) {
+  for (const kind of ["component", "state", "action", "effect", "slot", "defineForm", "field", "loader", "environment"]) {
     if (request.canonical[kind] !== undefined) {
       validatePosition(request.canonical[kind], `canonical ${kind}`);
     }
@@ -306,6 +350,9 @@ function validateV2AuthoringRequest(request) {
   if (!Array.isArray(request.serverActionInvocations)) {
     throw new TypeError("V2 authoring server action invocation sites must be an array");
   }
+  if (!Array.isArray(request.routeLoaderInvocations)) {
+    throw new TypeError("V2 authoring route loader invocation sites must be an array");
+  }
   const standardValidationIds = new Set();
   for (const site of request.standardValidations) {
     if (!site || typeof site.id !== "string" || !site.id
@@ -345,6 +392,20 @@ function validateV2AuthoringRequest(request) {
     }
     serverActionInvocationIds.add(site.id);
     validatePosition(site, "server action invocation site");
+  }
+  const routeLoaderInvocationIds = new Set();
+  for (const site of request.routeLoaderInvocations) {
+    if (!site || typeof site.id !== "string" || !site.id
+      || routeLoaderInvocationIds.has(site.id)
+      || typeof site.moduleSpecifier !== "string" || !site.moduleSpecifier
+      || typeof site.exportName !== "string" || !site.exportName
+      || !Number.isInteger(site.invocationPosition)
+      || !Number.isInteger(site.parametersTypePosition)
+      || !Number.isInteger(site.importPosition)) {
+      throw new TypeError("V2 authoring route loader sites require unique ids and named module exports");
+    }
+    routeLoaderInvocationIds.add(site.id);
+    validatePosition(site, "route loader site");
   }
   const validationIds = new Set();
   for (const site of request.validations) {

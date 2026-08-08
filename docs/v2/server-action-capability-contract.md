@@ -2,10 +2,10 @@
 
 ## Scope
 
-This contract completes the original server-action and capability gates at
-their compiler/publication handoff boundary. It makes server actions and route loaders named
-admitted records in the canonical semantic-capability registry; it does not
-define a server executor. The executable successor is the
+This contract fixes the server-action and capability gates at their
+compiler/publication boundary. It makes server actions and route loaders named
+admitted records in the canonical semantic-capability registry. The executable
+successor is the
 [Node capability executor contract](node-capability-executor-contract.md).
 
 ## Server-action admission and handoff
@@ -27,19 +27,19 @@ application method bodies nor package source are server code.
 handoffs as `legacy_method` records and adds executable `canonical_form`
 records. A canonical record exists only for an authority-proven
 `defineForm({ submit: async ({ formData, signal }) => imported(formData,
-signal) })` declaration. Authority schema v12 proves the surrounding Form,
+signal) })` declaration. Authority schema v13 proves the surrounding Form,
 named-import identity, canonical DOM parameters, and Promise completion before
 lowering. The record adds the Form identity, exact compiler-issued request
 path, and `abort` cancellation policy without making the legacy method
 executable.
 
-The Node deployment plan is schema version 2. It retains only canonical Form
+The Node deployment plan is schema version 3. It retains only canonical Form
 records in its executable registry, bundles their exact named runtime exports
 with the project-local Vite installation, inventories and verifies the bundle
 digest, and executes the closed request/response lifecycle defined by the
 [Node capability executor contract](node-capability-executor-contract.md).
-Routes containing loaders remain fail-closed with `501` until the loader codec
-and Resource-bootstrap gate is implemented.
+Canonical route loaders execute through a separate digest-bound registry using
+the schema-v2 loader plan and schema-v4 Resource bootstrap.
 
 ## Capability registry
 
@@ -49,10 +49,10 @@ dependency rules, resume policy, artifact impact, and proof fixture. It now
 names `resources`, `route_loaders`, and `server_actions` as their completed
 bounded paths:
 
-- Resource schema v3 restores validated snapshot triples before dependent
+- Resource schema v4 restores validated snapshot triples before dependent
   Computeds, or performs exactly one reload generation with no snapshot slot.
-- Route loaders remain server handoffs. Canonical Form-bound server actions are
-  executable only through the schema-v2 Node plan; legacy method handoffs and
+- Canonical Resource-field route loaders and canonical Form-bound server actions
+  execute only through the schema-v3 Node plan. Legacy decorator handoffs and
   Cloudflare Static Assets remain non-executable.
 
 `presolve explain --capabilities` exposes deterministic JSON, human, and

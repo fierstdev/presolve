@@ -285,19 +285,20 @@ pub fn parse_semantic_package_contract(
             return true;
         };
         !matches!(export.kind, SemanticPackageKind::Resource)
+            || export.type_signature
+                != "(RouteParameters, AbortSignal) -> Promise<RouteLoaderResult>"
+            || export.resume_policy != "reload"
             || !matches!(
                 endpoint.execution_boundary,
                 SemanticPackageResourceExecutionBoundary::Server
                     | SemanticPackageResourceExecutionBoundary::Shared
             )
             || match loader.cache.scope {
-                SemanticPackageServerCacheScope::Public => {
+                SemanticPackageServerCacheScope::Public
+                | SemanticPackageServerCacheScope::Private => {
                     loader.cache.max_age_seconds.is_none_or(|age| age == 0)
                 }
-                SemanticPackageServerCacheScope::NoStore
-                | SemanticPackageServerCacheScope::Private => {
-                    loader.cache.max_age_seconds.is_some()
-                }
+                SemanticPackageServerCacheScope::NoStore => loader.cache.max_age_seconds.is_some(),
             }
     }) {
         return Err(SemanticPackageContractError::InvalidRouteLoader);
@@ -439,7 +440,7 @@ mod tests {
     #[test]
     fn validates_route_loader_capabilities_on_server_or_shared_resource_exports() {
         let contract = parse_semantic_package_contract(
-            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"RouteParameters -> Resource<Post, NotFound>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"public","max_age_seconds":60},"failure":"typed"}}}}"#,
+            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"(RouteParameters, AbortSignal) -> Promise<RouteLoaderResult>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"public","max_age_seconds":60},"failure":"typed"}}}}"#,
         )
         .expect("closed route loader contract");
         assert_eq!(
@@ -455,7 +456,7 @@ mod tests {
         );
 
         let invalid_client = parse_semantic_package_contract(
-            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"RouteParameters -> Resource<Post, NotFound>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"client","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"no_store"},"failure":"typed"}}}}"#,
+            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"(RouteParameters, AbortSignal) -> Promise<RouteLoaderResult>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"client","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"no_store"},"failure":"typed"}}}}"#,
         );
         assert_eq!(
             invalid_client,

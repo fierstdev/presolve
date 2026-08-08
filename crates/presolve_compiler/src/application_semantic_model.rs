@@ -1940,6 +1940,11 @@ fn retain_v2_runtime_import_bindings(
                     export_name,
                     declaration_modules,
                     ..
+                }
+                | crate::DerivedAuthoredEvidenceV2::RouteLoaderInvocation {
+                    module_specifier,
+                    export_name,
+                    declaration_modules,
                 } => (module_specifier, export_name, declaration_modules),
                 _ => continue,
             };
@@ -2218,12 +2223,21 @@ fn build_application_semantic_model_from_files_with_bindings_mode_and_v2(
         &type_aliases,
         bindings,
     );
-    let resource_declarations = collect_resource_declarations(
+    let mut resource_declarations = collect_resource_declarations(
         &components,
         &resource_endpoint_resolutions,
         &base_semantic_types,
         bindings,
     );
+    if matches!(mode, ApplicationAssemblyMode::FileRoute(_)) {
+        let active_components = component_instance_plan
+            .instances
+            .values()
+            .map(|instance| instance.component.clone())
+            .collect::<BTreeSet<_>>();
+        resource_declarations
+            .retain(|_, declaration| active_components.contains(&declaration.owner_component));
+    }
     let resource_activations =
         collect_resource_activations(&resource_declarations, &component_instance_plan);
     let form_field_products =
@@ -3135,6 +3149,7 @@ fn collect_resource_endpoint_resolutions(
                             runtime_module,
                             resume_policy,
                             resource_endpoint: Some(endpoint),
+                            route_loader,
                             ..
                         } => crate::ResourceEndpointResolutionOutcome::Resolved(
                             crate::ResourceEndpointBinding {
@@ -3147,6 +3162,7 @@ fn collect_resource_endpoint_resolutions(
                                 runtime_module: runtime_module.clone(),
                                 resume_policy: resume_policy.clone(),
                                 endpoint: endpoint.clone(),
+                                route_loader: route_loader.clone(),
                             },
                         ),
                         crate::ImportBindingTarget::SemanticPackage { kind, .. } => {
@@ -5220,6 +5236,7 @@ mod tests {
                         form_fields: Vec::new(),
                         validations: Vec::new(),
                         server_action_invocations: Vec::new(),
+                        route_loader_invocations: Vec::new(),
                     },
                 )
                 .expect("V2 Slot lowering");

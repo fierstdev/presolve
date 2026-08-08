@@ -305,11 +305,13 @@ pub fn build_application_publication_product_from_asm_v1(
                 message: "compiler produced an invalid Resource runtime artifact".into(),
             });
         }
-        if let Some(declaration) = artifact
-            .declarations
-            .iter()
-            .find(|declaration| declaration.execution_boundary == "Server")
-        {
+        if let Some(declaration) = artifact.declarations.iter().find(|declaration| {
+            declaration.execution_boundary == "Server"
+                && !artifact
+                    .server_bootstraps
+                    .iter()
+                    .any(|bootstrap| bootstrap.declaration == declaration.id)
+        }) {
             return Err(ApplicationPublicationErrorV1 {
                 code: "PSAPP2004_SERVER_RESOURCE_IN_BROWSER_PUBLICATION",
                 message: format!(

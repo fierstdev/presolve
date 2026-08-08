@@ -12,9 +12,9 @@ use crate::{
     build_file_route_application_semantic_model_for_route_with_packages,
     build_file_route_application_semantic_model_for_route_with_packages_and_v2_authoring,
     build_file_route_application_semantic_model_for_unit_with_packages_and_v2_authoring,
-    build_layout_composition_plan_v1, build_module_graph, build_route_loader_plan_v1,
+    build_layout_composition_plan_v1, build_module_graph, build_route_loader_plan_v2,
     build_route_server_action_plan_v1, build_symbol_table, build_validated_file_route_graph_v1,
-    route_loader_plan_json_v1, route_server_action_plan_json_v1,
+    route_loader_plan_json_v2, route_server_action_plan_json_v1,
     validate_application_publication_request_v1, ApplicationPublicationArtifactV1,
     ApplicationPublicationErrorV1, ApplicationPublicationProfileV1,
     ApplicationPublicationRequestErrorV1, ApplicationPublicationRequestV1,
@@ -155,10 +155,12 @@ pub fn build_file_route_publication_v1(
     let modules = build_module_graph(&unit);
     let bindings =
         build_binding_table_with_packages(&unit, &symbols, &modules, &request.package_contracts);
-    let route_loader_plan = build_route_loader_plan_v1(&model.components, &graph, &bindings)
-        .map_err(|error| FileRoutePublicationErrorV1 {
-            code: error.code,
-            message: error.message,
+    let route_loader_plan =
+        build_route_loader_plan_v2(&model, &graph, &bindings).map_err(|error| {
+            FileRoutePublicationErrorV1 {
+                code: error.code,
+                message: error.message,
+            }
         })?;
     let route_server_action_plan =
         build_route_server_action_plan_v1(&model.components, &graph, &bindings).map_err(
@@ -257,7 +259,7 @@ pub fn build_file_route_publication_v1(
     routes.sort_by(|left, right| left.path.cmp(&right.path));
     artifacts.insert(
         PathBuf::from("route-loaders.plan.json"),
-        route_loader_plan_json_v1(&route_loader_plan).into_bytes(),
+        route_loader_plan_json_v2(&route_loader_plan).into_bytes(),
     );
     artifacts.insert(
         PathBuf::from("route-server-actions.plan.json"),
@@ -539,9 +541,9 @@ mod tests {
     }
 
     #[test]
-    fn publishes_an_exact_route_loader_handoff_plan_without_server_execution() {
+    fn publishes_an_exact_route_loader_execution_plan() {
         let contract = crate::parse_semantic_package_contract(
-            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"RouteParameters -> Resource<Post, NotFound>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"public","max_age_seconds":60},"failure":"typed"}}}}"#,
+            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadPost":{"kind":"resource","type_signature":"(RouteParameters, AbortSignal) -> Promise<RouteLoaderResult>","runtime_module":"dist/load-post.js","resume_policy":"reload","resource_endpoint":{"execution_boundary":"server","cancellation":"abort","resume":"reload"},"route_loader":{"input":"route_parameters","cache":{"scope":"public","max_age_seconds":60},"failure":"typed"}}}}"#,
         )
         .unwrap();
         let mut contracts = SemanticPackageResolutionTable::default();
@@ -553,7 +555,7 @@ mod tests {
                 source: r#"
 import { loadPost } from "post-service";
 @component() class Post {
-  @loader("loadPost") post!: Resource<Post, NotFound>;
+  @loader("loadPost") post!: Resource<string, string>;
   render() { return <article />; }
 }
 "#

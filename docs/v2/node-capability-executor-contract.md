@@ -4,7 +4,7 @@
 
 This contract turns Presolve's compiler-issued server handoffs into an
 executable Node release without introducing a second router, evaluating route
-source, or importing an unclassified package export. It replaces the previous
+source, or importing an unclassified package export. It closes the previous
 `node`-classification-only boundary in two explicit gates:
 
 1. a canonical Form submission bound to one integrity-qualified server-action
@@ -12,15 +12,17 @@ source, or importing an unclassified package export. It replaces the previous
 2. a route loader whose result codecs and Resource bootstrap target are fully
    named by the compiler.
 
-The Form/server-action gate is implemented first. A loader must continue to
-fail closed until the second gate's codec and bootstrap products exist. A raw
-HTTP endpoint with no authored application binding is not completion evidence.
+Both gates are implemented. A raw HTTP endpoint with no authored application
+binding is not completion evidence: every executable record must originate in
+the canonical component, Form or Resource, route, package, and runtime-module
+products described below.
 
 Status: the canonical Form/server-action gate is implemented in authority
-schema v12, server-action plan schema v2, Forms artifact schema v7, and Node
-deployment schema v2. Its focused compiler, deterministic preparation,
-real-request, and real-browser proofs are green. The route-loader gate remains
-open under the boundary below.
+schema v13, server-action plan schema v2, and Forms artifact schema v7. The
+canonical route-loader gate is implemented in route-loader plan schema v2 and
+Resource artifact schema v4. Node deployment schema v3 carries both digest-bound
+registries. Focused compiler, deterministic preparation, real-request,
+cancellation, cache-policy, and real-browser proofs are green for both gates.
 
 ## Canonical Form-bound server action
 
@@ -161,23 +163,62 @@ must provide its own capability registry and request host proof.
 
 ## Route-loader gate
 
-Schema-v1 route-loader records do not yet contain a data codec, error codec,
-Resource declaration/instance target, or initial bootstrap coordinate. Those
-facts are required before loader output can cross the server/document boundary.
-The next loader schema must join the existing Resource artifact and route plan
-to publish all four facts, plus the request-parameter normalization and cache
-key. Until then Node preparation may classify the route as `node` but must
-reject serving it; returning raw loader JSON or injecting unchecked values into
-HTML would be a parallel, non-resumable data model.
+The canonical source form is an authority-proven component field:
 
-The loader executor gate must separately prove percent-decoding, duplicate and
-invalid parameter handling, exact data/error codec validation, no-store/private/
-public cache behavior, request abort, deterministic cache keys, bootstrap
-restoration, and mixed static/loader routes.
+```tsx
+import { Component, loader, type Resource, type RouteParameters } from "presolve";
+import { loadPost } from "post-service";
+
+export class Post extends Component {
+  post: Resource<PostRecord, NotFound> = loader(
+    async (params: RouteParameters, signal: AbortSignal) =>
+      loadPost(params, signal),
+  );
+}
+```
+
+The handler is one direct named-import call. TypeScript proves canonical
+`loader`, the imported symbol, canonical `RouteParameters` and DOM
+`AbortSignal`, and Promise completion. The package export is a server/shared
+`resource` with a `route_loader` contract and exact signature
+`(RouteParameters, AbortSignal) -> Promise<RouteLoaderResult>`.
+
+Schema-v1 route-loader records did not contain a data codec, error codec,
+Resource declaration/activation target, or initial bootstrap coordinate.
+Schema v2 joins the authority-proven field, route instance, semantic
+`Resource<Data, Error>` type, and package binding. Each record publishes the
+closed data/error codecs, declaration/activation and state/data/error slot IDs,
+ordered route-parameter names and segment indexes, strict UTF-8 percent-decoding
+policy, and a cache-key recipe over the normalized parameter record.
+
+Resource artifact schema v4 adds compiler-owned server-bootstrap descriptors,
+not values. Per request, the Node host executes the exact loader registry,
+codec-validates either data or typed error, then injects one script-safe
+bootstrap value for the exact activation into the route document. The browser
+Resource runtime consumes that value before Computed reads and never imports a
+server module. A missing, duplicate, stale, or codec-invalid bootstrap fails
+closed; returning raw loader JSON or inventing an unrelated page-data object is
+forbidden.
+
+`no_store` performs no cache lookup and omits `max_age_seconds`. `private` and
+`public` require a positive `max_age_seconds`; both caches live only within the
+current host process. A private key includes the authorization/cookie partition
+digest, while a public key excludes all private request material. Every key
+also includes the loader capability ID and canonical JSON of the ordered,
+normalized parameter record. Pending work is coalesced only for the same
+complete key, and every waiter retains independent disconnect cancellation.
+
+The focused executor proof covers strict percent-decoding and invalid segment
+rejection, exact data/error codec validation, no-store/private/public cache
+behavior and partitioning, request and host-shutdown abort, deterministic
+preparation, browser bootstrap restoration and reactive rendering, multiple
+loader routes, and missing or unbundleable runtime modules. Route selection and
+Resource artifacts are isolated per published route, so sibling server
+declarations cannot leak into another page.
 
 ## Completion evidence
 
-The Form/server-action gate requires all of the following before publication:
+The Node capability executor requires all of the following before publication:
 
 1. TypeScript alias/lookalike/signature proof and parser shape coverage;
 2. deterministic compiler plan and browser artifact fixtures;
@@ -188,5 +229,8 @@ The Form/server-action gate requires all of the following before publication:
 5. real-browser validation, duplicate suppression, success, typed failure, and
    reset cancellation; exact HTTP redirect; and the shared Forms resume proof
    that active submissions are never replayed; and
-6. full application-platform, documentation, deterministic release, and public
+6. route-loader authority, exact parameter and codec planning, cache-scope,
+   typed-failure, cancellation, deterministic registry, and browser Resource
+   rendering proofs; and
+7. full application-platform, documentation, deterministic release, and public
    package gates.

@@ -632,13 +632,78 @@ impl SemanticTypeModel {
                 _ => None,
             });
         let alias = local_alias.or(imported_alias);
-        let semantic_type = alias
-            .map(|alias| alias.semantic_type.clone())
-            .or_else(|| semantic_type_from_annotation(&declared_type.text))?;
+        let semantic_type = alias.map(|alias| alias.semantic_type.clone()).or_else(|| {
+            self.resolve_annotation_with_aliases(
+                &declared_type.text,
+                &declared_type.provenance.path,
+                bindings,
+                &mut BTreeSet::new(),
+            )
+        })?;
         Some(ResolvedDeclaredSemanticType {
             semantic_type: normalize_semantic_type(semantic_type),
             alias_origin: alias.map(|alias| alias.id.clone()),
         })
+    }
+
+    fn resolve_annotation_with_aliases(
+        &self,
+        text: &str,
+        path: &std::path::Path,
+        bindings: Option<&BindingTable>,
+        visiting: &mut BTreeSet<String>,
+    ) -> Option<SemanticType> {
+        let text = text.trim();
+        let alias = self
+            .aliases
+            .values()
+            .find(|alias| alias.provenance.path == path && alias.name == text)
+            .or_else(|| {
+                bindings
+                    .and_then(|bindings| bindings.resolve_import(path, text))
+                    .and_then(|binding| match &binding.target {
+                        ImportBindingTarget::Symbol(symbol)
+                            if symbol.kind == SymbolKind::TypeAlias =>
+                        {
+                            self.aliases.get(&symbol.id)
+                        }
+                        _ => None,
+                    })
+            });
+        if let Some(alias) = alias {
+            if !visiting.insert(alias.id.to_string()) {
+                return None;
+            }
+            let resolved = Some(alias.semantic_type.clone());
+            visiting.remove(alias.id.as_str());
+            return resolved;
+        }
+        if let Some(arguments) = text
+            .strip_prefix("Resource<")
+            .and_then(|value| value.strip_suffix('>'))
+        {
+            let arguments = split_top_level(arguments, ',');
+            if arguments.len() == 2 {
+                return Some(SemanticType::Resource(ResourceType {
+                    data: Box::new(self.resolve_annotation_with_aliases(
+                        arguments[0],
+                        path,
+                        bindings,
+                        visiting,
+                    )?),
+                    error: Box::new(self.resolve_annotation_with_aliases(
+                        arguments[1],
+                        path,
+                        bindings,
+                        visiting,
+                    )?),
+                    pending: true,
+                    serializable: true,
+                    execution_boundary: ResourceExecutionBoundary::Shared,
+                }));
+            }
+        }
+        semantic_type_from_annotation(text)
     }
 
     #[must_use]

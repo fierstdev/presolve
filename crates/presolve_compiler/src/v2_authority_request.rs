@@ -14,7 +14,7 @@ use crate::{
     slot_field_sites_v1, AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 12;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 13;
 const V2_VALIDATION_RULE_NAMES: &[&str] = &[
     "required",
     "min",
@@ -107,6 +107,19 @@ pub struct V2AuthorityServerActionInvocationSiteV1 {
     pub export_name: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct V2AuthorityRouteLoaderInvocationSiteV1 {
+    pub id: String,
+    pub file: PathBuf,
+    pub position: usize,
+    pub invocation_position: usize,
+    pub parameters_type_position: usize,
+    pub import_position: usize,
+    pub module_specifier: String,
+    pub export_name: String,
+}
+
 /// A syntactic member-call candidate.  Rust deliberately records only the
 /// structural object and property positions; the TypeScript authority decides
 /// whether either resolved symbol has framework meaning.
@@ -136,6 +149,8 @@ pub struct V2AuthorityCanonicalV1 {
     pub define_form: Option<V2AuthorityPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<V2AuthorityPositionV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loader: Option<V2AuthorityPositionV1>,
     pub validation_rules: Vec<V2AuthorityNamedPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<V2AuthorityPositionV1>,
@@ -158,6 +173,7 @@ pub struct V2AuthorityRequestV1 {
     pub standard_validations: Vec<V2AuthorityStandardValidationSiteV1>,
     pub package_invocations: Vec<V2AuthorityPackageInvocationSiteV1>,
     pub server_action_invocations: Vec<V2AuthorityServerActionInvocationSiteV1>,
+    pub route_loader_invocations: Vec<V2AuthorityRouteLoaderInvocationSiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
 
@@ -204,6 +220,7 @@ pub fn build_v2_authority_request_v1(
     let slot = canonical_import(parsed, "slot")?;
     let define_form = canonical_import(parsed, "defineForm")?;
     let field = canonical_import(parsed, "field")?;
+    let loader = canonical_import(parsed, "loader")?;
     let validation_rules = canonical_validation_imports(parsed)?;
     let environment = canonical_import(parsed, "environment")?;
     let components = component_inheritance_sites_v1(parsed)
@@ -398,6 +415,7 @@ pub fn build_v2_authority_request_v1(
         .collect::<Result<Vec<_>, V2AuthorityRequestErrorV1>>()?;
     let package_invocations = terminal_package_invocation_sites(parsed)?;
     let server_action_invocations = server_action_invocation_sites(parsed, component_model)?;
+    let route_loader_invocations = route_loader_invocation_sites(parsed, component_model)?;
     let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
@@ -410,6 +428,7 @@ pub fn build_v2_authority_request_v1(
             slot,
             define_form,
             field,
+            loader,
             validation_rules,
             environment,
         },
@@ -424,6 +443,7 @@ pub fn build_v2_authority_request_v1(
         standard_validations,
         package_invocations,
         server_action_invocations,
+        route_loader_invocations,
         environment_public,
     })
 }
@@ -460,6 +480,7 @@ pub fn build_v2_authority_component_request_v1(
             slot: canonical_import(parsed, "slot")?,
             define_form: canonical_import(parsed, "defineForm")?,
             field: canonical_import(parsed, "field")?,
+            loader: canonical_import(parsed, "loader")?,
             validation_rules: canonical_validation_imports(parsed)?,
             environment: canonical_import(parsed, "environment")?,
         },
@@ -474,6 +495,7 @@ pub fn build_v2_authority_component_request_v1(
         standard_validations: Vec::new(),
         package_invocations: Vec::new(),
         server_action_invocations: Vec::new(),
+        route_loader_invocations: Vec::new(),
         environment_public: Vec::new(),
     })
 }
@@ -501,6 +523,7 @@ pub fn build_v2_environment_authority_request_v1(
             slot: None,
             define_form: None,
             field: None,
+            loader: None,
             validation_rules: Vec::new(),
             environment: Some(environment),
         },
@@ -515,6 +538,7 @@ pub fn build_v2_environment_authority_request_v1(
         standard_validations: Vec::new(),
         package_invocations: Vec::new(),
         server_action_invocations: Vec::new(),
+        route_loader_invocations: Vec::new(),
         environment_public: environment_public_member_sites(parsed, true)?,
     }))
 }
@@ -730,6 +754,123 @@ fn server_action_invocation_sites(
                     file: selected.file,
                     position: selected.position,
                     form_position: utf16_position(&parsed.syntax.source, form_span.start)?,
+                    import_position: utf16_position(&parsed.syntax.source, import_span.start)?,
+                    module_specifier,
+                    export_name,
+                })
+            },
+        )
+        .collect::<Result<Vec<_>, V2AuthorityRequestErrorV1>>()?;
+    sites.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(sites)
+}
+
+/// Select the closed route-loader field shape without assigning meaning to
+/// either call. TypeScript must prove both the canonical Presolve intrinsic
+/// and the exact named package import before lowering can admit the field.
+fn route_loader_invocation_sites(
+    parsed: &ParsedFile,
+    component_model: &CanonicalAuthoredSemanticModelV1,
+) -> Result<Vec<V2AuthorityRouteLoaderInvocationSiteV1>, V2AuthorityRequestErrorV1> {
+    let component_names = component_model
+        .declarations
+        .iter()
+        .filter(|declaration| {
+            declaration.kind == crate::CanonicalAuthoredDeclarationKindV1::Component
+        })
+        .map(|declaration| declaration.subject.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut sites = parsed
+        .classes
+        .iter()
+        .filter(|class| component_names.contains(class.name.as_str()))
+        .flat_map(|class| &class.properties)
+        .filter_map(|property| {
+            let loader_call = property.initializer_call.as_ref()?;
+            let handler = loader_call.inline_handler.as_ref()?;
+            let invocation = handler.direct_call.as_ref()?;
+            (!property.is_static
+                && loader_call.argument_count == 1
+                && handler.is_async
+                && handler.parameters.len() == 2
+                && handler.parameters[0].name == "params"
+                && handler.parameters[1].name == "signal"
+                && handler.state_updates.is_empty()
+                && handler.local_variables.is_empty()
+                && invocation.arguments.len() == 2
+                && invocation.arguments[0].name == "params"
+                && invocation.arguments[1].name == "signal")
+                .then_some((
+                    loader_call,
+                    invocation,
+                    handler.parameters[0].type_annotation.as_ref()?,
+                ))
+        })
+        .filter_map(|(loader_call, invocation, parameters_type)| {
+            parsed
+                .imports
+                .iter()
+                .filter(|import| {
+                    import.source != "presolve"
+                        && !relative_import_targets_server(&parsed.path, &import.source)
+                })
+                .flat_map(|import| {
+                    import
+                        .specifiers
+                        .iter()
+                        .map(move |specifier| (import.source.as_str(), specifier))
+                })
+                .find(|(_, specifier)| {
+                    specifier.local == invocation.callee && specifier.imported != "default"
+                })
+                .map(|(module_specifier, specifier)| {
+                    (
+                        loader_call.callee_span,
+                        invocation.callee_span,
+                        module_specifier.to_owned(),
+                        specifier.imported.clone(),
+                        specifier.local_span,
+                        parameters_type,
+                    )
+                })
+        })
+        .map(
+            |(
+                loader_span,
+                invocation_span,
+                module_specifier,
+                export_name,
+                import_span,
+                parameters_type,
+            )| {
+                let selected = site_for(
+                    "route-loader-invocation",
+                    AuthoredSourceRangeV1 {
+                        start: loader_span.start,
+                        end: loader_span.end,
+                        line: loader_span.line,
+                        column: loader_span.column,
+                    },
+                    &parsed.path,
+                    &parsed.syntax.source,
+                )?;
+                Ok(V2AuthorityRouteLoaderInvocationSiteV1 {
+                    id: selected.id,
+                    file: selected.file,
+                    position: selected.position,
+                    invocation_position: utf16_position(
+                        &parsed.syntax.source,
+                        invocation_span.start,
+                    )?,
+                    parameters_type_position: utf16_position(
+                        &parsed.syntax.source,
+                        parsed.syntax.source[parameters_type.span.start..parameters_type.span.end]
+                            .find(&parameters_type.text)
+                            .map(|offset| parameters_type.span.start + offset)
+                            .ok_or(V2AuthorityRequestErrorV1::InvalidSourceOffset(
+                                parameters_type.span.start,
+                            ))?,
+                    )?,
                     import_position: utf16_position(&parsed.syntax.source, import_span.start)?,
                     module_specifier,
                     export_name,

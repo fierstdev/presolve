@@ -2,15 +2,14 @@
 
 ## Current objective
 
-Freeze and implement the first capability-specific Node executor contract for
-compiler-issued route-loader and server-action handoffs. Preserve the existing
-file-route graph, semantic-capability registry, environment ownership, and
-deployment inventory as the only authorities; do not add a second router or
-execute unclassified package source. Prove request decoding, exact endpoint
-loading, cancellation, loader caching, FormData action input, JSON/redirect
-responses, typed failure, and mixed static/node routes before widening the
-surface. Then continue the remaining compatibility, diagnostics, performance,
-and release-hardening gates.
+Finish the remaining completion-grade beta product slices after the canonical
+Node server-action and route-loader executors. The next authored gate is the
+canonical general-purpose Resource/package surface: remove decorator-only
+authoring without creating a generic execution escape hatch, preserve exact
+semantic-package classification, and prove client/shared/server ownership,
+resume, diagnostics, and editor behavior. Then refresh scaffold/site docs and
+run the compatibility, determinism, release, public-package, and hosted-product
+gates.
 
 ## Completed slices
 
@@ -475,3 +474,47 @@ The next authored gate must add route-loader result/error codecs, normalized
 request parameters, deterministic cache keys, and one exact Resource bootstrap
 target before any loader output may execute or enter HTML. Full-beta completion
 is 80%.
+
+## Canonical Node route-loader executor
+
+The second capability-specific Node executor gate is complete. Authority schema
+v13 proves canonical `loader(handler)` fields, exact Presolve
+`RouteParameters`, DOM `AbortSignal`, Promise completion, and the direct named
+package import. Missing evidence, lookalikes, widened `any`, and incompatible
+endpoint signatures fail before lowering. Authored semantics schema v8 retains
+that proof without executing source.
+
+Route-loader plan schema v2 joins the exact route/component instance,
+`Resource<Data, Error>` semantic codecs, declaration/activation and slot IDs,
+ordered decoded segment indexes, strict normalization, cache ingredients, and
+private-partition fact. Resource runtime schema v4 adds one exact server
+bootstrap descriptor while omitting any browser location for the server module.
+Selected route publication now excludes sibling Resource declarations, closing
+the multi-loader application leak found by the acceptance corpus.
+
+Node deployment schema v3 bundles a digest-bound loader registry and executes
+only compiler-listed exports. The host validates request segments and result or
+typed-error codecs, injects a script-safe bootstrap before either stable or
+content-hashed runtime entry, and implements public, private, and no-store
+caching. Private responses partition authorization/cookies and emit
+`Vary: Authorization, Cookie`; pending work coalesces per complete key while
+each waiter retains disconnect cancellation. Host shutdown aborts active work.
+
+The production-shaped integration proof includes three loader routes, repeated
+public hits, two private authorization partitions, repeated no-store hits,
+malformed percent encoding, codec mismatch, typed failure, missing runtime and
+named export, deterministic plan/host/registry bytes, disconnect and SIGTERM
+abort, and a real browser that consumes the bootstrap, updates a
+Resource-backed text binding, and reports zero diagnostics. It also exposed and
+fixed the production-only hashed-runtime bootstrap marker mismatch.
+
+All 664 compiler tests, the complete Presolve CLI suite including 59 browser
+tests, TypeScript 7.0.2 compatibility, 12 authority tests, 91 documentation
+files, production determinism, fixed production budgets, formatting, and diff
+checks pass. The expected runtime growth is audited at 314,744 bytes and remains
+within the frozen production budgets. Full-beta completion is 86%.
+
+Next: design and implement the canonical general-purpose Resource/package
+authoring gate, including editor/tooling evidence, then update the scaffold and
+Presolve.dev from the published version before the final release hardening
+matrix.

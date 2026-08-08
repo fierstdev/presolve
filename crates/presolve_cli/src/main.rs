@@ -18,8 +18,8 @@ use presolve_cli::cloudflare_deployment::{
     CLOUDFLARE_WORKERS_COMPATIBILITY_DATE_V1,
 };
 use presolve_cli::node_deployment::{
-    attach_node_server_action_registry_v1, build_node_deployment_plan_v1,
-    node_deployment_plan_json_v1, node_static_host_module_v1,
+    attach_node_route_loader_registry_v1, attach_node_server_action_registry_v1,
+    build_node_deployment_plan_v1, node_deployment_plan_json_v1, node_static_host_module_v1,
     validate_node_deployment_artifacts_v1, NodeDeploymentOptionsV1, NodeDeploymentPlanV1,
 };
 use presolve_cli::{
@@ -38,7 +38,7 @@ use presolve_compiler::{
     build_file_route_publication_v1, build_form_inspection_registry, build_module_graph,
     build_production_audit_report_v1, build_production_reachability_graph,
     build_production_reports, build_production_runtime_artifact, build_resume_chunk_graph,
-    build_resume_manifest, build_route_loader_plan_v1, build_route_server_action_plan_v1,
+    build_resume_manifest, build_route_loader_plan_v2, build_route_server_action_plan_v1,
     build_runtime_component_artifact, build_runtime_computed_artifact,
     build_runtime_context_artifact, build_runtime_effect_artifact, build_runtime_forms_artifact,
     build_runtime_opaque_artifact_with_modules, build_runtime_resource_artifact_with_modules,
@@ -1606,6 +1606,14 @@ fn run_ergonomic_node_deploy(args: &[String]) {
         attach_node_server_action_registry_v1(&mut plan, digest)
             .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     }
+    if let Some(digest) =
+        attach_node_route_loader_runtime_module(&project.root, &adapter_root, &plan).unwrap_or_else(
+            |message| application_cli_error("PSNODE1025_ROUTE_LOADER_BUNDLE_FAILED", &message),
+        )
+    {
+        attach_node_route_loader_registry_v1(&mut plan, digest)
+            .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    }
     validate_node_deployment_artifacts_v1(&output_root, &plan)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     write_node_adapter_file(
@@ -1731,6 +1739,111 @@ await build({
     let bytes = fs::read(&bundled_path)
         .map_err(|error| format!("failed to read {}: {error}", bundled_path.display()))?;
     let destination = adapter_root.join("presolve.server-actions.mjs");
+    fs::write(&destination, &bytes)
+        .map_err(|error| format!("failed to write {}: {error}", destination.display()))?;
+    Ok(Some(format!("sha256:{:x}", Sha256::digest(bytes))))
+}
+
+fn attach_node_route_loader_runtime_module(
+    project_root: &Path,
+    adapter_root: &Path,
+    plan: &NodeDeploymentPlanV1,
+) -> Result<Option<String>, String> {
+    if plan.route_loaders.is_empty() {
+        return Ok(None);
+    }
+    let work_root = project_root.join(".presolve");
+    fs::create_dir_all(&work_root)
+        .map_err(|error| format!("failed to create {}: {error}", work_root.display()))?;
+    let mut entry = String::new();
+    for (index, loader) in plan.route_loaders.iter().enumerate() {
+        if loader.runtime_module.starts_with('/')
+            || Path::new(&loader.runtime_module)
+                .components()
+                .any(|component| matches!(component, std::path::Component::ParentDir))
+        {
+            return Err(format!(
+                "route loader {} has a non-canonical runtime module",
+                loader.id
+            ));
+        }
+        let runtime = project_root
+            .join("node_modules")
+            .join(&loader.package)
+            .join(&loader.runtime_module);
+        if !runtime.is_file() {
+            return Err(format!(
+                "route loader {} runtime module {} does not exist",
+                loader.id,
+                runtime.display()
+            ));
+        }
+        entry.push_str(&format!(
+            "import {{ {} as __presolve_route_loader_{index} }} from {};\n",
+            loader.export,
+            serde_json::to_string(&runtime.to_string_lossy())
+                .map_err(|error| format!("failed to encode route loader module: {error}"))?
+        ));
+    }
+    entry.push_str("const registry = Object.create(null);\n");
+    for (index, loader) in plan.route_loaders.iter().enumerate() {
+        entry.push_str(&format!(
+            "registry[{}] = __presolve_route_loader_{index};\n",
+            serde_json::to_string(&loader.id)
+                .map_err(|error| format!("failed to encode route loader id: {error}"))?
+        ));
+    }
+    entry.push_str("export const presolveRouteLoaders = Object.freeze(registry);\n");
+    let entry_path = work_root.join("presolve-node-route-loader-entry.mjs");
+    let runner_path = work_root.join("presolve-node-route-loader-build.mjs");
+    fs::write(&entry_path, entry)
+        .map_err(|error| format!("failed to write {}: {error}", entry_path.display()))?;
+    fs::write(
+        &runner_path,
+        r#"import { build } from "vite";
+await build({
+  root: process.cwd(),
+  configFile: false,
+  logLevel: "error",
+  build: {
+    outDir: ".presolve/node-route-loader-output",
+    emptyOutDir: true,
+    sourcemap: false,
+    assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+    rollupOptions: {
+      input: ".presolve/presolve-node-route-loader-entry.mjs",
+      preserveEntrySignatures: "strict",
+      output: {
+        format: "es",
+        entryFileNames: "presolve.route-loaders.mjs",
+        chunkFileNames: "presolve.route-loaders.[hash].mjs",
+        assetFileNames: "presolve.route-loaders.[hash][extname]",
+        inlineDynamicImports: true
+      }
+    }
+  }
+});
+"#,
+    )
+    .map_err(|error| format!("failed to write {}: {error}", runner_path.display()))?;
+    let output = Command::new("node")
+        .arg(&runner_path)
+        .current_dir(project_root)
+        .output()
+        .map_err(|error| format!("failed to start the route-loader Vite build: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Vite exited with {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let bundled_path = work_root
+        .join("node-route-loader-output")
+        .join("presolve.route-loaders.mjs");
+    let bytes = fs::read(&bundled_path)
+        .map_err(|error| format!("failed to read {}: {error}", bundled_path.display()))?;
+    let destination = adapter_root.join("presolve.route-loaders.mjs");
     fs::write(&destination, &bytes)
         .map_err(|error| format!("failed to write {}: {error}", destination.display()))?;
     Ok(Some(format!("sha256:{:x}", Sha256::digest(bytes))))
@@ -2400,7 +2513,7 @@ fn run_ergonomic_check(
     let symbols = build_symbol_table(&unit);
     let modules = build_module_graph(&unit);
     let bindings = build_binding_table_with_packages(&unit, &symbols, &modules, &package_contracts);
-    build_route_loader_plan_v1(&asm.components, &graph, &bindings)
+    build_route_loader_plan_v2(&asm, &graph, &bindings)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     build_route_server_action_plan_v1(&asm.components, &graph, &bindings)
         .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
@@ -2493,7 +2606,7 @@ fn try_run_ergonomic_file_check(root: &Path, args: &[String]) -> bool {
         let modules = build_module_graph(&unit);
         let bindings =
             build_binding_table_with_packages(&unit, &symbols, &modules, &package_contracts);
-        build_route_loader_plan_v1(&asm.components, &graph, &bindings)
+        build_route_loader_plan_v2(&asm, &graph, &bindings)
             .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
         build_route_server_action_plan_v1(&asm.components, &graph, &bindings)
             .unwrap_or_else(|error| application_cli_error(error.code, &error.message));

@@ -26,6 +26,7 @@ pub struct V2AuthoringResolutionsV1 {
     pub form_fields: Vec<ResolvedFormFieldDefinitionV1>,
     pub validations: Vec<ResolvedFormValidationDefinitionV1>,
     pub server_action_invocations: Vec<ResolvedServerActionInvocationV1>,
+    pub route_loader_invocations: Vec<ResolvedRouteLoaderInvocationV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +34,15 @@ pub struct ResolvedServerActionInvocationV1 {
     pub call_source: crate::AuthoredSourceRangeV1,
     pub module_specifier: String,
     pub export_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedRouteLoaderInvocationV1 {
+    pub callee_source: crate::AuthoredSourceRangeV1,
+    pub loader_identity: crate::ResolvedIntrinsicIdentityV1,
+    pub module_specifier: String,
+    pub export_name: String,
+    pub declaration_modules: Vec<String>,
 }
 
 /// The unified decorator-free canonical model and its constituent proof products.
@@ -61,6 +71,7 @@ pub enum V2AuthoringLoweringErrorV1 {
     FormField(FormFieldDefinitionLoweringErrorV1),
     Validation(FormValidationDefinitionLoweringErrorV1),
     ServerAction(String),
+    RouteLoader(String),
     Computed(ComputedGetterLoweringErrorV1),
     Composition(AuthoredSemanticCompositionErrorV1),
 }
@@ -77,6 +88,7 @@ impl std::fmt::Display for V2AuthoringLoweringErrorV1 {
             Self::FormField(error) => error.fmt(formatter),
             Self::Validation(error) => error.fmt(formatter),
             Self::ServerAction(error) => formatter.write_str(error),
+            Self::RouteLoader(error) => formatter.write_str(error),
             Self::Computed(error) => error.fmt(formatter),
             Self::Composition(error) => error.fmt(formatter),
         }
@@ -121,6 +133,11 @@ pub fn lower_v2_authoring_v1(
         resolutions.validations,
     )
     .map_err(V2AuthoringLoweringErrorV1::Validation)?;
+    let route_loaders = lower_route_loader_invocations(
+        parsed,
+        &components.model,
+        &resolutions.route_loader_invocations,
+    )?;
     let input = compose_authored_semantics_v1([
         components.model.clone(),
         states.model.clone(),
@@ -130,6 +147,7 @@ pub fn lower_v2_authoring_v1(
         forms.model.clone(),
         form_fields.model.clone(),
         validations.clone(),
+        route_loaders,
     ])
     .map_err(V2AuthoringLoweringErrorV1::Composition)?;
     let computed =
@@ -157,6 +175,81 @@ pub fn lower_v2_authoring_v1(
         validation_count,
         model,
     })
+}
+
+fn lower_route_loader_invocations(
+    parsed: &ParsedFile,
+    components: &CanonicalAuthoredSemanticModelV1,
+    resolutions: &[ResolvedRouteLoaderInvocationV1],
+) -> Result<CanonicalAuthoredSemanticModelV1, V2AuthoringLoweringErrorV1> {
+    let component_names = components
+        .declarations
+        .iter()
+        .filter(|declaration| {
+            declaration.kind == crate::CanonicalAuthoredDeclarationKindV1::Component
+        })
+        .map(|declaration| declaration.subject.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let candidates = resolutions
+        .iter()
+        .map(|resolution| {
+            let (class, property) = parsed
+                .classes
+                .iter()
+                .filter(|class| component_names.contains(class.name.as_str()))
+                .find_map(|class| {
+                    class.properties.iter().find_map(|property| {
+                        let call = property.initializer_call.as_ref()?;
+                        ((call.callee_span.start, call.callee_span.end)
+                            == (resolution.callee_source.start, resolution.callee_source.end))
+                            .then_some((class, property))
+                    })
+                })
+                .ok_or_else(|| {
+                    V2AuthoringLoweringErrorV1::RouteLoader(format!(
+                        "authority-proven route loader has no component field at {}..{}",
+                        resolution.callee_source.start, resolution.callee_source.end
+                    ))
+                })?;
+            let call = property
+                .initializer_call
+                .as_ref()
+                .expect("selected initializer call");
+            let handler = call.inline_handler.as_ref().ok_or_else(|| {
+                V2AuthoringLoweringErrorV1::RouteLoader(format!(
+                    "canonical route loader `{}.{}` requires one inline handler",
+                    class.name, property.name
+                ))
+            })?;
+            let valid_body = handler.direct_call.is_some()
+                && handler.state_updates.is_empty()
+                && handler.local_variables.is_empty()
+                && (handler.is_expression_body || handler.unsupported_statement_spans.len() == 1);
+            if call.argument_count != 1 || !handler.is_async || !valid_body {
+                return Err(V2AuthoringLoweringErrorV1::RouteLoader(format!(
+                    "canonical route loader `{}.{}` requires one async direct package call",
+                    class.name, property.name
+                )));
+            }
+            Ok(crate::ResolvedAuthoredSemanticCandidateV1 {
+                subject: format!("{}.{}", class.name, property.name),
+                source: crate::AuthoredSourceRangeV1 {
+                    start: property.span.start,
+                    end: property.span.end,
+                    line: property.span.line,
+                    column: property.span.column,
+                },
+                kind: crate::AuthoredSemanticCandidateKindV1::ResolvedRouteLoader {
+                    intrinsic_identity: resolution.loader_identity.clone(),
+                    module_specifier: resolution.module_specifier.clone(),
+                    export_name: resolution.export_name.clone(),
+                    declaration_modules: resolution.declaration_modules.clone(),
+                },
+            })
+        })
+        .collect::<Result<Vec<_>, V2AuthoringLoweringErrorV1>>()?;
+    crate::normalize_authored_semantics_v1(parsed, candidates)
+        .map_err(|error| V2AuthoringLoweringErrorV1::RouteLoader(error.to_string()))
 }
 
 fn validate_server_action_invocations(
@@ -309,6 +402,7 @@ class Counter extends AliasedBase {
                 form_fields: Vec::new(),
                 validations: Vec::new(),
                 server_action_invocations: Vec::new(),
+                route_loader_invocations: Vec::new(),
             },
         )
         .expect("one authority-backed V2 source model");

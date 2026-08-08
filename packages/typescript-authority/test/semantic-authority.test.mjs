@@ -146,6 +146,7 @@ test("the V2 authoring bridge resolves canonical component, State, Action, Effec
     standardValidations: [],
     packageInvocations: [],
     serverActionInvocations: [],
+    routeLoaderInvocations: [],
     environmentPublic: [
       {
         id: "application-name",
@@ -198,6 +199,7 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     standardValidations: [],
     packageInvocations: [],
     serverActionInvocations: [],
+    routeLoaderInvocations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
@@ -277,6 +279,7 @@ test("the V2 authoring bridge proves exact named-import package invocations", as
       },
     ],
     serverActionInvocations: [],
+    routeLoaderInvocations: [],
     environmentPublic: [],
   });
   assert.equal(result.diagnostics.length, 0);
@@ -289,6 +292,46 @@ test("the V2 authoring bridge proves exact named-import package invocations", as
   assert.deepEqual(result.packageInvocations[1].argumentTypes, ["string"]);
   assert.equal(result.packageInvocations[1].completion, "promise");
   assert.equal(result.packageInvocations[1].injectAbortSignal, true);
+});
+
+test("the V2 authoring bridge proves canonical route loader fields and package calls", async () => {
+  const file = resolve(root, "tests/framework-public-api/src/V2Loader.tsx");
+  const source = readFileSync(file, "utf8");
+  const result = await analyzeV2Authoring({
+    schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
+    configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+    canonical: {
+      component: { file, position: source.indexOf("Component") },
+      loader: { file, position: source.indexOf("loader") },
+      validationRules: [],
+    },
+    components: [{ id: "loader-page", file, position: source.indexOf("V2Loader extends") }],
+    states: [],
+    actions: [],
+    effects: [],
+    slots: [],
+    forms: [],
+    formFields: [],
+    validations: [],
+    standardValidations: [],
+    packageInvocations: [],
+    serverActionInvocations: [],
+    routeLoaderInvocations: [{
+      id: "route-loader",
+      file,
+      position: source.indexOf("loader<PostRecord"),
+      invocationPosition: source.indexOf("loadPost(params"),
+      parametersTypePosition: source.indexOf("RouteParameters", source.indexOf("async")),
+      importPosition: source.indexOf("loadPost"),
+      moduleSpecifier: "./V2PackageHelper.js",
+      exportName: "loadPost",
+    }],
+    environmentPublic: [],
+  });
+  assert.equal(result.diagnostics.length, 0);
+  assert.equal(result.routeLoaderInvocations.length, 1);
+  assert.equal(result.routeLoaderInvocations[0].loaderIdentity.name, "loader");
+  assert.equal(result.routeLoaderInvocations[0].identity.name, "loadPost");
 });
 
 test("the V2 authoring bridge resolves canonical decorator-free Form evidence", async () => {
@@ -362,6 +405,7 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
       moduleSpecifier: "./V2Schemas.js",
       exportName: "saveProfile",
     }],
+    routeLoaderInvocations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.forms.map(entry => entry.id), ["profile-form"]);
@@ -411,6 +455,7 @@ test("the V2 authoring bridge recognizes a direct Component heritage-expression 
     standardValidations: [],
     packageInvocations: [],
     serverActionInvocations: [],
+    routeLoaderInvocations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["direct"]);
@@ -438,6 +483,7 @@ test("the V2 authoring bridge resolves environment evidence without a component 
     standardValidations: [],
     packageInvocations: [],
     serverActionInvocations: [],
+    routeLoaderInvocations: [],
     environmentPublic: [{
       id: "application-name",
       file: frameworkFile,
@@ -479,6 +525,7 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
         standardValidations: [],
         packageInvocations: [],
         serverActionInvocations: [],
+        routeLoaderInvocations: [],
         environmentPublic: [],
       }),
       encoding: "utf8",

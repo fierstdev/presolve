@@ -847,8 +847,8 @@ pub use route_graph::{
     RouteManifestEntryV1, RouteManifestV1, RouteNode,
 };
 pub use route_loader::{
-    build_route_loader_plan_v1, route_loader_plan_json_v1, RouteLoaderBindingV1,
-    RouteLoaderPlanErrorV1, RouteLoaderPlanV1, RouteLoaderRouteV1,
+    build_route_loader_plan_v2, route_loader_plan_json_v2, RouteLoaderBindingV2,
+    RouteLoaderPlanErrorV2, RouteLoaderPlanV2, RouteLoaderRouteV2,
     ROUTE_LOADER_PLAN_SCHEMA_VERSION,
 };
 pub use route_metadata::{
@@ -949,7 +949,8 @@ pub use runtime_resource_artifact::{
     runtime_resource_artifact_json, validate_runtime_resource_artifact, RuntimeResourceArtifact,
     RuntimeResourceArtifactActivation, RuntimeResourceArtifactBuildError,
     RuntimeResourceArtifactDeclaration, RuntimeResourceArtifactEndpoint,
-    RuntimeResourceArtifactValidationError, RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
+    RuntimeResourceArtifactServerBootstrap, RuntimeResourceArtifactValidationError,
+    RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
 };
 pub use semantic_capability::{
     build_semantic_capability_registry, semantic_capability_matrix_text,
@@ -1074,14 +1075,15 @@ pub use template_semantics::{
     TemplateSemanticScope,
 };
 pub use v2_authoring_lowering::{
-    lower_v2_authoring_v1, ResolvedServerActionInvocationV1, V2AuthoringLoweringErrorV1,
-    V2AuthoringLoweringV1, V2AuthoringResolutionsV1,
+    lower_v2_authoring_v1, ResolvedRouteLoaderInvocationV1, ResolvedServerActionInvocationV1,
+    V2AuthoringLoweringErrorV1, V2AuthoringLoweringV1, V2AuthoringResolutionsV1,
 };
 pub use v2_authority_request::{
     build_v2_authority_component_request_v1, build_v2_authority_request_v1,
     build_v2_environment_authority_request_v1, V2AuthorityCanonicalV1, V2AuthorityFormFieldSiteV1,
     V2AuthorityMemberSiteV1, V2AuthorityPositionV1, V2AuthorityRequestErrorV1,
-    V2AuthorityRequestV1, V2AuthorityServerActionInvocationSiteV1, V2AuthoritySiteV1,
+    V2AuthorityRequestV1, V2AuthorityRouteLoaderInvocationSiteV1,
+    V2AuthorityServerActionInvocationSiteV1, V2AuthoritySiteV1,
     V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
 };
 pub use v2_authority_response::{
@@ -1089,8 +1091,8 @@ pub use v2_authority_response::{
     validate_v2_authority_response_v1, ResolvedEnvironmentPublicReadV1,
     V2AuthorityFormFieldResolutionV1, V2AuthorityFormFieldValueClassificationV1,
     V2AuthorityIdentityV1, V2AuthorityResolutionV1, V2AuthorityResponseErrorV1,
-    V2AuthorityResponseV1, V2AuthorityServerActionInvocationResolutionV1,
-    V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
+    V2AuthorityResponseV1, V2AuthorityRouteLoaderInvocationResolutionV1,
+    V2AuthorityServerActionInvocationResolutionV1, V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
 };
 
 #[cfg(test)]

@@ -75,15 +75,15 @@ normative source for this handoff.
 - [Resource lifecycle and resume contract](resource-lifecycle-resume-contract.md)
   defines compiler-owned cold, snapshot, reload, cancellation, and fallback
   behavior for declared Resource endpoints.
-- [Route-loader handoff contract](route-loader-handoff-contract.md) fixes the
-  integrity-bound compiler publication boundary and the explicit no-executor
-  rule for server route loaders.
+- [Route-loader execution contract](route-loader-handoff-contract.md) fixes the
+  canonical Resource authoring, integrity-bound compiler plan, Node execution,
+  cache, cancellation, and browser-bootstrap boundaries.
 - [Server-action and capability contract](server-action-capability-contract.md)
   records the closed server-action handoff and the public capability-registry
   boundary for Resources, loaders, and server actions.
 - [Node capability executor contract](node-capability-executor-contract.md)
-  defines the canonical Form-bound server-action execution gate and the exact
-  codec/bootstrap facts still required before route loaders may execute.
+  defines the completed canonical Form-bound server-action and route-loader
+  execution gates.
 - [V2 effect-field source contract](effect-field-source-contract.md) defines
   the authority-backed, decorator-free effect declaration boundary before
   lifecycle runtime adoption.
@@ -173,8 +173,8 @@ normative source for this handoff.
 ## Current boundary
 
 The tracker records repository-owned V2 authority products through canonical
-Form-bound server-action execution in the schema-v2 Node release. Route-loader
-execution remains explicitly fail-closed until compiler-owned result codecs,
-request normalization, and Resource bootstrap facts exist. The next beta gate
-therefore includes that loader slice plus refreshed compatibility, docs,
-scaffold, deterministic-release, and hosted-publication evidence.
+Form-bound server actions and route-owned loader Resources in the schema-v3
+Node release. The next beta gates are the remaining canonical general-purpose
+package/Resource authoring surfaces, cross-adapter server execution boundaries,
+and refreshed compatibility, docs, scaffold, deterministic-release, and
+hosted-publication evidence.

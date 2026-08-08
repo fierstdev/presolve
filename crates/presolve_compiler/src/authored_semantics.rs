@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use presolve_parser::ParsedFile;
 use serde::{Deserialize, Serialize};
 
-pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 7;
+pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -90,6 +90,12 @@ pub enum AuthoredSemanticCandidateKindV1 {
         input_type: Option<String>,
         output_type: Option<String>,
     },
+    ResolvedRouteLoader {
+        intrinsic_identity: ResolvedIntrinsicIdentityV1,
+        module_specifier: String,
+        export_name: String,
+        declaration_modules: Vec<String>,
+    },
     TsxBinding,
     TsxEventReference,
 }
@@ -123,6 +129,13 @@ pub enum DerivedAuthoredEvidenceV2 {
         argument_types: Vec<String>,
         completion: PackageInvocationCompletionV1,
         inject_abort_signal: bool,
+    },
+    /// A canonical `loader(...)` field whose sole package call and exact
+    /// parameter/Promise contract were proven by the TypeScript authority.
+    RouteLoaderInvocation {
+        module_specifier: String,
+        export_name: String,
+        declaration_modules: Vec<String>,
     },
 }
 
@@ -296,6 +309,14 @@ pub fn normalize_authored_semantics_v1(
                 declaration_modules.sort();
                 declaration_modules.dedup();
             }
+            if let Some(DerivedAuthoredEvidenceV2::RouteLoaderInvocation {
+                declaration_modules,
+                ..
+            }) = &mut derived_evidence
+            {
+                declaration_modules.sort();
+                declaration_modules.dedup();
+            }
             Ok(CanonicalAuthoredDeclarationV1 {
                 kind,
                 subject: candidate.subject,
@@ -399,6 +420,20 @@ fn declaration_kind(
                     output_type,
                 }),
             ),
+            AuthoredSemanticCandidateKindV1::ResolvedRouteLoader {
+                intrinsic_identity,
+                module_specifier,
+                export_name,
+                declaration_modules,
+            } => (
+                CanonicalAuthoredDeclarationKindV1::RouteLoader,
+                Some(intrinsic_identity),
+                Some(DerivedAuthoredEvidenceV2::RouteLoaderInvocation {
+                    module_specifier,
+                    export_name,
+                    declaration_modules,
+                }),
+            ),
             AuthoredSemanticCandidateKindV1::TsxBinding => {
                 (CanonicalAuthoredDeclarationKindV1::TsxBinding, None, None)
             }
@@ -482,7 +517,7 @@ mod tests {
             normalize_authored_semantics_v1(&parsed, [state.clone(), component.clone(), state])
                 .expect("valid resolved candidates");
 
-        assert_eq!(model.schema_version, 7);
+        assert_eq!(model.schema_version, 8);
         assert_eq!(model.declarations.len(), 2);
         assert_eq!(model.declarations[0].subject, "Card");
         assert_eq!(
@@ -505,7 +540,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&model).expect("serializable model"),
             serde_json::json!({
-                "schema_version": 7,
+                "schema_version": 8,
                 "source_path": "src/Card.tsx",
                 "declarations": [
                     {

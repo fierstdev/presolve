@@ -51,6 +51,7 @@ pub struct ResourceEndpointBinding {
     pub runtime_module: String,
     pub resume_policy: String,
     pub endpoint: SemanticPackageResourceEndpoint,
+    pub route_loader: Option<crate::SemanticPackageRouteLoader>,
 }
 
 /// Compiler-owned declaration for a Resource operation.

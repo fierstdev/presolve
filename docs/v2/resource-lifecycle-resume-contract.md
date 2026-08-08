@@ -28,13 +28,15 @@ The resolved package endpoint owns the policy:
   malformed, stale, mismatched, or non-codec values select one atomic cold
   fallback. No partial Resource registry survives that fallback.
 
-Browser runtime may reload only client/shared endpoints. A server-only reload
-requires an explicit server executor; until that product exists it selects the
-same cold fallback rather than attempting a browser call.
+Browser runtime may directly reload only client/shared endpoints. A canonical
+route-owned server/shared loader is executed by the Node request host and
+arrives through its exact server-bootstrap descriptor; the browser never calls
+or imports that endpoint. A server Resource without that compiler-issued route
+loader/bootstrap relationship still fails publication.
 
 ## Artifact and ordering
 
-The resource artifact (schema v2) publishes the exact endpoint coordinate,
+The resource artifact (schema v4) publishes the exact endpoint coordinate,
 runtime location, policy, cancellation mode, lifecycle generation, input
 dependencies, and compiler-issued closed codecs for the declaration's data and
 error types. The browser validates that codec grammar before executing an
@@ -53,17 +55,19 @@ depends on that activation's data slot, so its recomputation cannot precede
 Resource restoration. `reload` activations publish no snapshot slots.
 
 The browser consumes those compiler-issued slot IDs directly from Resource
-artifact schema v3. It stages the complete Resource registry, restores all R3
+artifact schema v4. It stages the complete Resource registry, restores all R3
 slots, and accepts only a positive-generation `ready` or `failed` lifecycle
 with the opposite terminal value null. Any missing slot, wrong linkage, bad
 codec value, pending/cancelled state, or cross-terminal value causes one cold
 fallback; snapshot restore never imports or invokes the endpoint.
 
-For `reload`, the browser restores no Resource value and publishes no Resource
-snapshot slot. It waits until State, computed, Context, component, Form, and
-DOM-binding restoration has completed, then invokes the exact client/shared
-endpoint once at generation one. Snapshot-policy endpoints are excluded from
-that call path.
+For a client/shared `reload`, the browser restores no Resource value and
+publishes no Resource snapshot slot. It waits until State, computed, Context,
+component, Form, and DOM-binding restoration has completed, then invokes the
+exact endpoint once at generation one. For a canonical server route loader,
+schema v4 instead requires one codec-validated generation-one bootstrap value
+before Resource allocation. Snapshot-policy endpoints are excluded from both
+reload paths.
 
 Browser acceptance covers malformed, `pending`, and `cancelled` Resource
 snapshots: each produces `ResourceSnapshotMismatch`, one cold boot, a cleared

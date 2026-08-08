@@ -14,9 +14,9 @@ use crate::{
     SemanticPackageRuntimeModuleKey, SemanticPackageRuntimeModuleTable,
 };
 
-/// Version 3 adds exact activation-to-resume-slot linkage for atomic browser
-/// snapshot restoration.
-pub const RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION: u32 = 3;
+/// Version 4 adds exact compiler-owned server bootstrap descriptors for route
+/// loader activations. Dynamic values remain request-owned Node output.
+pub const RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,6 +24,7 @@ pub struct RuntimeResourceArtifact {
     pub schema_version: u32,
     pub declarations: Vec<RuntimeResourceArtifactDeclaration>,
     pub activations: Vec<RuntimeResourceArtifactActivation>,
+    pub server_bootstraps: Vec<RuntimeResourceArtifactServerBootstrap>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,6 +73,17 @@ pub struct RuntimeResourceArtifactActivation {
     pub generation: Option<u64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeResourceArtifactServerBootstrap {
+    pub activation: String,
+    pub declaration: String,
+    pub component_instance: String,
+    pub loader_capability_id: String,
+    pub bootstrap_key: String,
+    pub resume_policy: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuntimeResourceArtifactValidationError {
     UnsupportedSchemaVersion {
@@ -98,6 +110,12 @@ pub enum RuntimeResourceArtifactValidationError {
     },
     InvalidValueCodec {
         declaration: String,
+    },
+    MissingRuntimeLocation {
+        declaration: String,
+    },
+    InvalidServerBootstrap {
+        activation: String,
     },
 }
 
@@ -183,10 +201,41 @@ pub fn build_runtime_resource_artifact(
             }
         })
         .collect();
+    let server_bootstraps = model
+        .resource_activations
+        .values()
+        .filter_map(|activation| {
+            let declaration = model.resource_declarations.get(&activation.declaration)?;
+            let endpoint = model
+                .resource_endpoint_resolutions
+                .iter()
+                .find(|resolution| {
+                    resolution.owner_component == declaration.owner_component
+                        && resolution.field == declaration.name
+                })
+                .and_then(|resolution| match &resolution.outcome {
+                    ResourceEndpointResolutionOutcome::Resolved(endpoint) => Some(endpoint),
+                    _ => None,
+                })?;
+            endpoint.route_loader.as_ref()?;
+            Some(RuntimeResourceArtifactServerBootstrap {
+                activation: activation.id.as_str().to_owned(),
+                declaration: declaration.id.as_str().to_owned(),
+                component_instance: activation.component_instance.as_str().to_owned(),
+                loader_capability_id: declaration
+                    .owner_component
+                    .route_loader(&declaration.name)
+                    .to_string(),
+                bootstrap_key: activation.id.as_str().to_owned(),
+                resume_policy: "reload".into(),
+            })
+        })
+        .collect();
     RuntimeResourceArtifact {
         schema_version: RUNTIME_RESOURCE_ARTIFACT_SCHEMA_VERSION,
         declarations,
         activations,
+        server_bootstraps,
     }
 }
 
@@ -198,6 +247,14 @@ pub fn build_runtime_resource_artifact_with_modules(
 ) -> Result<RuntimeResourceArtifact, RuntimeResourceArtifactBuildError> {
     let mut artifact = build_runtime_resource_artifact(model);
     for declaration in &mut artifact.declarations {
+        if artifact
+            .server_bootstraps
+            .iter()
+            .any(|bootstrap| bootstrap.declaration == declaration.id)
+        {
+            declaration.endpoint.runtime_location = None;
+            continue;
+        }
         let key = SemanticPackageRuntimeModuleKey {
             package: declaration.endpoint.package.clone(),
             version: declaration.endpoint.version.clone(),
@@ -238,6 +295,11 @@ pub fn validate_runtime_resource_artifact(
         );
     }
     let mut declarations = BTreeSet::new();
+    let bootstrap_declarations = artifact
+        .server_bootstraps
+        .iter()
+        .map(|bootstrap| bootstrap.declaration.as_str())
+        .collect::<BTreeSet<_>>();
     for declaration in &artifact.declarations {
         if !declarations.insert(declaration.id.clone()) {
             errors.push(
@@ -264,6 +326,15 @@ pub fn validate_runtime_resource_artifact(
             errors.push(RuntimeResourceArtifactValidationError::InvalidValueCodec {
                 declaration: declaration.id.clone(),
             });
+        }
+        if bootstrap_declarations.contains(declaration.id.as_str())
+            && declaration.endpoint.runtime_location.is_some()
+        {
+            errors.push(
+                RuntimeResourceArtifactValidationError::MissingRuntimeLocation {
+                    declaration: declaration.id.clone(),
+                },
+            );
         }
     }
     let mut activations = BTreeSet::new();
@@ -305,6 +376,32 @@ pub fn validate_runtime_resource_artifact(
             errors.push(
                 RuntimeResourceArtifactValidationError::InvalidResumeSlotIdentity {
                     activation: activation.id.clone(),
+                },
+            );
+        }
+    }
+    let activation_ids = artifact
+        .activations
+        .iter()
+        .map(|activation| activation.id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut bootstrap_activations = BTreeSet::new();
+    for bootstrap in &artifact.server_bootstraps {
+        let valid = bootstrap_activations.insert(bootstrap.activation.as_str())
+            && activation_ids.contains(bootstrap.activation.as_str())
+            && declarations.contains(bootstrap.declaration.as_str())
+            && bootstrap.bootstrap_key == bootstrap.activation
+            && !bootstrap.loader_capability_id.is_empty()
+            && bootstrap.resume_policy == "reload"
+            && artifact.activations.iter().any(|activation| {
+                activation.id == bootstrap.activation
+                    && activation.declaration == bootstrap.declaration
+                    && activation.component_instance == bootstrap.component_instance
+            });
+        if !valid {
+            errors.push(
+                RuntimeResourceArtifactValidationError::InvalidServerBootstrap {
+                    activation: bootstrap.activation.clone(),
                 },
             );
         }
