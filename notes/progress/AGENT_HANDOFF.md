@@ -2,13 +2,15 @@
 
 ## Current objective
 
-Commit and publish the fully rehearsed `0.2.0-beta.24` candidate, require hosted
-main CI and release-dry-run evidence, and prove the exact public creator. Then
-adopt beta.24 in Presolve.dev and require an unmodified Wrangler 4.119.0
-deployment. Beta.23 is public and deployed; its production proof exposed 20 MB
-of repeated pretty-print whitespace in route HTML and a three-request
-Cloudflare upload failure that disappeared only when transfer was serialized
-locally.
+Freeze and implement the first capability-specific Node executor contract for
+compiler-issued route-loader and server-action handoffs. Preserve the existing
+file-route graph, semantic-capability registry, environment ownership, and
+deployment inventory as the only authorities; do not add a second router or
+execute unclassified package source. Prove request decoding, exact endpoint
+loading, cancellation, loader caching, FormData action input, JSON/redirect
+responses, typed failure, and mixed static/node routes before widening the
+surface. Then continue the remaining compatibility, diagnostics, performance,
+and release-hardening gates.
 
 ## Completed slices
 
@@ -274,13 +276,15 @@ spill, rather than an 835,288-byte contaminated code sample.
 
 ## Next slice
 
-Finish the beta.23 release dry run, commit and push the verified candidate, and
-require hosted main CI, hosted release dry run, and GitHub Actions publication.
-The exact public `pnpm create presolve@0.2.0-beta.23 my-app` command must
-generate beta.23 pins and pass install, check, build, and deployment
-preparation. Then install that exact public release in Presolve.dev, rerun its
-local mobile/runtime acceptance with zero console errors, commit and deploy the
-site through Cloudflare, and resume the remaining authored beta gates.
+Author the narrow Node executor contract missing from the existing loader,
+server-action, and Node deployment handoffs, then implement one complete
+vertical slice without changing those frozen compiler products. The generated
+host must consume exact package coordinates and integrity facts from the
+published plans, decode only admitted request inputs, retain abort and cache
+ownership, return only admitted JSON/redirect/failure results, and continue to
+serve compiler-classified static routes unchanged. Require focused compiler,
+CLI, generated-host, deterministic-publication, and real-request evidence
+before expanding the executor surface.
 
 The complete beta.19 release dry run passes after the audited runtime baseline
 decreased by six bytes from the identity spelling correction: strict formatting
@@ -410,3 +414,36 @@ The audited runtime remains 302,655 bytes. The action-counter HTML baseline is
 26,136 bytes and component-structural HTML is 180,165 bytes. Hosted gates,
 publication, exact public scaffold proof, Presolve.dev adoption, and the
 unmodified Wrangler deployment remain required. Full-beta completion is 75%.
+
+## Beta.24 public publication and deployment
+
+Hosted main CI `31156361152`, hosted release dry run `31156361475`, and Publish
+beta `31157001481` completed successfully. The publish run released all three
+Rust crates, every npm/compiler/native-CLI package, VS Code prerelease `0.2.24`,
+and the non-draft GitHub prerelease. The updated npm credential was exercised
+successfully by the complete package publication.
+
+An exact public `pnpm create presolve@0.2.0-beta.24 my-app` invocation emitted
+beta.24 framework, CLI, and TypeScript-authority pins, installed from the public
+registry, passed `presolve check`, built the production publication, and
+prepared Cloudflare deployment. The documentation intentionally retains the
+explicit beta version because pnpm 11 applies its one-day minimum package age
+to unversioned creators. Release verification now also locks the creator's
+generated pins and the recovery workflow default to the requested version;
+future creator publications converge both npm `latest` and `beta` tags.
+
+Presolve.dev commit `4428f22` adopts beta.24 and its explicit creator command.
+All 38 source checks, production build, and Cloudflare preparation pass. The
+publication retains 667 filesystem files and Wrangler's 740-path inventory at
+about 62.6 MB, with 13,612,470 HTML bytes. Local and production browser proof
+at 390 by 844 verifies immutable CSS, no horizontal overflow, title and
+versioned favicons, the homepage counter, opaque close-on-navigation mobile
+menus, cart/Computed updates, rollout `1000 -> 2000`, structural tabs,
+Preview/Code switching, and a valid Form submission with zero diagnostics.
+
+Official unmodified Wrangler 4.119.0 uploaded all 257 changed assets in one
+ordinary deployment. Cloudflare Worker version
+`7c57ccbf-1748-4d6c-8bfd-9a23eb27b9c5` serves release SHA-256
+`4d967286cdb65961d14ce8a0d348f78dfb5388fa8dd29cd72fbe9aefe3d15d1b`;
+the favicon, PNG mark, and immutable stylesheet all return HTTP 200. The
+beta.23 manual-transfer blocker is closed. Full-beta completion is 77%.

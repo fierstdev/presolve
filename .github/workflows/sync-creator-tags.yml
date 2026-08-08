@@ -1,0 +1,46 @@
+name: Sync creator npm tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Published Presolve beta version, without the v prefix
+        required: true
+        default: "0.2.0-beta.24"
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync create-presolve latest and beta tags
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          registry-url: https://registry.npmjs.org
+      - name: Validate published creator
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          case "$RELEASE_VERSION" in
+            0.2.0-beta.*) ;;
+            *) echo "Expected a 0.2.0 beta version; received $RELEASE_VERSION." >&2; exit 1 ;;
+          esac
+          test "$(npm view "create-presolve@$RELEASE_VERSION" version)" = "$RELEASE_VERSION"
+      - name: Sync npm tags
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          npm dist-tag add "create-presolve@$RELEASE_VERSION" latest
+          npm dist-tag add "create-presolve@$RELEASE_VERSION" beta
+      - name: Verify npm tags
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          test "$(npm view create-presolve@latest version)" = "$RELEASE_VERSION"
+          test "$(npm view create-presolve@beta version)" = "$RELEASE_VERSION"

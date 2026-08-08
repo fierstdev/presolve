@@ -71,6 +71,29 @@ if (vscodeManifest.version !== marketplaceVersion) {
   );
 }
 
+const creatorSource = readFileSync(
+  "packages/create-presolve/bin/create-presolve.mjs",
+  "utf8",
+);
+for (const expectedPin of [
+  `npm:@presolve/framework@${requestedVersion}`,
+  `"@presolve/cli": "${requestedVersion}"`,
+  `"@presolve/typescript-authority": "${requestedVersion}"`,
+]) {
+  if (!creatorSource.includes(expectedPin)) {
+    throw new Error(
+      `packages/create-presolve/bin/create-presolve.mjs is missing release pin ${expectedPin}.`,
+    );
+  }
+}
+
+const publishWorkflow = readFileSync(".github/workflows/publish-beta.yml", "utf8");
+if (!publishWorkflow.includes(`default: "${requestedVersion}"`)) {
+  throw new Error(
+    `.github/workflows/publish-beta.yml recovery default is not ${requestedVersion}.`,
+  );
+}
+
 console.log(
   `Presolve ${channel} release train is locked at ${requestedVersion}; VS Code Marketplace prerelease ${marketplaceVersion}.`
 );

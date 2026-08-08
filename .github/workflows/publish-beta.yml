@@ -9,7 +9,7 @@ on:
       release_version:
         description: Existing beta version to resume, with or without the v prefix
         required: true
-        default: "0.2.0-beta.22"
+        default: "0.2.0-beta.24"
       crates_already_published:
         description: Skip crates.io only after confirming all three crates exist
         required: true
@@ -173,12 +173,14 @@ jobs:
           node scripts/publish-npm-if-missing.mjs pnpm framework/packages/presolve --no-git-checks --provenance --access public --tag beta
           node scripts/publish-npm-if-missing.mjs pnpm packages/cli --no-git-checks --provenance --tag beta
           node scripts/publish-npm-if-missing.mjs pnpm packages/create-presolve --no-git-checks --provenance --tag latest
+          npm dist-tag add "create-presolve@${RELEASE_VERSION#v}" beta
           for attempt in $(seq 1 12); do
-            if [ "$(npm view create-presolve@latest version)" = "${RELEASE_VERSION#v}" ]; then
+            if [ "$(npm view create-presolve@latest version)" = "${RELEASE_VERSION#v}" ] && \
+               [ "$(npm view create-presolve@beta version)" = "${RELEASE_VERSION#v}" ]; then
               break
             fi
             if [ "$attempt" = 12 ]; then
-              echo "create-presolve@latest did not converge to ${RELEASE_VERSION#v}." >&2
+              echo "create-presolve latest/beta tags did not converge to ${RELEASE_VERSION#v}." >&2
               exit 1
             fi
             sleep 5
