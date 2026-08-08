@@ -293,6 +293,7 @@ mod tests {
                 registry_version: 1,
                 standard_schema_module: None,
                 submission_capability_module: None,
+                server_action_capabilities: Vec::new(),
                 forms: Vec::new(),
                 instances: Vec::new(),
                 hosts: Vec::new(),

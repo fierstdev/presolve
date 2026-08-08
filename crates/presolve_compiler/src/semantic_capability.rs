@@ -419,7 +419,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 SemanticCapabilityClass::Bounded,
                 "empty synchronous @serverAction(\"importedEndpoint\") method on a conventional route page",
                 "compiler route graph, binding table, semantic-package contract, and RouteServerActionPlanV1 publication",
-                "one integrity-bound server_action export with FormData -> ServerActionResult, cold_fallback, form_data input, json or redirect response, and typed failure",
+                "one integrity-bound server_action export with (FormData, AbortSignal) -> Promise<ServerActionResult>, cold_fallback, form_data input, json or redirect response, and typed failure",
                 "the declaration has no parameters or body effects; the compiler records the closed server capability without reading package or application method source",
                 "server actions are cold-fallback handoffs with no browser resume record or executor; a route carrying one is classified node-only",
                 "route-server-actions.plan.json schema v1 and the compiler-issued Node release inventory",

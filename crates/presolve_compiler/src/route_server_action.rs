@@ -9,7 +9,7 @@ use crate::{
     SemanticPackageServerAction,
 };
 
-pub const ROUTE_SERVER_ACTION_PLAN_SCHEMA_VERSION: u32 = 1;
+pub const ROUTE_SERVER_ACTION_PLAN_SCHEMA_VERSION: u32 = 2;
 
 #[must_use]
 pub fn route_server_action_plan_json_v1(plan: &RouteServerActionPlanV1) -> String {
@@ -41,8 +41,13 @@ pub struct RouteServerActionRouteV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RouteServerActionBindingV1 {
     pub id: String,
+    pub source: String,
     pub component_id: String,
     pub method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub form: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_path: Option<String>,
     pub package: String,
     pub version: String,
     pub integrity: String,
@@ -53,6 +58,7 @@ pub struct RouteServerActionBindingV1 {
     pub input: String,
     pub response: String,
     pub failure: String,
+    pub cancellation: String,
 }
 
 /// Resolves route-page `@serverAction()` methods through the
@@ -164,8 +170,75 @@ pub fn build_route_server_action_plan_v1(
                 type_signature,
                 resume_policy,
                 action,
+                "legacy_method",
+                None,
+                None,
             ));
         }
+        for fact in &component.submission_declaration_facts {
+            if !fact.native_inline || fact.capability_input_name.as_deref() != Some("formData") {
+                continue;
+            }
+            let designator = fact.capability_local_name.as_deref().ok_or_else(|| {
+                RouteServerActionPlanErrorV1 {
+                    code: "PSROUTE1112_SERVER_ACTION_DECLARATION_INVALID",
+                    message: "canonical server Form submission requires one imported capability"
+                        .into(),
+                }
+            })?;
+            let binding = bindings
+                .resolve_import(&component.module_path, designator)
+                .ok_or_else(|| RouteServerActionPlanErrorV1 {
+                    code: "PSROUTE1113_SERVER_ACTION_ENDPOINT_UNBOUND",
+                    message: format!(
+                        "Form `{}` cannot resolve `{designator}`",
+                        fact.form_designator.as_deref().unwrap_or("unknown")
+                    ),
+                })?;
+            let ImportBindingTarget::SemanticPackage {
+                package,
+                version,
+                integrity,
+                export,
+                kind: SemanticPackageKind::ServerAction,
+                type_signature,
+                runtime_module,
+                resume_policy,
+                server_action: Some(action),
+                ..
+            } = &binding.target
+            else {
+                return Err(RouteServerActionPlanErrorV1 {
+                    code: "PSROUTE1114_SERVER_ACTION_CAPABILITY_INVALID",
+                    message: format!(
+                        "Form `{}` must select an imported server_action capability",
+                        fact.form_designator.as_deref().unwrap_or("unknown")
+                    ),
+                });
+            };
+            let capability_id = format!("server-action-capability:{}", fact.id.as_str());
+            let digest = crate::platform::Digest::sha256(capability_id.as_bytes());
+            let coordinate = digest
+                .as_str()
+                .strip_prefix("sha256:")
+                .expect("SHA-256 digest has canonical prefix");
+            actions.push(server_action_binding(
+                component,
+                fact.method_name.as_deref().unwrap_or("__submit"),
+                package,
+                version,
+                integrity,
+                export,
+                runtime_module,
+                type_signature,
+                resume_policy,
+                action,
+                "canonical_form",
+                fact.form_designator.clone(),
+                Some((capability_id, format!("/_presolve/actions/{coordinate}"))),
+            ));
+        }
+        actions.sort_by(|left, right| left.id.cmp(&right.id));
         routes.push(RouteServerActionRouteV1 {
             path: route.path.clone(),
             page_component_id: route.component.to_string(),
@@ -190,11 +263,21 @@ fn server_action_binding(
     type_signature: &str,
     resume_policy: &str,
     action: &SemanticPackageServerAction,
+    source: &str,
+    form: Option<String>,
+    execution: Option<(String, String)>,
 ) -> RouteServerActionBindingV1 {
+    let (id, request_path) = execution.map_or_else(
+        || (component.id.server_action(method).to_string(), None),
+        |(id, request_path)| (id, Some(request_path)),
+    );
     RouteServerActionBindingV1 {
-        id: component.id.server_action(method).to_string(),
+        id,
+        source: source.into(),
         component_id: component.id.to_string(),
         method: method.into(),
+        form,
+        request_path,
         package: package.into(),
         version: version.into(),
         integrity: integrity.into(),
@@ -212,6 +295,7 @@ fn server_action_binding(
         failure: match action.failure {
             crate::SemanticPackageRouteLoaderFailure::Typed => "typed".into(),
         },
+        cancellation: "abort".into(),
     }
 }
 
@@ -241,7 +325,7 @@ import { savePost } from "post-service";
             .insert(
                 "post-service".into(),
                 parse_semantic_package_contract(
-                    r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"savePost":{"kind":"server_action","type_signature":"FormData -> ServerActionResult","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"json","failure":"typed"}}}}"#,
+                    r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"savePost":{"kind":"server_action","type_signature":"(FormData, AbortSignal) -> Promise<ServerActionResult>","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"json","failure":"typed"}}}}"#,
                 )
                 .unwrap(),
             )

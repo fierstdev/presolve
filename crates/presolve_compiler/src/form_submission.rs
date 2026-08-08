@@ -72,6 +72,8 @@ pub struct FormSubmissionPlan {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FormSubmissionCapability {
     pub id: String,
+    pub execution_boundary: String,
+    pub input: String,
     pub module_specifier: String,
     pub package: String,
     pub version: String,
@@ -79,6 +81,9 @@ pub struct FormSubmissionCapability {
     pub export: String,
     pub runtime_module: String,
     pub resume_policy: String,
+    pub response: Option<String>,
+    pub failure: Option<String>,
+    pub request_path: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -325,24 +330,62 @@ fn lower_candidate(
                     export,
                     runtime_module,
                     resume_policy,
-                    form_submission: Some(_),
+                    form_submission,
+                    server_action,
                     ..
                 } = &binding.target
                 else {
                     return None;
                 };
-                Some(FormSubmissionCapability {
-                    id: format!(
-                        "form-submission-capability:{package}@{version}:{export}:{integrity}"
-                    ),
-                    module_specifier: binding.source_module.to_string_lossy().into_owned(),
-                    package: package.clone(),
-                    version: version.clone(),
-                    integrity: integrity.clone(),
-                    export: export.clone(),
-                    runtime_module: runtime_module.clone(),
-                    resume_policy: resume_policy.clone(),
-                })
+                match fact.capability_input_name.as_deref() {
+                    Some("value") if form_submission.is_some() => Some(FormSubmissionCapability {
+                        id: format!(
+                            "form-submission-capability:{package}@{version}:{export}:{integrity}"
+                        ),
+                        execution_boundary: "client".into(),
+                        input: "form_value".into(),
+                        module_specifier: binding.source_module.to_string_lossy().into_owned(),
+                        package: package.clone(),
+                        version: version.clone(),
+                        integrity: integrity.clone(),
+                        export: export.clone(),
+                        runtime_module: runtime_module.clone(),
+                        resume_policy: resume_policy.clone(),
+                        response: None,
+                        failure: None,
+                        request_path: None,
+                    }),
+                    Some("formData") => {
+                        let action = server_action.as_ref()?;
+                        let id = format!("server-action-capability:{}", fact.id.as_str());
+                        let digest = crate::platform::Digest::sha256(id.as_bytes());
+                        let coordinate = digest
+                            .as_str()
+                            .strip_prefix("sha256:")
+                            .expect("SHA-256 digest has canonical prefix");
+                        Some(FormSubmissionCapability {
+                            id,
+                            execution_boundary: "server".into(),
+                            input: "form_data".into(),
+                            module_specifier: binding.source_module.to_string_lossy().into_owned(),
+                            package: package.clone(),
+                            version: version.clone(),
+                            integrity: integrity.clone(),
+                            export: export.clone(),
+                            runtime_module: runtime_module.clone(),
+                            resume_policy: resume_policy.clone(),
+                            response: Some(match action.response {
+                                crate::SemanticPackageServerActionResponse::Json => "json".into(),
+                                crate::SemanticPackageServerActionResponse::Redirect => {
+                                    "redirect".into()
+                                }
+                            }),
+                            failure: Some("typed".into()),
+                            request_path: Some(format!("/_presolve/actions/{coordinate}")),
+                        })
+                    }
+                    _ => None,
+                }
             })
         });
     if fact.capability_local_name.is_some() && capability.is_none() {

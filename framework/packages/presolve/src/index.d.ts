@@ -126,12 +126,16 @@ export interface FormFieldOptions<Value> {
 }
 export interface FormSubmission<Value> {
   readonly value: Value;
+  /** Compiler-serialized payload for an admitted server-action capability. */
+  readonly formData: FormData;
   readonly signal: AbortSignal;
 }
 export interface FormDefinition<Fields extends FormFieldTree> {
   serialization?: FormSerialization;
   fields: Fields;
-  submit?: (submission: FormSubmission<FormValue<Fields>>) => void | Promise<void>;
+  submit?: (
+    submission: FormSubmission<FormValue<Fields>>
+  ) => void | ServerActionResult | Promise<void | ServerActionResult>;
 }
 export interface DefinedForm<Fields extends FormFieldTree> extends Form {
   readonly fields: Fields;
@@ -176,6 +180,16 @@ export interface Resource<Data, Error> {
   readonly state: ResourceState;
   readonly __presolveResourceBrand: unique symbol;
 }
+export type ServerActionJsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly ServerActionJsonValue[]
+  | { readonly [key: string]: ServerActionJsonValue };
+export type ServerActionResult =
+  | ServerActionJsonValue
+  | { readonly location: `/${string}` };
 export declare function resource(endpoint: string): PresolveFieldDecorator;
 export declare function loader(endpoint: string): PresolveFieldDecorator;
 export declare function serverAction(endpoint: string): PresolveMethodDecorator;

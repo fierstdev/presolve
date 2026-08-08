@@ -5,7 +5,7 @@ import {
   createCanonicalIntrinsicRegistry,
 } from "./index.js";
 
-export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 11;
+export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 12;
 
 /**
  * Resolves explicit source positions for the implemented decorator-free V2
@@ -50,6 +50,11 @@ export async function analyzeV2Authoring(request) {
         file: site.file,
         position: site.importPosition,
       })),
+      ...request.serverActionInvocations.flatMap(site => [
+        { id: `server-action-form:${site.id}`, file: site.file, position: site.formPosition },
+        { id: `server-action-invocation:${site.id}`, file: site.file, position: site.position },
+        { id: `server-action-import:${site.id}`, file: site.file, position: site.importPosition },
+      ]),
     ],
     componentHeritage: request.components.map(site => ({
       id: `component:${site.id}`,
@@ -64,6 +69,11 @@ export async function analyzeV2Authoring(request) {
       })),
       ...request.packageInvocations.map(site => ({
         id: `package-invocation-call:${site.id}`,
+        file: site.file,
+        position: site.position,
+      })),
+      ...request.serverActionInvocations.map(site => ({
+        id: `server-action-invocation-call:${site.id}`,
         file: site.file,
         position: site.position,
       })),
@@ -194,6 +204,33 @@ export async function analyzeV2Authoring(request) {
           }]
         : [];
     }),
+    serverActionInvocations: request.serverActionInvocations.flatMap(site => {
+      const formIntrinsic = classifyResolvedIntrinsic(registry, symbols.get(`server-action-form:${site.id}`));
+      const identity = resolvedIdentity(symbols.get(`server-action-invocation:${site.id}`));
+      const importedIdentity = resolvedIdentity(symbols.get(`server-action-import:${site.id}`));
+      const signature = fieldSignatures.get(`server-action-invocation-call:${site.id}`);
+      const parameterTypes = signature?.parameterTypes?.map(parameter => parameter.type);
+      const exactParameters = Array.isArray(parameterTypes)
+        && parameterTypes.length === 2
+        && parameterTypes[0]?.text === "FormData"
+        && isCanonicalDomType(parameterTypes[0], "FormData")
+        && parameterTypes[1]?.text === "AbortSignal"
+        && isCanonicalDomType(parameterTypes[1], "AbortSignal");
+      return formIntrinsic?.kind === "form"
+        && identity?.name === site.exportName
+        && importedIdentity?.name === site.exportName
+        && sameDeclarationModules(identity, importedIdentity)
+        && identity.declarationModules.length > 0
+        && exactParameters
+        && isCanonicalPromise(signature?.returnType)
+        ? [{
+            id: site.id,
+            identity,
+            moduleSpecifier: site.moduleSpecifier,
+            exportName: site.exportName,
+          }]
+        : [];
+    }),
     environmentPublic: request.environmentPublic.flatMap(site => {
       const receiver = classifyResolvedIntrinsic(registry, symbols.get(`environment-object:${site.id}`));
       const member = resolvedIdentity(symbols.get(`environment-property:${site.id}`));
@@ -266,6 +303,9 @@ function validateV2AuthoringRequest(request) {
   if (!Array.isArray(request.packageInvocations)) {
     throw new TypeError("V2 authoring package invocation sites must be an array");
   }
+  if (!Array.isArray(request.serverActionInvocations)) {
+    throw new TypeError("V2 authoring server action invocation sites must be an array");
+  }
   const standardValidationIds = new Set();
   for (const site of request.standardValidations) {
     if (!site || typeof site.id !== "string" || !site.id
@@ -292,6 +332,19 @@ function validateV2AuthoringRequest(request) {
     }
     packageInvocationIds.add(site.id);
     validatePosition(site, "package invocation site");
+  }
+  const serverActionInvocationIds = new Set();
+  for (const site of request.serverActionInvocations) {
+    if (!site || typeof site.id !== "string" || !site.id
+      || serverActionInvocationIds.has(site.id)
+      || typeof site.moduleSpecifier !== "string" || !site.moduleSpecifier
+      || typeof site.exportName !== "string" || !site.exportName
+      || !Number.isInteger(site.formPosition)
+      || !Number.isInteger(site.importPosition)) {
+      throw new TypeError("V2 authoring server action invocation sites require unique ids and named module exports");
+    }
+    serverActionInvocationIds.add(site.id);
+    validatePosition(site, "server action invocation site");
   }
   const validationIds = new Set();
   for (const site of request.validations) {
@@ -351,6 +404,12 @@ function isCanonicalPromise(type) {
   const identity = type?.symbol?.identity;
   return identity?.name === "Promise"
     && identity.declarationModules.some(module => /(?:^|\/)lib\.es\d+\.promise\.d\.ts$/.test(module));
+}
+
+function isCanonicalDomType(type, name) {
+  const identity = type?.symbol?.identity;
+  return identity?.name === name
+    && identity.declarationModules.some(module => /(?:^|\/)lib\.dom\.d\.ts$/.test(module));
 }
 
 function isCanonicalPromiseVoid(type) {

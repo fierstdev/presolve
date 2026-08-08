@@ -4,7 +4,11 @@ import {
   field,
   required,
 } from "presolve";
-import { displayNameSchema, saveProfile } from "./V2Schemas.js";
+import {
+  displayNameSchema,
+  saveProfile,
+  saveServerProfile,
+} from "./V2Schemas.js";
 
 type Uploads = File[];
 
@@ -21,6 +25,14 @@ export class V2ProfileForm extends Component {
       }),
     },
     submit: async ({ value, signal }) => saveProfile(value, signal),
+  });
+
+  serverProfile = defineForm({
+    serialization: "form-data",
+    fields: {
+      name: field({ initial: "" }),
+    },
+    submit: async ({ formData, signal }) => saveServerProfile(formData, signal),
   });
 
   render() {

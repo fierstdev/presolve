@@ -2,10 +2,11 @@
 
 ## Scope
 
-This contract completes the beta loader gate at the compiler/publication
+This contract completes the original loader handoff gate at the compiler/publication
 boundary. A route loader is an integrity-bound server capability selected by a
 conventional route page. It is not browser code and this contract does not
-define a server executor.
+define a server executor. The additional codec and bootstrap requirements are
+fixed by the [Node capability executor contract](node-capability-executor-contract.md).
 
 ## Authored admission
 

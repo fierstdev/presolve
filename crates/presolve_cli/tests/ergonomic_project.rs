@@ -2,10 +2,13 @@ use std::fs;
 use std::io::{Read as _, Write as _};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::process::{Command, Output, Stdio};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Mutex,
+};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use sha2::{Digest as _, Sha256};
 
@@ -46,6 +49,110 @@ fn development_get(port: u16, path: &str) -> Option<String> {
     Some(response)
 }
 
+fn raw_http_request(port: u16, request: &str) -> String {
+    for _ in 0..120 {
+        if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
+            stream.write_all(request.as_bytes()).unwrap();
+            let mut response = Vec::new();
+            stream.read_to_end(&mut response).unwrap();
+            return String::from_utf8(response).unwrap();
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    panic!("Node host did not accept a request on port {port}");
+}
+
+#[cfg(unix)]
+fn chrome_bin() -> PathBuf {
+    if let Some(path) = std::env::var_os("PRESOLVE_CHROME") {
+        let path = PathBuf::from(path);
+        if path.is_file() {
+            return path;
+        }
+    }
+    [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/opt/google/chrome/chrome",
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+    ]
+    .iter()
+    .map(PathBuf::from)
+    .find(|path| path.is_file())
+    .expect("headless Chrome was not found")
+}
+
+#[cfg(unix)]
+fn run_chrome_with_timeout(chrome: PathBuf, arguments: &[String], timeout: Duration) -> Output {
+    let mut child = Command::new(chrome)
+        .args(arguments)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to run headless Chrome");
+    let mut stdout = child.stdout.take().unwrap();
+    let mut stderr = child.stderr.take().unwrap();
+    let stdout_output = Arc::new(Mutex::new(Vec::new()));
+    let stdout_buffer = Arc::clone(&stdout_output);
+    let stdout_reader = thread::spawn(move || {
+        let mut chunk = [0_u8; 16 * 1024];
+        while let Ok(count) = stdout.read(&mut chunk) {
+            if count == 0 {
+                break;
+            }
+            stdout_buffer
+                .lock()
+                .unwrap()
+                .extend_from_slice(&chunk[..count]);
+        }
+    });
+    let stderr_output = Arc::new(Mutex::new(Vec::new()));
+    let stderr_buffer = Arc::clone(&stderr_output);
+    let stderr_reader = thread::spawn(move || {
+        let mut chunk = [0_u8; 16 * 1024];
+        while let Ok(count) = stderr.read(&mut chunk) {
+            if count == 0 {
+                break;
+            }
+            stderr_buffer
+                .lock()
+                .unwrap()
+                .extend_from_slice(&chunk[..count]);
+        }
+    });
+    let started = Instant::now();
+    let status = loop {
+        if stdout_output
+            .lock()
+            .unwrap()
+            .windows(b"</html>".len())
+            .any(|window| window == b"</html>")
+        {
+            child.kill().unwrap();
+            break child.wait().unwrap();
+        }
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if started.elapsed() > timeout {
+            child.kill().unwrap();
+            break child.wait().unwrap();
+        }
+        thread::sleep(Duration::from_millis(50));
+    };
+    stdout_reader.join().unwrap();
+    stderr_reader.join().unwrap();
+    let stdout = stdout_output.lock().unwrap().clone();
+    let stderr = stderr_output.lock().unwrap().clone();
+    Output {
+        status,
+        stdout,
+        stderr,
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn decorator_free_v2_source_uses_installed_authority_for_file_route_assembly() {
@@ -83,7 +190,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 writeFileSync("authority-ran", "yes");
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 11,
+  schemaVersion: 12,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
@@ -325,11 +432,9 @@ process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFile
         "Standard Schema build stderr: {}",
         String::from_utf8_lossy(&build.stderr)
     );
-    let forms: serde_json::Value = serde_json::from_slice(
-        &fs::read(root.join("dist/routes/root/forms.runtime.json")).unwrap(),
-    )
-    .unwrap();
-    assert_eq!(forms["schema_version"], 6);
+    let first_forms = fs::read(root.join("dist/routes/root/forms.runtime.json")).unwrap();
+    let forms: serde_json::Value = serde_json::from_slice(&first_forms).unwrap();
+    assert_eq!(forms["schema_version"], 7);
     assert_eq!(
         forms["standard_schema_module"]["path"],
         "/presolve.validators.js"
@@ -716,7 +821,7 @@ import { savePost } from "post-service";
     .unwrap();
     fs::write(
         package.join("presolve.contract.json"),
-        r#"{"schema_version":1,"package":"post-service","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"savePost":{"kind":"server_action","type_signature":"FormData -> ServerActionResult","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"json","failure":"typed"}}}}"#,
+        r#"{"schema_version":1,"package":"post-service","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"savePost":{"kind":"server_action","type_signature":"(FormData, AbortSignal) -> Promise<ServerActionResult>","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"json","failure":"typed"}}}}"#,
     )
     .unwrap();
     fs::write(
@@ -762,6 +867,484 @@ import { savePost } from "post-service";
     let deployment = fs::read_to_string(root.join(".presolve/node/deployment.plan.json")).unwrap();
     assert!(deployment.contains("\"execution\": \"node\""));
     assert!(deployment.contains("\"serverActionCount\": 1"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn canonical_form_server_action_bundles_and_executes_through_the_node_host() {
+    let root = project_root("canonical-node-server-action");
+    let repository = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap();
+    let framework_types = repository.join("framework/packages/presolve/src/index.d.ts");
+    let authority_module = repository.join("packages/typescript-authority/src/index.js");
+    let package = root.join("node_modules/post-service");
+    fs::create_dir_all(package.join("dist")).unwrap();
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"import { Component, defineForm, field, required } from "presolve";
+import { redirectPost as navigatePost, savePost as persistPost } from "post-service";
+
+export class Post extends Component {
+  post = defineForm({
+    serialization: "form-data",
+    fields: { title: field({ initial: "", validate: [required()] }) },
+    submit: async ({ formData, signal }) => persistPost(formData, signal),
+  });
+  redirect = defineForm({
+    serialization: "form-data",
+    fields: { destination: field({ initial: "/" }) },
+    submit: async ({ formData, signal }) => navigatePost(formData, signal),
+  });
+  render() {
+    return <main><form form={this.post}><input name="title" bind:value={this.post.fields.title} /><button type="submit">Save</button></form><form form={this.redirect}><input name="destination" bind:value={this.redirect.fields.destination} /><button type="submit">Continue</button></form></main>;
+  }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("app/routes/about.tsx"),
+        r#"import { Component } from "presolve";
+export class About extends Component { render() { return <main>About Presolve</main>; } }
+"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("tsconfig.json"),
+        format!(
+            r#"{{"compilerOptions":{{"noEmit":true,"strict":true,"jsx":"preserve","module":"NodeNext","moduleResolution":"NodeNext","paths":{{"presolve":["{}"]}}}}}}"#,
+            framework_types.display()
+        ),
+    )
+    .unwrap();
+    fs::write(
+        package.join("package.json"),
+        r#"{"name":"post-service","version":"1.0.0","type":"module","types":"index.d.ts"}"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("index.d.ts"),
+        "export declare function savePost(data: FormData, signal: AbortSignal): Promise<{ saved: string; aborted: boolean }>;\nexport declare function redirectPost(data: FormData, signal: AbortSignal): Promise<{ location: `/${string}` }>;\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join("presolve.contract.json"),
+        r#"{"schema_version":1,"package":"post-service","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"redirectPost":{"kind":"server_action","type_signature":"(FormData, AbortSignal) -> Promise<ServerActionResult>","runtime_module":"dist/redirect-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"redirect","failure":"typed"}},"savePost":{"kind":"server_action","type_signature":"(FormData, AbortSignal) -> Promise<ServerActionResult>","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"json","failure":"typed"}}}}"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("dist/save-post.js"),
+        "let browserCalls = 0; export async function savePost(data, signal) { const title = String(data.get('title')); if (title === 'invalid') throw { status: 422, code: 'TITLE_INVALID', message: 'Title is invalid', issues: [{ path: ['title'] }] }; if (title === 'slow') return await new Promise((resolve, reject) => { signal.addEventListener('abort', () => { console.error('PRESOLVE_TEST_ACTION_ABORTED'); reject(new Error('aborted')); }, { once: true }); }); if (title === 'Browser') browserCalls += 1; return { saved: title, aborted: signal.aborted, browserCalls }; }\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join("dist/redirect-post.js"),
+        "export async function redirectPost(data, signal) { if (signal.aborted) throw new Error('aborted'); return { location: String(data.get('destination')) }; }\n",
+    )
+    .unwrap();
+    let executable = root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(
+        &executable,
+        format!(
+            r#"#!/usr/bin/env node
+import {{ analyzeV2Authoring }} from "{}";
+import {{ readFileSync }} from "node:fs";
+process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFileSync(0, "utf8")))));
+"#,
+            authority_module.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+    std::os::unix::fs::symlink(
+        repository.join("packages/vite/node_modules/vite"),
+        root.join("node_modules/vite"),
+    )
+    .unwrap();
+
+    let deploy = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare", "--name", "presolve-actions"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        deploy.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&deploy.stderr)
+    );
+    let adapter = root.join(".presolve/node");
+    assert!(adapter.join("presolve.server-actions.mjs").is_file());
+    let deployment: serde_json::Value =
+        serde_json::from_slice(&fs::read(adapter.join("deployment.plan.json")).unwrap()).unwrap();
+    assert_eq!(deployment["schemaVersion"], 2);
+    let server_actions = deployment["serverActions"].as_array().unwrap();
+    assert_eq!(server_actions.len(), 2);
+    let request_path = server_actions
+        .iter()
+        .find(|action| action["response"] == "json")
+        .and_then(|action| action["requestPath"].as_str())
+        .unwrap();
+    let redirect_path = server_actions
+        .iter()
+        .find(|action| action["response"] == "redirect")
+        .and_then(|action| action["requestPath"].as_str())
+        .unwrap();
+    assert!(request_path.starts_with("/_presolve/actions/"));
+    assert_eq!(
+        deployment["serverActionRegistry"]["path"],
+        "presolve.server-actions.mjs"
+    );
+    let first_forms = fs::read(root.join("dist/routes/root/forms.runtime.json")).unwrap();
+    let forms: serde_json::Value = serde_json::from_slice(&first_forms).unwrap();
+    assert_eq!(forms["schema_version"], 7);
+    assert_eq!(
+        forms["server_action_capabilities"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(forms["server_action_capabilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|action| action["request_path"] == request_path));
+    assert!(forms.get("submission_capability_module").is_none());
+    let first_plan = fs::read(adapter.join("deployment.plan.json")).unwrap();
+    let first_host = fs::read(adapter.join("server.mjs")).unwrap();
+    let first_registry = fs::read(adapter.join("presolve.server-actions.mjs")).unwrap();
+    let deterministic = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare", "--name", "presolve-actions"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        deterministic.status.success(),
+        "deterministic deploy stderr: {}",
+        String::from_utf8_lossy(&deterministic.stderr)
+    );
+    assert_eq!(
+        fs::read(adapter.join("deployment.plan.json")).unwrap(),
+        first_plan,
+        "Node deployment plan changed across identical preparations"
+    );
+    assert_eq!(
+        fs::read(adapter.join("server.mjs")).unwrap(),
+        first_host,
+        "Node host changed across identical preparations"
+    );
+    assert_eq!(
+        fs::read(adapter.join("presolve.server-actions.mjs")).unwrap(),
+        first_registry,
+        "server-action registry changed across identical preparations"
+    );
+    assert_eq!(
+        fs::read(root.join("dist/routes/root/forms.runtime.json")).unwrap(),
+        first_forms,
+        "Forms server-action artifact changed across identical preparations"
+    );
+    let index_path = root.join("dist/routes/root/index.html");
+    let index = fs::read_to_string(&index_path).unwrap();
+    fs::write(
+        &index_path,
+        index.replace(
+            "</body>",
+            r#"<script>
+const waitFor = (predicate, label) => new Promise((resolve, reject) => { const deadline = Date.now() + 4000; const tick = () => predicate() ? resolve() : Date.now() > deadline ? reject(new Error(`Timed out waiting for ${label}`)) : setTimeout(tick, 20); tick(); });
+(async () => {
+  await waitFor(() => ["ready", "error"].includes(document.documentElement.dataset.presolveRuntime), "runtime readiness");
+  if (document.documentElement.dataset.presolveRuntime !== "ready") throw new Error("runtime failed to boot");
+  const forms = [...document.querySelectorAll("form")];
+  const form = forms[0];
+  const input = form.querySelector('input[name="title"]');
+  const instances = [...window.__PRESOLVE__.store.formInstances.values()];
+  const instance = instances.find(entry => entry.definition.debug_name === "post");
+  const invalidLocal = new Event("submit", { bubbles: true, cancelable: true });
+  form.dispatchEvent(invalidLocal);
+  await waitFor(() => instance.submission === "Invalid", "client validation rejection");
+  if (!invalidLocal.defaultPrevented) throw new Error("invalid submission did not remain compiler-owned");
+  window.__PRESOLVE_FORMS__.resetForm(instance.instance.id);
+  input.value = "invalid";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  await waitFor(() => instance.submission === "Failed", "typed server failure");
+  if (!window.__PRESOLVE__.diagnostics.some(entry => entry.code === "PSR_FORM_SERVER_ACTION_REJECTED" && entry.detail?.status === 422)) throw new Error("typed server failure was not normalized");
+  window.__PRESOLVE_FORMS__.resetForm(instance.instance.id);
+  input.value = "slow";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  await waitFor(() => instance.submission === "Submitting", "active server action");
+  window.__PRESOLVE_FORMS__.resetForm(instance.instance.id);
+  await waitFor(() => instance.submission === "Idle", "cancelled server action reset");
+  input.value = "Browser";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  const submit = new Event("submit", { bubbles: true, cancelable: true });
+  form.dispatchEvent(submit);
+  form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  await waitFor(() => instance.submission === "Completed" || instance.submission === "Failed", "server action response");
+  if (!submit.defaultPrevented || instance.submission !== "Completed" || instance.submission_result?.saved !== "Browser" || instance.submission_result?.browserCalls !== 1) throw new Error(`server action mismatch: ${JSON.stringify(instance.submission_result)}`);
+  document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_NODE_SERVER_ACTION_BROWSER_PASS</div>");
+})().catch((error) => document.body.insertAdjacentHTML("beforeend", `<div>PRESOLVE_NODE_SERVER_ACTION_BROWSER_FAIL: ${error.message}</div>`));
+</script></body>"#,
+        ),
+    )
+    .unwrap();
+    let syntax = Command::new("node")
+        .arg("--check")
+        .arg(adapter.join("server.mjs"))
+        .output()
+        .unwrap();
+    assert!(
+        syntax.status.success(),
+        "Node release syntax stderr: {}",
+        String::from_utf8_lossy(&syntax.stderr)
+    );
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    let mut host = Command::new("node")
+        .arg(adapter.join("server.mjs"))
+        .env("PORT", port.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let page = raw_http_request(
+        port,
+        "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(page.starts_with("HTTP/1.1 200 OK"));
+    assert!(page.contains("Save"));
+    let about_page = raw_http_request(
+        port,
+        "GET /about HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert!(about_page.starts_with("HTTP/1.1 200 OK"));
+    assert!(about_page.contains("About Presolve"));
+    let profile = adapter.join("chrome-server-action-profile");
+    fs::create_dir_all(&profile).unwrap();
+    let mut chrome_arguments = vec![
+        "--headless=new".to_string(),
+        "--disable-gpu".to_string(),
+        "--no-first-run".to_string(),
+        "--disable-background-networking".to_string(),
+        "--disable-component-update".to_string(),
+        "--disable-default-apps".to_string(),
+        "--disable-extensions".to_string(),
+        "--disable-sync".to_string(),
+        "--virtual-time-budget=5000".to_string(),
+        "--dump-dom".to_string(),
+        format!("--user-data-dir={}", profile.display()),
+        format!("http://127.0.0.1:{port}/"),
+    ];
+    if std::env::var_os("CI").is_some() {
+        chrome_arguments.insert(0, "--no-sandbox".to_string());
+        chrome_arguments.insert(1, "--disable-dev-shm-usage".to_string());
+    }
+    let chrome = run_chrome_with_timeout(chrome_bin(), &chrome_arguments, Duration::from_secs(20));
+    assert!(
+        String::from_utf8_lossy(&chrome.stdout)
+            .contains("PRESOLVE_NODE_SERVER_ACTION_BROWSER_PASS"),
+        "browser server-action probe failed\nstatus: {}\nstdout: {}\nstderr: {}",
+        chrome.status,
+        String::from_utf8_lossy(&chrome.stdout),
+        String::from_utf8_lossy(&chrome.stderr)
+    );
+    let method = raw_http_request(
+        port,
+        &format!(
+            "GET {request_path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+        ),
+    );
+    assert!(method.starts_with("HTTP/1.1 405 Method Not Allowed"));
+    let body = "title=Compiler";
+    let foreign = raw_http_request(
+        port,
+        &format!(
+            "POST {request_path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: https://example.com\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        ),
+    );
+    assert!(foreign.starts_with("HTTP/1.1 403 Forbidden"));
+    assert!(foreign.contains("PSNODE2004_ACTION_ORIGIN_REJECTED"));
+    let unsupported = raw_http_request(
+        port,
+        &format!(
+            "POST {request_path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://127.0.0.1:{port}\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}"
+        ),
+    );
+    assert!(unsupported.starts_with("HTTP/1.1 415 Unsupported Media Type"));
+    let multipart_body = "--presolve-boundary\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nMultipart\r\n--presolve-boundary--\r\n";
+    let multipart = raw_http_request(
+        port,
+        &format!(
+            "POST {request_path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://127.0.0.1:{port}\r\nContent-Type: multipart/form-data; boundary=presolve-boundary\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{multipart_body}",
+            multipart_body.len()
+        ),
+    );
+    assert!(multipart.starts_with("HTTP/1.1 200 OK"));
+    assert!(multipart.contains(r#""saved":"Multipart""#));
+    let oversized = raw_http_request(
+        port,
+        &format!(
+            "POST {request_path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://127.0.0.1:{port}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 8388609\r\nConnection: close\r\n\r\n"
+        ),
+    );
+    assert!(oversized.starts_with("HTTP/1.1 413 Payload Too Large"));
+    assert!(oversized.contains("PSNODE2008_ACTION_BODY_TOO_LARGE"));
+    let invalid_body = "title=invalid";
+    let invalid = raw_http_request(
+        port,
+        &format!(
+            "POST {request_path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://127.0.0.1:{port}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{invalid_body}",
+            invalid_body.len()
+        ),
+    );
+    assert!(invalid.starts_with("HTTP/1.1 422 Unprocessable Entity"));
+    assert!(invalid.contains("TITLE_INVALID"));
+    let redirect_body = "destination=%2F";
+    let redirect = raw_http_request(
+        port,
+        &format!(
+            "POST {redirect_path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://127.0.0.1:{port}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{redirect_body}",
+            redirect_body.len()
+        ),
+    );
+    assert!(redirect.starts_with("HTTP/1.1 303 See Other"));
+    assert!(redirect.to_ascii_lowercase().contains("location: /\r\n"));
+    let request = format!(
+        "POST {request_path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://127.0.0.1:{port}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let response = raw_http_request(port, &request);
+    let slow_body = "title=slow";
+    let mut disconnected = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    disconnected
+        .write_all(
+            format!(
+                "POST {request_path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://127.0.0.1:{port}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{slow_body}",
+                slow_body.len()
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+    drop(disconnected);
+    thread::sleep(Duration::from_millis(100));
+    host.kill().unwrap();
+    let output = host.wait_with_output().unwrap();
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "response: {response}\nhost stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(response.contains(r#""saved":"Compiler""#));
+    assert!(response.contains(r#""aborted":false"#));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("PRESOLVE_TEST_ACTION_ABORTED"),
+        "client disconnect did not abort the active package capability\nhost stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let shutdown_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let shutdown_port = shutdown_listener.local_addr().unwrap().port();
+    drop(shutdown_listener);
+    let shutdown_host = Command::new("node")
+        .arg(adapter.join("server.mjs"))
+        .env("PORT", shutdown_port.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let _ = raw_http_request(
+        shutdown_port,
+        "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    let mut active = TcpStream::connect(("127.0.0.1", shutdown_port)).unwrap();
+    active
+        .write_all(
+            format!(
+                "POST {request_path} HTTP/1.1\r\nHost: 127.0.0.1:{shutdown_port}\r\nOrigin: http://127.0.0.1:{shutdown_port}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {}\r\nConnection: keep-alive\r\n\r\n{slow_body}",
+                slow_body.len()
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+    thread::sleep(Duration::from_millis(100));
+    let terminated = Command::new("kill")
+        .args(["-TERM", &shutdown_host.id().to_string()])
+        .status()
+        .unwrap();
+    assert!(terminated.success());
+    thread::sleep(Duration::from_millis(100));
+    drop(active);
+    let shutdown_output = shutdown_host.wait_with_output().unwrap();
+    assert!(shutdown_output.status.success());
+    assert!(
+        String::from_utf8_lossy(&shutdown_output.stderr).contains("PRESOLVE_TEST_ACTION_ABORTED"),
+        "host shutdown did not abort the active package capability: {}",
+        String::from_utf8_lossy(&shutdown_output.stderr)
+    );
+    fs::write(
+        package.join("index.d.ts"),
+        "export declare function savePost(data: any, signal: any): Promise<{ saved: string; aborted: boolean }>;\nexport declare function redirectPost(data: FormData, signal: AbortSignal): Promise<{ location: `/${string}` }>;\n",
+    )
+    .unwrap();
+    let unproven = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(!unproven.status.success());
+    assert!(
+        String::from_utf8_lossy(&unproven.stderr).contains("was not proven as an imported"),
+        "non-exact TypeScript server action was not rejected: {}",
+        String::from_utf8_lossy(&unproven.stderr)
+    );
+    fs::write(
+        package.join("index.d.ts"),
+        "export declare function savePost(data: FormData, signal: AbortSignal): Promise<{ saved: string; aborted: boolean }>;\nexport declare function redirectPost(data: FormData, signal: AbortSignal): Promise<{ location: `/${string}` }>;\n",
+    )
+    .unwrap();
+    let package_contract = fs::read_to_string(package.join("presolve.contract.json")).unwrap();
+    fs::write(
+        package.join("presolve.contract.json"),
+        package_contract.replace("dist/save-post.js", "dist/missing-save-post.js"),
+    )
+    .unwrap();
+    let missing_runtime = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare", "--name", "presolve-actions"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(!missing_runtime.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing_runtime.stderr)
+            .contains("PSDISC1012_PACKAGE_RUNTIME_MISSING"),
+        "missing server runtime was not rejected: {}",
+        String::from_utf8_lossy(&missing_runtime.stderr)
+    );
+    fs::write(package.join("presolve.contract.json"), &package_contract).unwrap();
+    fs::write(
+        package.join("dist/save-post.js"),
+        "export const wrongExport = true;\n",
+    )
+    .unwrap();
+    let missing_export = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .args(["deploy", "node", "--prepare", "--name", "presolve-actions"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(!missing_export.status.success());
+    assert!(
+        String::from_utf8_lossy(&missing_export.stderr)
+            .contains("PSNODE1018_SERVER_ACTION_BUNDLE_FAILED"),
+        "missing named server export was not rejected: {}",
+        String::from_utf8_lossy(&missing_export.stderr)
+    );
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -1067,7 +1650,7 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 11,
+  schemaVersion: 12,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),

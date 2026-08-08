@@ -12,8 +12,9 @@ use crate::{
     ValidationRuleArgument, RUNTIME_FORM_REGISTRY_VERSION,
 };
 
-/// Version 6 adds the integrity-bound Form submission capability registry.
-pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 6;
+/// Version 7 separates browser-bundled submission capabilities from exact
+/// server-action request coordinates.
+pub const RUNTIME_FORM_ARTIFACT_SCHEMA_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeFormsArtifact {
@@ -23,6 +24,7 @@ pub struct RuntimeFormsArtifact {
     pub standard_schema_module: Option<RuntimeFormsArtifactStandardSchemaModule>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub submission_capability_module: Option<RuntimeFormsArtifactSubmissionCapabilityModule>,
+    pub server_action_capabilities: Vec<RuntimeFormsArtifactServerActionCapability>,
     pub forms: Vec<RuntimeFormsArtifactForm>,
     pub instances: Vec<RuntimeFormsArtifactInstance>,
     /// Instance-qualified executable submit-host records. These are the only
@@ -46,6 +48,23 @@ pub struct RuntimeFormsArtifactSubmissionCapability {
     pub export: String,
     pub runtime_module: String,
     pub resume_policy: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub struct RuntimeFormsArtifactServerActionCapability {
+    pub id: String,
+    pub request_path: String,
+    pub module_specifier: String,
+    pub package: String,
+    pub version: String,
+    pub integrity: String,
+    pub export: String,
+    pub runtime_module: String,
+    pub resume_policy: String,
+    pub input: String,
+    pub response: String,
+    pub failure: String,
+    pub cancellation: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -332,6 +351,7 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
         .plans
         .values()
         .filter_map(|plan| plan.capability.as_ref())
+        .filter(|capability| capability.execution_boundary == "client")
         .map(|capability| RuntimeFormsArtifactSubmissionCapability {
             id: capability.id.clone(),
             module_specifier: capability.module_specifier.clone(),
@@ -341,6 +361,39 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
             export: capability.export.clone(),
             runtime_module: capability.runtime_module.clone(),
             resume_policy: capability.resume_policy.clone(),
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let server_action_capabilities = model
+        .submissions
+        .plans
+        .values()
+        .filter_map(|plan| plan.capability.as_ref())
+        .filter(|capability| capability.execution_boundary == "server")
+        .map(|capability| RuntimeFormsArtifactServerActionCapability {
+            id: capability.id.clone(),
+            request_path: capability
+                .request_path
+                .clone()
+                .expect("server capability has compiler request path"),
+            module_specifier: capability.module_specifier.clone(),
+            package: capability.package.clone(),
+            version: capability.version.clone(),
+            integrity: capability.integrity.clone(),
+            export: capability.export.clone(),
+            runtime_module: capability.runtime_module.clone(),
+            resume_policy: capability.resume_policy.clone(),
+            input: capability.input.clone(),
+            response: capability
+                .response
+                .clone()
+                .expect("server capability has response family"),
+            failure: capability
+                .failure
+                .clone()
+                .expect("server capability has failure family"),
+            cancellation: "abort".into(),
         })
         .collect::<BTreeSet<_>>()
         .into_iter()
@@ -427,6 +480,7 @@ pub fn build_runtime_forms_artifact(model: &ApplicationSemanticModel) -> Runtime
                 capabilities: submission_capabilities,
             },
         ),
+        server_action_capabilities,
         forms,
         instances,
         hosts,
@@ -517,10 +571,46 @@ pub fn validate_runtime_forms_artifact(
         None if expected_standard_schema_validators.is_empty() => {}
         _ => diagnostics.push("invalid Standard Schema runtime module".to_string()),
     }
+    let server_action_capability_ids = artifact
+        .server_action_capabilities
+        .iter()
+        .map(|capability| capability.id.as_str())
+        .collect::<BTreeSet<_>>();
+    if server_action_capability_ids.len() != artifact.server_action_capabilities.len()
+        || artifact
+            .server_action_capabilities
+            .iter()
+            .any(|capability| {
+                capability.id.is_empty()
+                    || !capability.request_path.starts_with("/_presolve/actions/")
+                    || capability.request_path.len() != "/_presolve/actions/".len() + 64
+                    || !capability
+                        .request_path
+                        .trim_start_matches("/_presolve/actions/")
+                        .chars()
+                        .all(|character| {
+                            character.is_ascii_hexdigit() && !character.is_ascii_uppercase()
+                        })
+                    || capability.module_specifier.is_empty()
+                    || capability.package.is_empty()
+                    || capability.version.is_empty()
+                    || !capability.integrity.starts_with("sha256:")
+                    || capability.export.is_empty()
+                    || capability.runtime_module.is_empty()
+                    || capability.resume_policy != "cold_fallback"
+                    || capability.input != "form_data"
+                    || !matches!(capability.response.as_str(), "json" | "redirect")
+                    || capability.failure != "typed"
+                    || capability.cancellation != "abort"
+            })
+    {
+        diagnostics.push("invalid server-action capability registry".to_string());
+    }
     let expected_submission_capabilities = artifact
         .forms
         .iter()
         .filter_map(|form| form.submission.as_ref()?.capability.as_deref())
+        .filter(|capability| !server_action_capability_ids.contains(capability))
         .collect::<BTreeSet<_>>();
     match &artifact.submission_capability_module {
         Some(module)
@@ -700,14 +790,14 @@ fn field_programs(
 #[cfg(test)]
 mod tests {
     #[test]
-    fn emits_schema_v6_with_typed_validation_arguments_and_canonical_references() {
+    fn emits_schema_v7_with_typed_validation_arguments_and_canonical_references() {
         let parsed = presolve_parser::parse_file(
             "src/X.tsx",
             r#"@component("x")class X{@form()form!:Form;@validate(minLength(2))@field(this.form)value="";render(){return <input field={this.value}/>;}}"#,
         );
         let asm = crate::build_application_semantic_model(&parsed);
         let artifact = super::build_runtime_forms_artifact(&asm);
-        assert_eq!(artifact.schema_version, 6);
+        assert_eq!(artifact.schema_version, 7);
         assert_eq!(artifact.registry_version, 1);
         assert_eq!(artifact.forms.len(), 1);
         assert_eq!(artifact.instances.len(), 1);

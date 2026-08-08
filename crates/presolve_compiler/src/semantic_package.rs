@@ -305,7 +305,8 @@ pub fn parse_semantic_package_contract(
     if contract.exports.values().any(|export| {
         (export.kind == SemanticPackageKind::ServerAction) != export.server_action.is_some()
             || (export.kind == SemanticPackageKind::ServerAction
-                && (export.type_signature != "FormData -> ServerActionResult"
+                && (export.type_signature
+                    != "(FormData, AbortSignal) -> Promise<ServerActionResult>"
                     || export.resume_policy != "cold_fallback"))
     }) {
         return Err(SemanticPackageContractError::InvalidServerAction);
@@ -465,7 +466,7 @@ mod tests {
     #[test]
     fn validates_closed_server_action_capabilities() {
         let contract = parse_semantic_package_contract(
-            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"savePost":{"kind":"server_action","type_signature":"FormData -> ServerActionResult","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"json","failure":"typed"}}}}"#,
+            r#"{"schema_version":1,"package":"post-service","version":"1.2.3","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"savePost":{"kind":"server_action","type_signature":"(FormData, AbortSignal) -> Promise<ServerActionResult>","runtime_module":"dist/save-post.js","resume_policy":"cold_fallback","server_action":{"input":"form_data","response":"json","failure":"typed"}}}}"#,
         );
         assert!(contract.is_ok());
     }

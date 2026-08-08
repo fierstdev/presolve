@@ -32,3 +32,10 @@ export async function saveProfile(
 ): Promise<void> {
   await Promise.resolve({ value, signal });
 }
+
+export async function saveServerProfile(
+  formData: FormData,
+  signal: AbortSignal,
+): Promise<{ saved: boolean }> {
+  return { saved: formData.has("name") && !signal.aborted };
+}

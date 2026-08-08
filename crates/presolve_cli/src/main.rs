@@ -18,8 +18,9 @@ use presolve_cli::cloudflare_deployment::{
     CLOUDFLARE_WORKERS_COMPATIBILITY_DATE_V1,
 };
 use presolve_cli::node_deployment::{
-    build_node_deployment_plan_v1, node_deployment_plan_json_v1, node_static_host_module_v1,
-    validate_node_deployment_artifacts_v1, NodeDeploymentOptionsV1,
+    attach_node_server_action_registry_v1, build_node_deployment_plan_v1,
+    node_deployment_plan_json_v1, node_static_host_module_v1,
+    validate_node_deployment_artifacts_v1, NodeDeploymentOptionsV1, NodeDeploymentPlanV1,
 };
 use presolve_cli::{
     load_explicit_project_envelope_v1, load_explicit_source_inputs_v1,
@@ -1585,19 +1586,28 @@ fn run_ergonomic_node_deploy(args: &[String]) {
             application_cli_error("PSNODE1014_DEFAULT_APPLICATION_NAME_INVALID", &message)
         })
     });
-    let plan = build_node_deployment_plan_v1(
+    let mut plan = build_node_deployment_plan_v1(
         &manifest,
         &loader_plan,
         &action_plan,
         &NodeDeploymentOptionsV1 { application_name },
     )
     .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
-    validate_node_deployment_artifacts_v1(&output_root, &plan)
-        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     let adapter_root = project.root.join(".presolve/node");
     fs::create_dir_all(&adapter_root).unwrap_or_else(|error| {
         application_cli_error("PSNODE1015_ADAPTER_OUTPUT_UNAVAILABLE", &error.to_string())
     });
+    if let Some(digest) =
+        attach_node_server_action_runtime_module(&project.root, &adapter_root, &plan)
+            .unwrap_or_else(|message| {
+                application_cli_error("PSNODE1018_SERVER_ACTION_BUNDLE_FAILED", &message)
+            })
+    {
+        attach_node_server_action_registry_v1(&mut plan, digest)
+            .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
+    }
+    validate_node_deployment_artifacts_v1(&output_root, &plan)
+        .unwrap_or_else(|error| application_cli_error(error.code, &error.message));
     write_node_adapter_file(
         &adapter_root.join("deployment.plan.json"),
         node_deployment_plan_json_v1(&plan).as_bytes(),
@@ -1619,6 +1629,111 @@ fn run_ergonomic_node_deploy(args: &[String]) {
         adapter_root.join("server.mjs").display(),
         plan.release_id
     );
+}
+
+fn attach_node_server_action_runtime_module(
+    project_root: &Path,
+    adapter_root: &Path,
+    plan: &NodeDeploymentPlanV1,
+) -> Result<Option<String>, String> {
+    if plan.server_actions.is_empty() {
+        return Ok(None);
+    }
+    let work_root = project_root.join(".presolve");
+    fs::create_dir_all(&work_root)
+        .map_err(|error| format!("failed to create {}: {error}", work_root.display()))?;
+    let mut entry = String::new();
+    for (index, action) in plan.server_actions.iter().enumerate() {
+        if action.runtime_module.starts_with('/')
+            || Path::new(&action.runtime_module)
+                .components()
+                .any(|component| matches!(component, std::path::Component::ParentDir))
+        {
+            return Err(format!(
+                "server action {} has a non-canonical runtime module",
+                action.id
+            ));
+        }
+        let runtime = project_root
+            .join("node_modules")
+            .join(&action.package)
+            .join(&action.runtime_module);
+        if !runtime.is_file() {
+            return Err(format!(
+                "server action {} runtime module {} does not exist",
+                action.id,
+                runtime.display()
+            ));
+        }
+        entry.push_str(&format!(
+            "import {{ {} as __presolve_server_action_{index} }} from {};\n",
+            action.export,
+            serde_json::to_string(&runtime.to_string_lossy())
+                .map_err(|error| format!("failed to encode server action module: {error}"))?
+        ));
+    }
+    entry.push_str("const registry = Object.create(null);\n");
+    for (index, action) in plan.server_actions.iter().enumerate() {
+        entry.push_str(&format!(
+            "registry[{}] = __presolve_server_action_{index};\n",
+            serde_json::to_string(&action.id)
+                .map_err(|error| format!("failed to encode server action id: {error}"))?
+        ));
+    }
+    entry.push_str("export const presolveServerActions = Object.freeze(registry);\n");
+    let entry_path = work_root.join("presolve-node-server-action-entry.mjs");
+    let runner_path = work_root.join("presolve-node-server-action-build.mjs");
+    fs::write(&entry_path, entry)
+        .map_err(|error| format!("failed to write {}: {error}", entry_path.display()))?;
+    fs::write(
+        &runner_path,
+        r#"import { build } from "vite";
+await build({
+  root: process.cwd(),
+  configFile: false,
+  logLevel: "error",
+  build: {
+    outDir: ".presolve/node-server-action-output",
+    emptyOutDir: true,
+    sourcemap: false,
+    assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+    rollupOptions: {
+      input: ".presolve/presolve-node-server-action-entry.mjs",
+      preserveEntrySignatures: "strict",
+      output: {
+        format: "es",
+        entryFileNames: "presolve.server-actions.mjs",
+        chunkFileNames: "presolve.server-actions.[hash].mjs",
+        assetFileNames: "presolve.server-actions.[hash][extname]",
+        inlineDynamicImports: true
+      }
+    }
+  }
+});
+"#,
+    )
+    .map_err(|error| format!("failed to write {}: {error}", runner_path.display()))?;
+    let output = Command::new("node")
+        .arg(&runner_path)
+        .current_dir(project_root)
+        .output()
+        .map_err(|error| format!("failed to start the server-action Vite build: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Vite exited with {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let bundled_path = work_root
+        .join("node-server-action-output")
+        .join("presolve.server-actions.mjs");
+    let bytes = fs::read(&bundled_path)
+        .map_err(|error| format!("failed to read {}: {error}", bundled_path.display()))?;
+    let destination = adapter_root.join("presolve.server-actions.mjs");
+    fs::write(&destination, &bytes)
+        .map_err(|error| format!("failed to write {}: {error}", destination.display()))?;
+    Ok(Some(format!("sha256:{:x}", Sha256::digest(bytes))))
 }
 
 fn parse_node_deploy_arguments(args: &[String]) -> Result<Option<String>, String> {

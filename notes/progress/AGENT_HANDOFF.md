@@ -447,3 +447,31 @@ ordinary deployment. Cloudflare Worker version
 `4d967286cdb65961d14ce8a0d348f78dfb5388fa8dd29cd72fbe9aefe3d15d1b`;
 the favicon, PNG mark, and immutable stylesheet all return HTTP 200. The
 beta.23 manual-transfer blocker is closed. Full-beta completion is 77%.
+
+## Canonical Node server-action executor
+
+The first capability-specific Node executor gate is complete. Authority schema
+v12 now proves the surrounding canonical Form, the exact named import, DOM
+`FormData` and `AbortSignal` parameters, and Promise completion. Lookalikes and
+widened signatures cannot become server actions. Route server-action schema v2
+and Forms artifact schema v7 share the compiler-issued request coordinate;
+Node deployment schema v2 bundles only the selected named exports with project
+Vite and verifies the frozen registry digest before import.
+
+The generated host owns method, origin, media-type, 8 MiB body, FormData,
+JSON/redirect/typed-failure, and disconnect/shutdown cancellation behavior. It
+serves compiled HTML for action-only routes, retains mixed static routes, and
+leaves loader-bearing routes at stable `501`. Deterministic repeat preparation
+covers the deployment plan, host, registry, and Forms artifact. Real-browser
+evidence covers client validation, typed failure, reset abort, duplicate
+suppression, and JSON completion; raw request evidence covers URL-encoded and
+multipart bodies, redirect, limits, origin, cancellation, and physical
+missing-runtime/export failures.
+
+The complete touched-surface gate is green: 664 compiler tests, all 20
+ergonomic CLI tests, three Node deployment tests, the decorator-free Forms
+browser regression, 11 TypeScript-authority tests, formatting, and diff checks.
+The next authored gate must add route-loader result/error codecs, normalized
+request parameters, deterministic cache keys, and one exact Resource bootstrap
+target before any loader output may execute or enter HTML. Full-beta completion
+is 80%.

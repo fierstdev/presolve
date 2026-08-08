@@ -234,6 +234,10 @@ pub struct AuthoredSubmissionDeclarationFact {
     /// syntax. Binding/package authority resolves it during application
     /// assembly; legacy and State-update submissions leave it absent.
     pub capability_local_name: Option<String>,
+    /// Exact canonical submission value forwarded to the imported capability.
+    /// `value` selects the client Form-value contract; `formData` nominates a
+    /// server-action contract and remains unclassified until package binding.
+    pub capability_input_name: Option<String>,
     pub capability_provenance: Option<SourceProvenance>,
     pub inherited: bool,
     pub decorator_provenance: SourceProvenance,
@@ -2376,7 +2380,7 @@ pub fn build_v2_component_graph_for_module(
                         && handler.state_updates.is_empty()
                         && handler.local_variables.is_empty()
                         && call.arguments.len() == 2
-                        && call.arguments[0].name == "value"
+                        && matches!(call.arguments[0].name.as_str(), "value" | "formData")
                         && call.arguments[1].name == "signal"
                 });
                 let state_update_handler = submit.parameter_count == 1
@@ -2452,6 +2456,8 @@ pub fn build_v2_component_graph_for_module(
                     action_invoked: true,
                     action_argument_count: 0,
                     capability_local_name: capability_call.map(|call| call.callee.clone()),
+                    capability_input_name: capability_call
+                        .map(|call| call.arguments[0].name.clone()),
                     capability_provenance: capability_call
                         .map(|call| SourceProvenance::new(&parsed.path, call.callee_span)),
                     inherited: false,
@@ -3509,6 +3515,7 @@ fn submission_declaration_facts_from_class(
                     action_invoked: action.is_some_and(|decorator| decorator.is_invoked),
                     action_argument_count: action.map_or(0, |decorator| decorator.argument_count),
                     capability_local_name: None,
+                    capability_input_name: None,
                     capability_provenance: None,
                     inherited: class.heritage.is_some(),
                     decorator_provenance: SourceProvenance::new(path, decorator.span),

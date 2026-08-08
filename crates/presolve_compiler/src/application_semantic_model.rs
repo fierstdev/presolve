@@ -5219,6 +5219,7 @@ mod tests {
                         forms: Vec::new(),
                         form_fields: Vec::new(),
                         validations: Vec::new(),
+                        server_action_invocations: Vec::new(),
                     },
                 )
                 .expect("V2 Slot lowering");

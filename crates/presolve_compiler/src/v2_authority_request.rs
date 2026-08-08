@@ -14,7 +14,7 @@ use crate::{
     slot_field_sites_v1, AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 11;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 12;
 const V2_VALIDATION_RULE_NAMES: &[&str] = &[
     "required",
     "min",
@@ -95,6 +95,18 @@ pub struct V2AuthorityPackageInvocationSiteV1 {
     pub signal_position: Option<usize>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct V2AuthorityServerActionInvocationSiteV1 {
+    pub id: String,
+    pub file: PathBuf,
+    pub position: usize,
+    pub form_position: usize,
+    pub import_position: usize,
+    pub module_specifier: String,
+    pub export_name: String,
+}
+
 /// A syntactic member-call candidate.  Rust deliberately records only the
 /// structural object and property positions; the TypeScript authority decides
 /// whether either resolved symbol has framework meaning.
@@ -145,6 +157,7 @@ pub struct V2AuthorityRequestV1 {
     pub validations: Vec<V2AuthoritySiteV1>,
     pub standard_validations: Vec<V2AuthorityStandardValidationSiteV1>,
     pub package_invocations: Vec<V2AuthorityPackageInvocationSiteV1>,
+    pub server_action_invocations: Vec<V2AuthorityServerActionInvocationSiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
 
@@ -384,6 +397,7 @@ pub fn build_v2_authority_request_v1(
         })
         .collect::<Result<Vec<_>, V2AuthorityRequestErrorV1>>()?;
     let package_invocations = terminal_package_invocation_sites(parsed)?;
+    let server_action_invocations = server_action_invocation_sites(parsed, component_model)?;
     let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {
         schema_version: V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
@@ -409,6 +423,7 @@ pub fn build_v2_authority_request_v1(
         validations,
         standard_validations,
         package_invocations,
+        server_action_invocations,
         environment_public,
     })
 }
@@ -458,6 +473,7 @@ pub fn build_v2_authority_component_request_v1(
         validations: Vec::new(),
         standard_validations: Vec::new(),
         package_invocations: Vec::new(),
+        server_action_invocations: Vec::new(),
         environment_public: Vec::new(),
     })
 }
@@ -498,6 +514,7 @@ pub fn build_v2_environment_authority_request_v1(
         validations: Vec::new(),
         standard_validations: Vec::new(),
         package_invocations: Vec::new(),
+        server_action_invocations: Vec::new(),
         environment_public: environment_public_member_sites(parsed, true)?,
     }))
 }
@@ -628,6 +645,94 @@ fn terminal_package_invocation_sites(
                     signal_position: signal_span
                         .map(|span| utf16_position(&parsed.syntax.source, span.start))
                         .transpose()?,
+                })
+            },
+        )
+        .collect::<Result<Vec<_>, V2AuthorityRequestErrorV1>>()?;
+    sites.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(sites)
+}
+
+/// Select canonical Form submit calls whose `formData` and `signal` bindings
+/// nominate a package server action. TypeScript still owns the exact symbol,
+/// DOM parameter, and Promise proof for every selected call.
+fn server_action_invocation_sites(
+    parsed: &ParsedFile,
+    component_model: &CanonicalAuthoredSemanticModelV1,
+) -> Result<Vec<V2AuthorityServerActionInvocationSiteV1>, V2AuthorityRequestErrorV1> {
+    let form_callees = form_definition_sites_v1(parsed, component_model)
+        .map_err(|error| V2AuthorityRequestErrorV1::FieldSiteSelection(error.to_string()))?
+        .into_iter()
+        .map(|site| (site.callee_source.start, site.callee_source.end))
+        .collect::<BTreeSet<_>>();
+    let mut sites = parsed
+        .classes
+        .iter()
+        .flat_map(|class| &class.properties)
+        .filter(|property| {
+            property.initializer_call.as_ref().is_some_and(|call| {
+                form_callees.contains(&(call.callee_span.start, call.callee_span.end))
+            })
+        })
+        .filter_map(|property| {
+            let form_call = property.initializer_call.as_ref()?;
+            let submit = property.form_definition_shape.as_ref()?.submit.as_ref()?;
+            let call = submit.handler.direct_call.as_ref()?;
+            (submit.is_async
+                && submit.parameter_count == 1
+                && call.arguments.len() == 2
+                && call.arguments[0].name == "formData"
+                && call.arguments[1].name == "signal")
+                .then_some((form_call, call))
+        })
+        .filter_map(|(form_call, call)| {
+            parsed
+                .imports
+                .iter()
+                .filter(|import| {
+                    import.source != "presolve"
+                        && !relative_import_targets_server(&parsed.path, &import.source)
+                })
+                .flat_map(|import| {
+                    import
+                        .specifiers
+                        .iter()
+                        .map(move |specifier| (import.source.as_str(), specifier))
+                })
+                .find(|(_, specifier)| {
+                    specifier.local == call.callee && specifier.imported != "default"
+                })
+                .map(|(module_specifier, specifier)| {
+                    (
+                        form_call.callee_span,
+                        call.callee_span,
+                        module_specifier.to_owned(),
+                        specifier.imported.clone(),
+                        specifier.local_span,
+                    )
+                })
+        })
+        .map(
+            |(form_span, callee_span, module_specifier, export_name, import_span)| {
+                let selected = site_for(
+                    "server-action-invocation",
+                    AuthoredSourceRangeV1 {
+                        start: callee_span.start,
+                        end: callee_span.end,
+                        line: callee_span.line,
+                        column: callee_span.column,
+                    },
+                    &parsed.path,
+                    &parsed.syntax.source,
+                )?;
+                Ok(V2AuthorityServerActionInvocationSiteV1 {
+                    id: selected.id,
+                    file: selected.file,
+                    position: selected.position,
+                    form_position: utf16_position(&parsed.syntax.source, form_span.start)?,
+                    import_position: utf16_position(&parsed.syntax.source, import_span.start)?,
+                    module_specifier,
+                    export_name,
                 })
             },
         )

@@ -25,6 +25,14 @@ pub struct V2AuthoringResolutionsV1 {
     pub forms: Vec<ResolvedFormDefinitionV1>,
     pub form_fields: Vec<ResolvedFormFieldDefinitionV1>,
     pub validations: Vec<ResolvedFormValidationDefinitionV1>,
+    pub server_action_invocations: Vec<ResolvedServerActionInvocationV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedServerActionInvocationV1 {
+    pub call_source: crate::AuthoredSourceRangeV1,
+    pub module_specifier: String,
+    pub export_name: String,
 }
 
 /// The unified decorator-free canonical model and its constituent proof products.
@@ -52,6 +60,7 @@ pub enum V2AuthoringLoweringErrorV1 {
     Form(FormDefinitionLoweringErrorV1),
     FormField(FormFieldDefinitionLoweringErrorV1),
     Validation(FormValidationDefinitionLoweringErrorV1),
+    ServerAction(String),
     Computed(ComputedGetterLoweringErrorV1),
     Composition(AuthoredSemanticCompositionErrorV1),
 }
@@ -67,6 +76,7 @@ impl std::fmt::Display for V2AuthoringLoweringErrorV1 {
             Self::Form(error) => error.fmt(formatter),
             Self::FormField(error) => error.fmt(formatter),
             Self::Validation(error) => error.fmt(formatter),
+            Self::ServerAction(error) => formatter.write_str(error),
             Self::Computed(error) => error.fmt(formatter),
             Self::Composition(error) => error.fmt(formatter),
         }
@@ -80,6 +90,11 @@ pub fn lower_v2_authoring_v1(
     parsed: &ParsedFile,
     resolutions: V2AuthoringResolutionsV1,
 ) -> Result<V2AuthoringLoweringV1, V2AuthoringLoweringErrorV1> {
+    validate_server_action_invocations(
+        parsed,
+        &resolutions.forms,
+        &resolutions.server_action_invocations,
+    )?;
     let components = lower_component_inheritance_v1(parsed, resolutions.components)
         .map_err(V2AuthoringLoweringErrorV1::Component)?;
     let states = lower_state_initializers_v1(parsed, &components.model, resolutions.states)
@@ -142,6 +157,49 @@ pub fn lower_v2_authoring_v1(
         validation_count,
         model,
     })
+}
+
+fn validate_server_action_invocations(
+    parsed: &ParsedFile,
+    forms: &[ResolvedFormDefinitionV1],
+    resolutions: &[ResolvedServerActionInvocationV1],
+) -> Result<(), V2AuthoringLoweringErrorV1> {
+    let canonical_forms = forms
+        .iter()
+        .map(|form| (form.callee_source.start, form.callee_source.end))
+        .collect::<std::collections::BTreeSet<_>>();
+    for property in parsed.classes.iter().flat_map(|class| &class.properties) {
+        let Some(form_call) = property.initializer_call.as_ref() else {
+            continue;
+        };
+        if !canonical_forms.contains(&(form_call.callee_span.start, form_call.callee_span.end)) {
+            continue;
+        }
+        let Some(call) = property
+            .form_definition_shape
+            .as_ref()
+            .and_then(|shape| shape.submit.as_ref())
+            .and_then(|submit| submit.handler.direct_call.as_ref())
+            .filter(|call| {
+                call.arguments.len() == 2
+                    && call.arguments[0].name == "formData"
+                    && call.arguments[1].name == "signal"
+            })
+        else {
+            continue;
+        };
+        let proven = resolutions.iter().any(|resolution| {
+            (resolution.call_source.start, resolution.call_source.end)
+                == (call.callee_span.start, call.callee_span.end)
+        });
+        if !proven {
+            return Err(V2AuthoringLoweringErrorV1::ServerAction(format!(
+                "canonical Form server action `{}` was not proven as an imported (FormData, AbortSignal) Promise capability by the TypeScript authority",
+                call.callee
+            )));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -250,6 +308,7 @@ class Counter extends AliasedBase {
                 forms: Vec::new(),
                 form_fields: Vec::new(),
                 validations: Vec::new(),
+                server_action_invocations: Vec::new(),
             },
         )
         .expect("one authority-backed V2 source model");

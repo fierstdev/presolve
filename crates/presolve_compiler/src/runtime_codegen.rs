@@ -23,7 +23,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
-  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 6;
+  const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 7;
   const SUPPORTED_RESOURCES_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_OPAQUE_ARTIFACT_SCHEMA_VERSION = 1;
   const SUPPORTED_PACKAGE_INVOCATIONS_ARTIFACT_SCHEMA_VERSION = 2;
@@ -74,6 +74,7 @@ const RUNTIME_STUB: &str = r#"(() => {
   };
   let standardSchemaValidators = new Map();
   let formSubmissionCapabilities = new Map();
+  let serverActionCapabilities = new Map();
   let packageInvocationRegistry = new Map();
 
   function exactObjectKeys(value, expected) {
@@ -980,9 +981,32 @@ const RUNTIME_STUB: &str = r#"(() => {
       reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Standard Schema runtime module did not match validation rules", {}, true);
       throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
     }
+    const serverActions = formsArtifact.server_action_capabilities;
+    if (!Array.isArray(serverActions)
+      || !serverActions.every((capability) =>
+        exactObjectKeys(capability, ["id", "request_path", "module_specifier", "package", "version", "integrity", "export", "runtime_module", "resume_policy", "input", "response", "failure", "cancellation"])
+        && typeof capability.id === "string" && capability.id.length > 0
+        && typeof capability.request_path === "string" && /^\/_presolve\/actions\/[0-9a-f]{64}$/.test(capability.request_path)
+        && typeof capability.module_specifier === "string" && capability.module_specifier.length > 0
+        && typeof capability.package === "string" && capability.package.length > 0
+        && typeof capability.version === "string" && capability.version.length > 0
+        && typeof capability.integrity === "string" && /^sha256:[0-9a-fA-F]{64}$/.test(capability.integrity)
+        && typeof capability.export === "string" && capability.export.length > 0
+        && typeof capability.runtime_module === "string" && capability.runtime_module.length > 0
+        && capability.resume_policy === "cold_fallback"
+        && capability.input === "form_data"
+        && (capability.response === "json" || capability.response === "redirect")
+        && capability.failure === "typed"
+        && capability.cancellation === "abort")
+      || new Set(serverActions.map((capability) => capability.id)).size !== serverActions.length
+      || new Set(serverActions.map((capability) => capability.request_path)).size !== serverActions.length) {
+      reportDiagnostic(diagnostics, "PSR_INVALID_FORMS_ARTIFACT", "Server-action capabilities were not compiler-canonical", {}, true);
+      throw new PresolveBootError("PSR_INVALID_FORMS_ARTIFACT");
+    }
+    const serverActionIds = new Set(serverActions.map((capability) => capability.id));
     const submissionCapabilityIds = [...new Set(formsArtifact.forms
       .map((form) => form?.submission?.capability)
-      .filter((capability) => typeof capability === "string"))].sort();
+      .filter((capability) => typeof capability === "string" && !serverActionIds.has(capability)))].sort();
     const submissionCapabilityModule = formsArtifact.submission_capability_module;
     if (submissionCapabilityIds.length === 0) {
       if (submissionCapabilityModule !== undefined) {
@@ -5139,6 +5163,66 @@ const RUNTIME_STUB: &str = r#"(() => {
     if (!record.formInstance.aggregate_valid) { record.formInstance.submission = "Invalid"; return; }
     const capabilityId = record.formInstance.definition.submission?.capability;
     if (capabilityId !== undefined) {
+      const serverAction = serverActionCapabilities.get(capabilityId);
+      if (serverAction !== undefined) {
+        const controller = new AbortController();
+        record.formInstance.submission_controller = controller;
+        const body = canonicalFormData(record.formInstance);
+        record.formInstance.serialized = body;
+        try {
+          const response = await fetch(serverAction.request_path, {
+            method: "POST",
+            body,
+            signal: controller.signal,
+            redirect: "follow",
+            headers: { Accept: "application/json" }
+          });
+          if (generation !== record.formInstance.submission_generation) return;
+          if (controller.signal.aborted) {
+            record.formInstance.submission = "Cancelled";
+          } else if (response.redirected) {
+            record.formInstance.submission = "Completed";
+            window.location.assign(response.url);
+          } else {
+            const contentType = response.headers.get("content-type") ?? "";
+            const payload = contentType.toLowerCase().includes("application/json")
+              ? await response.json()
+              : null;
+            if (!response.ok) {
+              record.formInstance.submission = "Failed";
+              reportDiagnostic(store.diagnostics, "PSR_FORM_SERVER_ACTION_REJECTED", "Server action returned a typed failure", {
+                capability: capabilityId,
+                status: response.status,
+                code: payload?.error?.code ?? "PSNODE2009_ACTION_EXECUTION_FAILED"
+              });
+            } else if (serverAction.response !== "json" || payload === null) {
+              record.formInstance.submission = "Failed";
+              reportDiagnostic(store.diagnostics, "PSR_FORM_SERVER_ACTION_RESPONSE_MISMATCH", "Server action response did not match its compiler contract", {
+                capability: capabilityId,
+                status: response.status
+              });
+            } else {
+              record.formInstance.submission_result = payload;
+              record.formInstance.submission = "Completed";
+            }
+          }
+        } catch (error) {
+          if (generation === record.formInstance.submission_generation) {
+            record.formInstance.submission = controller.signal.aborted ? "Cancelled" : "Failed";
+            if (!controller.signal.aborted) {
+              reportDiagnostic(store.diagnostics, "PSR_FORM_SERVER_ACTION_NETWORK_FAILED", "Server action request failed", {
+                capability: capabilityId,
+                message: error instanceof Error ? error.message : String(error)
+              });
+            }
+          }
+        } finally {
+          if (generation === record.formInstance.submission_generation) {
+            record.formInstance.submission_controller = null;
+          }
+        }
+        return;
+      }
       const capability = formSubmissionCapabilities.get(capabilityId);
       if (capability === undefined) {
         reportDiagnostic(store.diagnostics, "PSR_UNRESOLVED_FORM_SUBMISSION_CAPABILITY", "Submission plan did not resolve its exact compiler capability", { capability: capabilityId }, true);
@@ -5210,6 +5294,24 @@ const RUNTIME_STUB: &str = r#"(() => {
       let target = result;
       for (const segment of path.slice(0, -1)) target = target[segment] ??= {};
       target[path[path.length - 1]] = state.value;
+    }
+    return result;
+  }
+
+  function canonicalFormData(formInstance) {
+    const fields = new Map((formInstance.definition.fields ?? []).map((field) => [field.id, field]));
+    const result = new FormData();
+    for (const [fieldId, state] of formInstance.fields.entries()) {
+      const path = fields.get(fieldId)?.path;
+      if (!Array.isArray(path) || path.length === 0) continue;
+      const key = path.join(".");
+      const values = Array.isArray(state.value) ? state.value : [state.value];
+      for (const value of values) {
+        if (value instanceof File) result.append(key, value, value.name);
+        else if (value === null || value === undefined) result.append(key, "");
+        else if (typeof value === "object") result.append(key, JSON.stringify(value));
+        else result.append(key, String(value));
+      }
     }
     return result;
   }
@@ -6710,6 +6812,9 @@ const RUNTIME_STUB: &str = r#"(() => {
       validateFormsArtifact(formsArtifact, manifest, diagnostics);
       standardSchemaValidators = await loadStandardSchemaValidators(formsArtifact, diagnostics);
       formSubmissionCapabilities = await loadFormSubmissionCapabilities(formsArtifact, diagnostics);
+      serverActionCapabilities = new Map(
+        (formsArtifact?.server_action_capabilities ?? []).map((capability) => [capability.id, capability])
+      );
       const resourcesArtifact = readResourcesArtifact(diagnostics);
       validateResourcesArtifact(resourcesArtifact, diagnostics);
 

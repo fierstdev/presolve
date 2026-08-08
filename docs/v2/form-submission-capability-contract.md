@@ -66,7 +66,7 @@ contract/runtime module fails publication.
 
 ## Publication and proof
 
-Forms artifact schema v6 publishes the exact capability coordinate and the
+Forms artifact schema v7 publishes the exact client capability coordinate and the
 closed `/presolve.form-submissions.js` registry path. The ergonomic builder
 uses project Vite to bundle only the contract-selected runtime module and named
 export, includes the output in the digest inventory, and rejects missing or

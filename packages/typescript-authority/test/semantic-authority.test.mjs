@@ -145,6 +145,7 @@ test("the V2 authoring bridge resolves canonical component, State, Action, Effec
     validations: [],
     standardValidations: [],
     packageInvocations: [],
+    serverActionInvocations: [],
     environmentPublic: [
       {
         id: "application-name",
@@ -196,6 +197,7 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     validations: [],
     standardValidations: [],
     packageInvocations: [],
+    serverActionInvocations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["counter"]);
@@ -274,6 +276,7 @@ test("the V2 authoring bridge proves exact named-import package invocations", as
         completion: "synchronous",
       },
     ],
+    serverActionInvocations: [],
     environmentPublic: [],
   });
   assert.equal(result.diagnostics.length, 0);
@@ -342,6 +345,23 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
       exportName: "displayNameSchema",
     }],
     packageInvocations: [],
+    serverActionInvocations: [{
+      id: "profile-server-action",
+      file: formFile,
+      position: formSource.lastIndexOf("saveServerProfile(formData"),
+      formPosition: formSource.lastIndexOf("defineForm({"),
+      importPosition: formSource.indexOf("saveServerProfile"),
+      moduleSpecifier: "./V2Schemas.js",
+      exportName: "saveServerProfile",
+    }, {
+      id: "profile-client-submission-lookalike",
+      file: formFile,
+      position: formSource.lastIndexOf("saveProfile(value"),
+      formPosition: formSource.indexOf("defineForm({"),
+      importPosition: formSource.indexOf("saveProfile"),
+      moduleSpecifier: "./V2Schemas.js",
+      exportName: "saveProfile",
+    }],
     environmentPublic: [],
   });
   assert.deepEqual(result.forms.map(entry => entry.id), ["profile-form"]);
@@ -364,6 +384,8 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
     inputType: "string",
     outputType: "string",
   }]);
+  assert.deepEqual(result.serverActionInvocations.map(entry => entry.id), ["profile-server-action"]);
+  assert.equal(result.serverActionInvocations[0].identity.name, "saveServerProfile");
 });
 
 test("the V2 authoring bridge recognizes a direct Component heritage-expression query", async () => {
@@ -388,6 +410,7 @@ test("the V2 authoring bridge recognizes a direct Component heritage-expression 
     validations: [],
     standardValidations: [],
     packageInvocations: [],
+    serverActionInvocations: [],
     environmentPublic: [],
   });
   assert.deepEqual(result.components.map(entry => entry.id), ["direct"]);
@@ -414,6 +437,7 @@ test("the V2 authoring bridge resolves environment evidence without a component 
     validations: [],
     standardValidations: [],
     packageInvocations: [],
+    serverActionInvocations: [],
     environmentPublic: [{
       id: "application-name",
       file: frameworkFile,
@@ -454,6 +478,7 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
         validations: [],
         standardValidations: [],
         packageInvocations: [],
+        serverActionInvocations: [],
         environmentPublic: [],
       }),
       encoding: "utf8",

@@ -15,7 +15,7 @@ use crate::{
     ResolvedTerminalPackageInvocationV1, V2AuthoringResolutionsV1,
 };
 
-pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 11;
+pub const V2_AUTHORITY_RESPONSE_SCHEMA_VERSION: u32 = 12;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -38,6 +38,8 @@ pub struct V2AuthorityResponseV1 {
     pub standard_validations: Vec<V2AuthorityStandardValidationResolutionV1>,
     #[serde(default)]
     pub package_invocations: Vec<V2AuthorityPackageInvocationResolutionV1>,
+    #[serde(default)]
+    pub server_action_invocations: Vec<V2AuthorityServerActionInvocationResolutionV1>,
     pub environment_public: Vec<V2AuthorityResolutionV1>,
 }
 
@@ -93,6 +95,15 @@ pub struct V2AuthorityPackageInvocationResolutionV1 {
     pub argument_types: Vec<String>,
     pub completion: V2AuthorityPackageInvocationCompletionV1,
     pub inject_abort_signal: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct V2AuthorityServerActionInvocationResolutionV1 {
+    pub id: String,
+    pub identity: V2AuthorityIdentityV1,
+    pub module_specifier: String,
+    pub export_name: String,
 }
 
 /// Exact TypeScript-authoritative evidence for one environment member call.
@@ -169,6 +180,10 @@ pub fn validate_v2_authority_response_v1(
     validate_package_invocation_family(
         &request.package_invocations,
         &response.package_invocations,
+    )?;
+    validate_server_action_invocation_family(
+        &request.server_action_invocations,
+        &response.server_action_invocations,
     )?;
     validate_member_family(&request.environment_public, &response.environment_public)
 }
@@ -332,6 +347,21 @@ pub fn v2_authoring_resolutions_from_response_v1(
                 })
             }))
             .collect::<Result<Vec<_>, V2AuthorityResponseErrorV1>>()?,
+        server_action_invocations: response
+            .server_action_invocations
+            .iter()
+            .map(|resolution| {
+                Ok(crate::ResolvedServerActionInvocationV1 {
+                    call_source: range_from_site_id(
+                        &resolution.id,
+                        "server-action-invocation",
+                        &parsed.syntax.source,
+                    )?,
+                    module_specifier: resolution.module_specifier.clone(),
+                    export_name: resolution.export_name.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, V2AuthorityResponseErrorV1>>()?,
     })
 }
 
@@ -405,6 +435,39 @@ fn validate_package_invocation_family(
             || resolution.argument_types != site.argument_types
             || !completion_matches
             || resolution.inject_abort_signal != site.signal_position.is_some()
+        {
+            return Err(V2AuthorityResponseErrorV1::IncompatibleSite(
+                resolution.id.clone(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_server_action_invocation_family(
+    request: &[crate::v2_authority_request::V2AuthorityServerActionInvocationSiteV1],
+    response: &[V2AuthorityServerActionInvocationResolutionV1],
+) -> Result<(), V2AuthorityResponseErrorV1> {
+    let allowed = request
+        .iter()
+        .map(|site| (site.id.as_str(), site))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let mut seen = BTreeSet::new();
+    for resolution in response {
+        let Some(site) = allowed.get(resolution.id.as_str()) else {
+            return Err(V2AuthorityResponseErrorV1::UnknownSite(
+                resolution.id.clone(),
+            ));
+        };
+        if !seen.insert(resolution.id.as_str()) {
+            return Err(V2AuthorityResponseErrorV1::DuplicateSite(
+                resolution.id.clone(),
+            ));
+        }
+        if resolution.module_specifier != site.module_specifier
+            || resolution.export_name != site.export_name
+            || resolution.identity.name != site.export_name
+            || resolution.identity.declaration_modules.is_empty()
         {
             return Err(V2AuthorityResponseErrorV1::IncompatibleSite(
                 resolution.id.clone(),
@@ -654,6 +717,7 @@ class Counter extends Component { count = state(0); increment = action(() => {})
             validations: Vec::new(),
             standard_validations: Vec::new(),
             package_invocations: Vec::new(),
+            server_action_invocations: Vec::new(),
             environment_public: Vec::new(),
         };
         (parsed, request, response)
@@ -768,6 +832,7 @@ const applicationName = environment.public("PRESOLVE_PUBLIC_APP_NAME");
             validations: Vec::new(),
             standard_validations: Vec::new(),
             package_invocations: Vec::new(),
+            server_action_invocations: Vec::new(),
             environment_public: vec![V2AuthorityResolutionV1 {
                 id: request.environment_public[0].id.clone(),
                 identity: identity("public"),
@@ -850,6 +915,7 @@ export class Profile extends Component {
                 output_type: Some("string".into()),
             }],
             package_invocations: Vec::new(),
+            server_action_invocations: Vec::new(),
             environment_public: Vec::new(),
         };
         let resolutions =

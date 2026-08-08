@@ -1218,7 +1218,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const sourceAt = site => readFileSync(site.file, "utf8").slice(site.position);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 11,
+  schemaVersion: 12,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states
@@ -1280,7 +1280,7 @@ process.stdout.write(JSON.stringify({
         .expect("V2 Form runtime artifact");
     let artifact: serde_json::Value =
         serde_json::from_str(&artifact_json).expect("V2 Form runtime artifact JSON");
-    assert_eq!(artifact["schema_version"], 6);
+    assert_eq!(artifact["schema_version"], 7);
     assert_eq!(artifact["forms"][0]["fields"].as_array().unwrap().len(), 6);
     assert_eq!(
         artifact["forms"][0]["validation_rules"]
@@ -3035,7 +3035,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 11,
+  schemaVersion: 12,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
@@ -3421,7 +3421,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 const resolves = (site, name) => readFileSync(site.file, "utf8").slice(site.position).startsWith(name);
 process.stdout.write(JSON.stringify({
-  schemaVersion: 11,
+  schemaVersion: 12,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.filter(site => resolves(site, "state")).map(site => ({ id: site.id, identity: identity("state") })),
@@ -4456,7 +4456,7 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 11,
+  schemaVersion: 12,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
@@ -4558,7 +4558,7 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 11,
+  schemaVersion: 12,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),

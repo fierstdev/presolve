@@ -81,6 +81,9 @@ normative source for this handoff.
 - [Server-action and capability contract](server-action-capability-contract.md)
   records the closed server-action handoff and the public capability-registry
   boundary for Resources, loaders, and server actions.
+- [Node capability executor contract](node-capability-executor-contract.md)
+  defines the canonical Form-bound server-action execution gate and the exact
+  codec/bootstrap facts still required before route loaders may execute.
 - [V2 effect-field source contract](effect-field-source-contract.md) defines
   the authority-backed, decorator-free effect declaration boundary before
   lifecycle runtime adoption.
@@ -169,9 +172,9 @@ normative source for this handoff.
 
 ## Current boundary
 
-The tracker records repository-owned V2 authority products through the
-compiler-issued Node release inventory and static eligibility classification.
-Its beta gate is complete: server executors remain explicitly deferred
-capability products, while the admitted compiler, runtime, diagnostics,
-artifact, compatibility, and release evidence is recorded in the tracker and
-the beta-hardening contract.
+The tracker records repository-owned V2 authority products through canonical
+Form-bound server-action execution in the schema-v2 Node release. Route-loader
+execution remains explicitly fail-closed until compiler-owned result codecs,
+request normalization, and Resource bootstrap facts exist. The next beta gate
+therefore includes that loader slice plus refreshed compatibility, docs,
+scaffold, deterministic-release, and hosted-publication evidence.

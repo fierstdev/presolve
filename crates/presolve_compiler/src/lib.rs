@@ -1074,21 +1074,23 @@ pub use template_semantics::{
     TemplateSemanticScope,
 };
 pub use v2_authoring_lowering::{
-    lower_v2_authoring_v1, V2AuthoringLoweringErrorV1, V2AuthoringLoweringV1,
-    V2AuthoringResolutionsV1,
+    lower_v2_authoring_v1, ResolvedServerActionInvocationV1, V2AuthoringLoweringErrorV1,
+    V2AuthoringLoweringV1, V2AuthoringResolutionsV1,
 };
 pub use v2_authority_request::{
     build_v2_authority_component_request_v1, build_v2_authority_request_v1,
     build_v2_environment_authority_request_v1, V2AuthorityCanonicalV1, V2AuthorityFormFieldSiteV1,
     V2AuthorityMemberSiteV1, V2AuthorityPositionV1, V2AuthorityRequestErrorV1,
-    V2AuthorityRequestV1, V2AuthoritySiteV1, V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
+    V2AuthorityRequestV1, V2AuthorityServerActionInvocationSiteV1, V2AuthoritySiteV1,
+    V2_AUTHORITY_REQUEST_SCHEMA_VERSION,
 };
 pub use v2_authority_response::{
     v2_authoring_resolutions_from_response_v1, v2_environment_public_resolutions_from_response_v1,
     validate_v2_authority_response_v1, ResolvedEnvironmentPublicReadV1,
     V2AuthorityFormFieldResolutionV1, V2AuthorityFormFieldValueClassificationV1,
     V2AuthorityIdentityV1, V2AuthorityResolutionV1, V2AuthorityResponseErrorV1,
-    V2AuthorityResponseV1, V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
+    V2AuthorityResponseV1, V2AuthorityServerActionInvocationResolutionV1,
+    V2_AUTHORITY_RESPONSE_SCHEMA_VERSION,
 };
 
 #[cfg(test)]
