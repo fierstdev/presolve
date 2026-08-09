@@ -1447,7 +1447,7 @@ mod tests {
     use super::*;
 
     fn contract() -> ContractVersion {
-        ContractVersion::new("presolve-compiler:0.2.0-beta.24")
+        ContractVersion::new("presolve-compiler:0.2.0-beta.25")
     }
     fn request(
         configuration: WorkspaceConfiguration,
@@ -1612,7 +1612,7 @@ mod tests {
         ));
         let configuration = WorkspaceConfiguration::default();
         let workspace = platform::derive_workspace_id_v1(&configuration).unwrap();
-        let contract = ContractVersion::new("presolve-compiler:0.2.0-beta.24");
+        let contract = ContractVersion::new("presolve-compiler:0.2.0-beta.25");
         let mut host = CompilerServiceHost::start(&root, contract.clone()).unwrap();
         let session = host
             .open_session(configuration.clone(), &workspace)

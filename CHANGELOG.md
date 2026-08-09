@@ -8,6 +8,41 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.25 - 2026-08-08
+
+### Added
+
+- Canonical `defineForm(...)` declarations can bind an exact imported Node
+  server action with `(FormData, AbortSignal) -> Promise` semantics. The Node
+  adapter bundles only compiler-proven exports and executes URL-encoded and
+  multipart submissions with typed JSON, redirect, and failure results.
+- Route components can declare a canonical server-backed
+  `Resource<Data, Error>` with `loader(handler)`. TypeScript authority proves
+  the exact Presolve intrinsic, route-parameter and abort types, Promise
+  completion, and direct named package import before compiler lowering.
+- The Node adapter executes compiler-issued route-loader plan schema v2 through
+  a digest-verified server-only Vite registry. It provides strict route
+  parameter decoding, exact data/error codecs, public/private/no-store caching,
+  request and shutdown cancellation, and schema-v4 Resource bootstrap values.
+
+### Changed
+
+- Form submission hosts now enforce compiler-owned method, origin, media-type,
+  body-size, duplicate-submission, request-disconnect, reset, and graceful
+  shutdown behavior before invoking application server code.
+- Node deployment plan schema v3 inventories both server-action and
+  route-loader registries. Private loader responses partition authorization and
+  cookies and emit `Vary: Authorization, Cookie`.
+- Route-specific publication now excludes sibling routes' Resource
+  declarations, allowing multiple dynamic loader routes to publish independent
+  browser artifacts.
+
+### Fixed
+
+- Resource bootstrap injection recognizes both stable `runtime.js` and the
+  compiler's production content-hashed runtime script. Dynamic loader routes no
+  longer fail with a 500 only in production builds.
+
 ## 0.2.0-beta.24 - 2026-08-07
 
 ### Changed

@@ -512,9 +512,20 @@ All 664 compiler tests, the complete Presolve CLI suite including 59 browser
 tests, TypeScript 7.0.2 compatibility, 12 authority tests, 91 documentation
 files, production determinism, fixed production budgets, formatting, and diff
 checks pass. The expected runtime growth is audited at 314,744 bytes and remains
-within the frozen production budgets. Full-beta completion is 86%.
+within the frozen production budgets.
 
-Next: design and implement the canonical general-purpose Resource/package
-authoring gate, including editor/tooling evidence, then update the scaffold and
-Presolve.dev from the published version before the final release hardening
-matrix.
+## Beta.25 release candidate
+
+The beta.25 release surfaces and version-derived tooling identities are
+consistent. An uninterrupted `pnpm release:check` passes the complete Rust,
+browser, package, TypeScript, documentation, packed-scaffold, production,
+crate, and VSIX gates. The framework, CLI, and creator package hashes are
+respectively `deb404ebc9d1f25a3d54eaee159760c0467d3646090024a5cc022835928c103e`,
+`e1bc1643e2e4e82101714185216b6bb8ca9643e21cf031c14e5f6b4a9b858623`, and
+`4561395fc549dcff877cba7d7c8bbcf5a6e4bcda5035461ae57d99132ca06e1d`.
+
+Full-beta completion is 87%. Next: commit and fast-forward the verified
+candidate to public main, require hosted CI and release-dry-run success, publish
+beta.25 exclusively through GitHub Actions, prove an exact public scaffold,
+then update and deploy Presolve.dev. After publication, continue the canonical
+general-purpose Resource/package authoring gate and final hardening matrix.
