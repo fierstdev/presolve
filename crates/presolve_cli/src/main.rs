@@ -70,7 +70,8 @@ use presolve_compiler::{
     ImmutableAsmPass, ProductionDiagnosticFact, ProductionDiagnosticKind,
     ProductionProjectedDiagnostic, ProductionReportInputs, ProductionRootChunkInput,
     RenderAttribute, RenderAttributeValue, SemanticEntity, SemanticEntityKind, SemanticId,
-    SemanticOwner, SemanticPackageResolutionTable, SemanticPackageRuntimeModuleKey,
+    SemanticOwner, SemanticPackageKind, SemanticPackageResolutionTable,
+    SemanticPackageResourceExecutionBoundary, SemanticPackageRuntimeModuleKey,
     SemanticPackageRuntimeModuleTable, SemanticReferenceKind, SerializableValue,
     SharedChunkCandidatePlan, SourceProvenance, StateOperation, TemplateChild, TemplateGraph,
     TemplateSemanticKind, V2AuthorityResponseV1,
@@ -194,6 +195,28 @@ fn run_ergonomic_build(
     );
     let (package_contracts, package_runtime_modules) =
         discover_imported_package_tables(&project.root, &discovery_unit);
+    let selected_resources = models
+        .values()
+        .flat_map(|model| &model.declarations)
+        .filter_map(|declaration| match declaration.derived_evidence.as_ref() {
+            Some(presolve_compiler::DerivedAuthoredEvidenceV2::ResourceInvocation {
+                module_specifier,
+                export_name,
+                ..
+            }) => Some((module_specifier.clone(), export_name.clone())),
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
+    let (package_runtime_modules, resource_runtime_bundles) =
+        bundle_client_resource_runtime_modules(
+            &project.root,
+            &package_contracts,
+            &package_runtime_modules,
+            &selected_resources,
+        )
+        .unwrap_or_else(|message| {
+            application_cli_error("PSRES1002_RESOURCE_BUNDLE_FAILED", &message)
+        });
     let request = FileRoutePublicationRequestV1 {
         configuration: presolve_compiler::platform::WorkspaceConfiguration::default(),
         sources: project
@@ -226,6 +249,9 @@ fn run_ergonomic_build(
         .unwrap_or_else(|message| {
             application_cli_error("PSFORM1001_STANDARD_SCHEMA_BUNDLE_FAILED", &message)
         });
+    attach_client_resource_runtime_modules(&mut product, resource_runtime_bundles).unwrap_or_else(
+        |message| application_cli_error("PSRES1002_RESOURCE_BUNDLE_FAILED", &message),
+    );
     attach_form_submission_runtime_module(&project.root, &mut product).unwrap_or_else(|message| {
         application_cli_error("PSFORM1002_SUBMISSION_CAPABILITY_BUNDLE_FAILED", &message)
     });
@@ -946,6 +972,187 @@ fn standard_schema_bundle_specifier(
         "../{}",
         normalized.to_string_lossy().replace('\\', "/")
     ))
+}
+
+#[derive(Debug, Clone)]
+struct ClientResourceRuntimeBundleV1 {
+    path: PathBuf,
+    bytes: Vec<u8>,
+}
+
+fn bundle_client_resource_runtime_modules(
+    project_root: &Path,
+    packages: &SemanticPackageResolutionTable,
+    physical_modules: &SemanticPackageRuntimeModuleTable,
+    selected: &BTreeSet<(String, String)>,
+) -> Result<
+    (
+        SemanticPackageRuntimeModuleTable,
+        Vec<ClientResourceRuntimeBundleV1>,
+    ),
+    String,
+> {
+    let mut selected_modules =
+        BTreeMap::<SemanticPackageRuntimeModuleKey, (String, BTreeSet<String>)>::new();
+    for (specifier, export_name) in selected {
+        let contract = packages
+            .contract(specifier)
+            .ok_or_else(|| format!("Resource package `{specifier}` has no semantic contract"))?;
+        let export = contract.exports.get(export_name).ok_or_else(|| {
+            format!("Resource package `{specifier}` has no export `{export_name}`")
+        })?;
+        if export.kind != SemanticPackageKind::Resource {
+            continue;
+        }
+        let Some(endpoint) = &export.resource_endpoint else {
+            continue;
+        };
+        if endpoint.execution_boundary == SemanticPackageResourceExecutionBoundary::Server {
+            continue;
+        }
+        let key = SemanticPackageRuntimeModuleKey {
+            package: contract.package.clone(),
+            version: contract.version.clone(),
+            integrity: contract.integrity.clone(),
+            runtime_module: export.runtime_module.clone(),
+        };
+        let physical = physical_modules
+            .resolve(&key)
+            .ok_or_else(|| {
+                format!("Resource `{specifier}` / `{export_name}` has no runtime module")
+            })?
+            .to_owned();
+        let record = selected_modules
+            .entry(key)
+            .or_insert_with(|| (physical, BTreeSet::new()));
+        record.1.insert(export_name.clone());
+    }
+
+    let work_root = project_root.join(".presolve/resource-build");
+    let output_root = work_root.join("output");
+    if work_root.exists() {
+        fs::remove_dir_all(&work_root)
+            .map_err(|error| format!("failed to clear {}: {error}", work_root.display()))?;
+    }
+    fs::create_dir_all(&output_root)
+        .map_err(|error| format!("failed to create {}: {error}", output_root.display()))?;
+
+    let mut public_locations = BTreeMap::new();
+    let mut bundles = Vec::new();
+    for (index, (key, (physical, exports))) in selected_modules.iter().enumerate() {
+        let coordinate = serde_json::to_vec(&(
+            &key.package,
+            &key.version,
+            &key.integrity,
+            &key.runtime_module,
+            exports,
+        ))
+        .map_err(|error| format!("failed to encode Resource coordinate: {error}"))?;
+        let digest = format!("{:x}", Sha256::digest(coordinate));
+        let file_name = format!("presolve.resource.{}.js", &digest[..16]);
+        let entry_path = work_root.join(format!("presolve-resource-entry-{index}.mjs"));
+        let runner_path = work_root.join(format!("presolve-resource-build-{index}.mjs"));
+        let export_list = exports.iter().cloned().collect::<Vec<_>>().join(", ");
+        fs::write(
+            &entry_path,
+            format!(
+                "export {{ {export_list} }} from {};\n",
+                serde_json::to_string(physical)
+                    .map_err(|error| format!("failed to encode Resource module: {error}"))?
+            ),
+        )
+        .map_err(|error| format!("failed to write {}: {error}", entry_path.display()))?;
+        fs::write(
+            &runner_path,
+            format!(
+                r#"import {{ build }} from "vite";
+await build({{
+  root: process.cwd(),
+  configFile: false,
+  logLevel: "error",
+  build: {{
+    outDir: ".presolve/resource-build/output",
+    emptyOutDir: false,
+    sourcemap: false,
+    assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+    rollupOptions: {{
+      input: {},
+      preserveEntrySignatures: "strict",
+      output: {{ format: "es", entryFileNames: {}, inlineDynamicImports: true }}
+    }}
+  }}
+}});
+"#,
+                serde_json::to_string(&entry_path.to_string_lossy())
+                    .map_err(|error| format!("failed to encode Resource entry path: {error}"))?,
+                serde_json::to_string(&file_name)
+                    .map_err(|error| format!("failed to encode Resource file name: {error}"))?,
+            ),
+        )
+        .map_err(|error| format!("failed to write {}: {error}", runner_path.display()))?;
+        let output = Command::new("node")
+            .arg(&runner_path)
+            .current_dir(project_root)
+            .output()
+            .map_err(|error| format!("failed to start the Resource Vite build: {error}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "Vite exited with {}: {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+        let path = PathBuf::from(&file_name);
+        let bytes = fs::read(output_root.join(&path))
+            .map_err(|error| format!("failed to read Resource bundle {file_name}: {error}"))?;
+        public_locations.insert(key.clone(), format!("/{file_name}"));
+        bundles.push(ClientResourceRuntimeBundleV1 { path, bytes });
+    }
+
+    let mut runtime_modules = SemanticPackageRuntimeModuleTable::default();
+    for (key, physical) in physical_modules.entries() {
+        runtime_modules
+            .insert(
+                key.clone(),
+                public_locations
+                    .get(key)
+                    .cloned()
+                    .unwrap_or_else(|| physical.to_owned()),
+            )
+            .map_err(|error| format!("invalid Resource runtime projection: {error:?}"))?;
+    }
+    Ok((runtime_modules, bundles))
+}
+
+fn attach_client_resource_runtime_modules(
+    product: &mut presolve_compiler::FileRoutePublicationProductV1,
+    bundles: Vec<ClientResourceRuntimeBundleV1>,
+) -> Result<(), String> {
+    for bundle in bundles {
+        if product.artifacts.contains_key(&bundle.path) {
+            return Err(format!(
+                "Resource bundle {} collides with a published artifact",
+                bundle.path.display()
+            ));
+        }
+        product
+            .manifest
+            .artifacts
+            .push(presolve_compiler::ApplicationPublicationArtifactV1 {
+                path: bundle.path.to_string_lossy().into_owned(),
+                digest: format!("sha256:{:x}", Sha256::digest(&bundle.bytes)),
+            });
+        product.artifacts.insert(bundle.path, bundle.bytes);
+    }
+    product
+        .manifest
+        .artifacts
+        .sort_by(|left, right| left.path.cmp(&right.path));
+    product.artifacts.insert(
+        PathBuf::from("file-routes.manifest.json"),
+        presolve_compiler::file_route_publication_manifest_json_v1(&product.manifest).into_bytes(),
+    );
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]

@@ -12,7 +12,7 @@ composes:
 1. workspace formatting and strict Rust lint;
 2. deterministic production baselines, budgets, reports, and representative
    application publication;
-3. the real-browser compatibility matrix for decorator-free Actions, Effects,
+3. the real-browser compatibility matrix for canonical Actions, Effects,
    conditional/keyed/nested structural components, Slot projection, Context,
    Forms, Resources, diagnostics, resume fallback, and production CSP;
 4. compiler, package, TypeScript compatibility, documentation, and public API
@@ -29,17 +29,17 @@ for an unpublished package.
 ## Public-contract integrity
 
 The capability registry, CLI diagnostics, scaffold, and public guides must
-describe the same release. Canonical V2 examples use the admitted
-decorator-free source forms. Any retained decorator example must be labelled
-as alpha compatibility; the documentation verifier rejects an unlabelled guide
-example. The CLI obtains its unsupported-platform diagnostic version from its
+describe the same release. Canonical V2 examples use the current admitted
+source forms. Any retained decorator example must be labelled as alpha
+compatibility; the documentation verifier rejects an unlabelled guide example.
+The CLI obtains its unsupported-platform diagnostic version from its
 own package manifest, with a package-level regression test, so an old release
 label cannot be shipped with a later binary package.
 
 ## Completion
 
 The dry run emits the versioned `presolve.release-dry-run` artifact inventory
-only after every gate passes. The beta source surface is the canonical,
-decorator-free V2 surface, including the closed Action product recorded in
+only after every gate passes. The beta source surface is the canonical V2
+surface, including the closed Action product recorded in
 `action-beta-surface-contract.md`. Legacy decorators remain compatibility-only
 and cannot satisfy this gate.

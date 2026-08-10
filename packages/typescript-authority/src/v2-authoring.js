@@ -5,7 +5,7 @@ import {
   createCanonicalIntrinsicRegistry,
 } from "./index.js";
 
-export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 13;
+export const V2_AUTHORED_AUTHORITY_SCHEMA_VERSION = 14;
 
 /**
  * Resolves explicit source positions for the implemented decorator-free V2
@@ -23,6 +23,7 @@ export async function analyzeV2Authoring(request) {
       ...(request.canonical.slot ? [{ id: "canonical:slot", ...request.canonical.slot }] : []),
       ...(request.canonical.defineForm ? [{ id: "canonical:define-form", ...request.canonical.defineForm }] : []),
       ...(request.canonical.field ? [{ id: "canonical:field", ...request.canonical.field }] : []),
+      ...(request.canonical.resource ? [{ id: "canonical:resource", ...request.canonical.resource }] : []),
       ...(request.canonical.loader ? [{ id: "canonical:loader", ...request.canonical.loader }] : []),
       ...request.canonical.validationRules.map(entry => ({
         id: `canonical-validation:${entry.name}`,
@@ -56,6 +57,12 @@ export async function analyzeV2Authoring(request) {
         { id: `server-action-invocation:${site.id}`, file: site.file, position: site.position },
         { id: `server-action-import:${site.id}`, file: site.file, position: site.importPosition },
       ]),
+      ...request.resourceInvocations.flatMap(site => [
+        { id: `resource:${site.id}`, file: site.file, position: site.position },
+        { id: `resource-invocation:${site.id}`, file: site.file, position: site.invocationPosition },
+        { id: `resource-import:${site.id}`, file: site.file, position: site.importPosition },
+        { id: `resource-context:${site.id}`, file: site.file, position: site.contextTypePosition },
+      ]),
       ...request.routeLoaderInvocations.flatMap(site => [
         { id: `route-loader:${site.id}`, file: site.file, position: site.position },
         { id: `route-loader-invocation:${site.id}`, file: site.file, position: site.invocationPosition },
@@ -83,6 +90,11 @@ export async function analyzeV2Authoring(request) {
         id: `server-action-invocation-call:${site.id}`,
         file: site.file,
         position: site.position,
+      })),
+      ...request.resourceInvocations.map(site => ({
+        id: `resource-invocation-call:${site.id}`,
+        file: site.file,
+        position: site.invocationPosition,
       })),
       ...request.routeLoaderInvocations.map(site => ({
         id: `route-loader-invocation-call:${site.id}`,
@@ -114,6 +126,7 @@ export async function analyzeV2Authoring(request) {
     ...(request.canonical.slot ? [{ kind: "slot", symbol: symbols.get("canonical:slot") }] : []),
     ...(request.canonical.defineForm ? [{ kind: "form", symbol: symbols.get("canonical:define-form") }] : []),
     ...(request.canonical.field ? [{ kind: "field", symbol: symbols.get("canonical:field") }] : []),
+    ...(request.canonical.resource ? [{ kind: "resource", symbol: symbols.get("canonical:resource") }] : []),
     ...(request.canonical.loader ? [{ kind: "loader", symbol: symbols.get("canonical:loader") }] : []),
     ...request.canonical.validationRules.map(entry => ({
       kind: "validate",
@@ -244,6 +257,35 @@ export async function analyzeV2Authoring(request) {
           }]
         : [];
     }),
+    resourceInvocations: request.resourceInvocations.flatMap(site => {
+      const resourceIntrinsic = classifyResolvedIntrinsic(registry, symbols.get(`resource:${site.id}`));
+      const identity = resolvedIdentity(symbols.get(`resource-invocation:${site.id}`));
+      const importedIdentity = resolvedIdentity(symbols.get(`resource-import:${site.id}`));
+      const contextIdentity = resolvedIdentity(symbols.get(`resource-context:${site.id}`));
+      const signature = fieldSignatures.get(`resource-invocation-call:${site.id}`);
+      const parameterTypes = signature?.parameterTypes?.map(parameter => parameter.type);
+      const exactParameters = Array.isArray(parameterTypes)
+        && parameterTypes.length === 1
+        && parameterTypes[0]?.text === "ResourceContext";
+      return resourceIntrinsic?.kind === "resource"
+        && identity?.name === site.exportName
+        && importedIdentity?.name === site.exportName
+        && sameDeclarationModules(identity, importedIdentity)
+        && identity.declarationModules.length > 0
+        && contextIdentity?.name === "ResourceContext"
+        && contextIdentity.declarationModules
+          .some(module => /(?:^|\/)presolve\/(?:src\/)?index\.d\.ts$/.test(module))
+        && exactParameters
+        && isCanonicalPromise(signature?.returnType)
+        ? [{
+            id: site.id,
+            identity,
+            resourceIdentity: resourceIntrinsic.identity,
+            moduleSpecifier: site.moduleSpecifier,
+            exportName: site.exportName,
+          }]
+        : [];
+    }),
     routeLoaderInvocations: request.routeLoaderInvocations.flatMap(site => {
       const loaderIntrinsic = classifyResolvedIntrinsic(registry, symbols.get(`route-loader:${site.id}`));
       const identity = resolvedIdentity(symbols.get(`route-loader-invocation:${site.id}`));
@@ -350,6 +392,9 @@ function validateV2AuthoringRequest(request) {
   if (!Array.isArray(request.serverActionInvocations)) {
     throw new TypeError("V2 authoring server action invocation sites must be an array");
   }
+  if (!Array.isArray(request.resourceInvocations)) {
+    throw new TypeError("V2 authoring Resource invocation sites must be an array");
+  }
   if (!Array.isArray(request.routeLoaderInvocations)) {
     throw new TypeError("V2 authoring route loader invocation sites must be an array");
   }
@@ -394,6 +439,20 @@ function validateV2AuthoringRequest(request) {
     validatePosition(site, "server action invocation site");
   }
   const routeLoaderInvocationIds = new Set();
+  const resourceInvocationIds = new Set();
+  for (const site of request.resourceInvocations) {
+    if (!site || typeof site.id !== "string" || !site.id
+      || resourceInvocationIds.has(site.id)
+      || typeof site.moduleSpecifier !== "string" || !site.moduleSpecifier
+      || typeof site.exportName !== "string" || !site.exportName
+      || !Number.isInteger(site.invocationPosition)
+      || !Number.isInteger(site.contextTypePosition)
+      || !Number.isInteger(site.importPosition)) {
+      throw new TypeError("V2 authoring Resource sites require unique ids and named module exports");
+    }
+    resourceInvocationIds.add(site.id);
+    validatePosition(site, "Resource site");
+  }
   for (const site of request.routeLoaderInvocations) {
     if (!site || typeof site.id !== "string" || !site.id
       || routeLoaderInvocationIds.has(site.id)

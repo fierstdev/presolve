@@ -596,3 +596,42 @@ The root, stylesheet, SVG favicon, and PNG mark return HTTP 200.
 Full-beta completion is 96%. Continue with the authored canonical
 general-purpose Resource/package authoring gate, then complete the final
 compatibility, product, diagnostic, determinism, and release hardening matrix.
+
+## Beta.27 canonical general Resource release candidate
+
+Canonical `resource(handler)` authoring is complete without a parallel runtime
+or source escape hatch. TypeScript authority schema v14 proves the exact
+framework intrinsic, named package import, `ResourceContext`, and Promise
+contract. Authored-semantics schema v9 retains exact Resource invocation
+membership. The existing Resource declaration, execution, snapshot, reload,
+and resume products remain the sole runtime authority. Server-only handlers are
+rejected with canonical route `loader(...)` remediation.
+
+The CLI resolves only the selected client/shared endpoint, bundles it through
+the project's direct Vite dependency, publishes a content-addressed
+`presolve.resource.<digest>.js`, and joins that asset to the atomic release.
+Scratch Resource builds are replaced on every build. Semantic package
+registries expose deterministic entries without introducing a new package
+authority path.
+
+Computed getter evidence now includes canonical Resource dependencies. A pure
+getter is admitted when its dependency graph reaches State or Resource, so a
+settled Resource invalidates its derived bindings exactly once. Browser proof
+uses a real package endpoint, observes `Ada`, and verifies no loader lookalike
+is admitted as a general Resource. All 667 compiler tests and all 59 browser
+tests pass.
+
+The beta.27 version train, changelog, public API, capability registry, CLI,
+forms/resources guide, third-party package guide, support matrix, TypeScript
+guide, and V2 contracts are aligned. An uninterrupted release dry run passes
+all Rust, browser, package, TypeScript 7.0.2, documentation, packed-scaffold,
+determinism, budget, crate, native CLI, VSIX, and checksum gates. Framework,
+CLI, and creator hashes are respectively
+`f75ab41ca3322186003c5cc73f512055671847986b67c4349f8c436a497f526b`,
+`db0a7481c39ae4a73e10a3f80612b7925e7abdca4acd8428382351bea1b9bb23`,
+and `0a8102faee07824757facf10f7e83b3f58c37f81d5b6bad16e0b708d46c63093`.
+
+Full-beta completion is 99.5%. Next: commit and fast-forward the verified
+candidate to `fierstdev/presolve` main, require hosted CI and hosted release
+dry-run success, publish beta.27 only through GitHub Actions, verify the exact
+registry scaffold, then update, deploy, and production-validate Presolve.dev.

@@ -26,6 +26,7 @@ pub struct V2AuthoringResolutionsV1 {
     pub form_fields: Vec<ResolvedFormFieldDefinitionV1>,
     pub validations: Vec<ResolvedFormValidationDefinitionV1>,
     pub server_action_invocations: Vec<ResolvedServerActionInvocationV1>,
+    pub resource_invocations: Vec<ResolvedResourceInvocationV1>,
     pub route_loader_invocations: Vec<ResolvedRouteLoaderInvocationV1>,
 }
 
@@ -40,6 +41,15 @@ pub struct ResolvedServerActionInvocationV1 {
 pub struct ResolvedRouteLoaderInvocationV1 {
     pub callee_source: crate::AuthoredSourceRangeV1,
     pub loader_identity: crate::ResolvedIntrinsicIdentityV1,
+    pub module_specifier: String,
+    pub export_name: String,
+    pub declaration_modules: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedResourceInvocationV1 {
+    pub callee_source: crate::AuthoredSourceRangeV1,
+    pub resource_identity: crate::ResolvedIntrinsicIdentityV1,
     pub module_specifier: String,
     pub export_name: String,
     pub declaration_modules: Vec<String>,
@@ -72,6 +82,7 @@ pub enum V2AuthoringLoweringErrorV1 {
     Validation(FormValidationDefinitionLoweringErrorV1),
     ServerAction(String),
     RouteLoader(String),
+    Resource(String),
     Computed(ComputedGetterLoweringErrorV1),
     Composition(AuthoredSemanticCompositionErrorV1),
 }
@@ -89,6 +100,7 @@ impl std::fmt::Display for V2AuthoringLoweringErrorV1 {
             Self::Validation(error) => error.fmt(formatter),
             Self::ServerAction(error) => formatter.write_str(error),
             Self::RouteLoader(error) => formatter.write_str(error),
+            Self::Resource(error) => formatter.write_str(error),
             Self::Computed(error) => error.fmt(formatter),
             Self::Composition(error) => error.fmt(formatter),
         }
@@ -138,6 +150,8 @@ pub fn lower_v2_authoring_v1(
         &components.model,
         &resolutions.route_loader_invocations,
     )?;
+    let resources =
+        lower_resource_invocations(parsed, &components.model, &resolutions.resource_invocations)?;
     let input = compose_authored_semantics_v1([
         components.model.clone(),
         states.model.clone(),
@@ -147,6 +161,7 @@ pub fn lower_v2_authoring_v1(
         forms.model.clone(),
         form_fields.model.clone(),
         validations.clone(),
+        resources,
         route_loaders,
     ])
     .map_err(V2AuthoringLoweringErrorV1::Composition)?;
@@ -175,6 +190,81 @@ pub fn lower_v2_authoring_v1(
         validation_count,
         model,
     })
+}
+
+fn lower_resource_invocations(
+    parsed: &ParsedFile,
+    components: &CanonicalAuthoredSemanticModelV1,
+    resolutions: &[ResolvedResourceInvocationV1],
+) -> Result<CanonicalAuthoredSemanticModelV1, V2AuthoringLoweringErrorV1> {
+    let component_names = components
+        .declarations
+        .iter()
+        .filter(|declaration| {
+            declaration.kind == crate::CanonicalAuthoredDeclarationKindV1::Component
+        })
+        .map(|declaration| declaration.subject.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let candidates = resolutions
+        .iter()
+        .map(|resolution| {
+            let (class, property) = parsed
+                .classes
+                .iter()
+                .filter(|class| component_names.contains(class.name.as_str()))
+                .find_map(|class| {
+                    class.properties.iter().find_map(|property| {
+                        let call = property.initializer_call.as_ref()?;
+                        ((call.callee_span.start, call.callee_span.end)
+                            == (resolution.callee_source.start, resolution.callee_source.end))
+                            .then_some((class, property))
+                    })
+                })
+                .ok_or_else(|| {
+                    V2AuthoringLoweringErrorV1::Resource(format!(
+                        "authority-proven Resource has no component field at {}..{}",
+                        resolution.callee_source.start, resolution.callee_source.end
+                    ))
+                })?;
+            let call = property
+                .initializer_call
+                .as_ref()
+                .expect("selected initializer call");
+            let handler = call.inline_handler.as_ref().ok_or_else(|| {
+                V2AuthoringLoweringErrorV1::Resource(format!(
+                    "canonical Resource `{}.{}` requires one inline handler",
+                    class.name, property.name
+                ))
+            })?;
+            let valid_body = handler.direct_call.is_some()
+                && handler.state_updates.is_empty()
+                && handler.local_variables.is_empty()
+                && (handler.is_expression_body || handler.unsupported_statement_spans.len() == 1);
+            if call.argument_count != 1 || !handler.is_async || !valid_body {
+                return Err(V2AuthoringLoweringErrorV1::Resource(format!(
+                    "canonical Resource `{}.{}` requires one async direct package call",
+                    class.name, property.name
+                )));
+            }
+            Ok(crate::ResolvedAuthoredSemanticCandidateV1 {
+                subject: format!("{}.{}", class.name, property.name),
+                source: crate::AuthoredSourceRangeV1 {
+                    start: property.span.start,
+                    end: property.span.end,
+                    line: property.span.line,
+                    column: property.span.column,
+                },
+                kind: crate::AuthoredSemanticCandidateKindV1::ResolvedResource {
+                    intrinsic_identity: resolution.resource_identity.clone(),
+                    module_specifier: resolution.module_specifier.clone(),
+                    export_name: resolution.export_name.clone(),
+                    declaration_modules: resolution.declaration_modules.clone(),
+                },
+            })
+        })
+        .collect::<Result<Vec<_>, V2AuthoringLoweringErrorV1>>()?;
+    crate::normalize_authored_semantics_v1(parsed, candidates)
+        .map_err(|error| V2AuthoringLoweringErrorV1::Resource(error.to_string()))
 }
 
 fn lower_route_loader_invocations(
@@ -402,6 +492,7 @@ class Counter extends AliasedBase {
                 form_fields: Vec::new(),
                 validations: Vec::new(),
                 server_action_invocations: Vec::new(),
+                resource_invocations: Vec::new(),
                 route_loader_invocations: Vec::new(),
             },
         )
@@ -470,5 +561,77 @@ class Counter extends AliasedBase {
         assert_eq!(graph.components[0].methods[0].name, "doubled");
         assert!(graph.components[0].methods[1].is_computed());
         assert_eq!(graph.components[0].methods[1].name, "quadrupled");
+    }
+
+    #[test]
+    fn assembles_an_authority_proven_general_resource_without_a_decorator() {
+        let source = r#"
+class Profile extends FrameworkBase {
+  profile: Resource<string, string> = resource(async (context: ResourceContext) => loadProfile(context));
+  get profileName(): string | null { return this.profile.data; }
+}
+"#;
+        let parsed = parse_file("src/Profile.tsx", source);
+        let component = component_inheritance_sites_v1(&parsed).pop().unwrap();
+        let resource_callee = parsed.classes[0].properties[0]
+            .initializer_call
+            .as_ref()
+            .unwrap()
+            .callee_span;
+        let lowering = lower_v2_authoring_v1(
+            &parsed,
+            V2AuthoringResolutionsV1 {
+                components: vec![crate::ResolvedComponentInheritanceV1 {
+                    heritage_source: crate::AuthoredSourceRangeV1 {
+                        start: component.heritage_source.start,
+                        end: component.heritage_source.end,
+                        line: component.heritage_source.line,
+                        column: component.heritage_source.column,
+                    },
+                    component_identity: identity("Component"),
+                }],
+                resource_invocations: vec![crate::ResolvedResourceInvocationV1 {
+                    callee_source: crate::AuthoredSourceRangeV1 {
+                        start: resource_callee.start,
+                        end: resource_callee.end,
+                        line: resource_callee.line,
+                        column: resource_callee.column,
+                    },
+                    resource_identity: identity("resource"),
+                    module_specifier: "profile-service".into(),
+                    export_name: "loadProfile".into(),
+                    declaration_modules: vec!["node_modules/profile-service/index.d.ts".into()],
+                }],
+                ..V2AuthoringResolutionsV1::default()
+            },
+        )
+        .expect("authority-backed Resource model");
+        let declaration = lowering
+            .model
+            .declarations
+            .iter()
+            .find(|declaration| declaration.kind == CanonicalAuthoredDeclarationKindV1::Resource)
+            .unwrap();
+        assert_eq!(declaration.subject, "Profile.profile");
+        assert!(matches!(
+            declaration.derived_evidence,
+            Some(crate::DerivedAuthoredEvidenceV2::ResourceInvocation { .. })
+        ));
+        assert_eq!(lowering.computed_count, 1);
+        let computed = lowering
+            .model
+            .declarations
+            .iter()
+            .find(|declaration| declaration.kind == CanonicalAuthoredDeclarationKindV1::Computed)
+            .unwrap();
+        assert!(matches!(
+            &computed.derived_evidence,
+            Some(crate::DerivedAuthoredEvidenceV2::ComputedGetter {
+                state_dependencies,
+                resource_dependencies,
+                ..
+            }) if state_dependencies.is_empty()
+                && resource_dependencies == &["Profile.profile".to_owned()]
+        ));
     }
 }

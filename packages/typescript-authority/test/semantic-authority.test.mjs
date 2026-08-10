@@ -146,6 +146,7 @@ test("the V2 authoring bridge resolves canonical component, State, Action, Effec
     standardValidations: [],
     packageInvocations: [],
     serverActionInvocations: [],
+    resourceInvocations: [],
     routeLoaderInvocations: [],
     environmentPublic: [
       {
@@ -199,6 +200,7 @@ test("the V2 authoring bridge supports a component-only discovery phase", async 
     standardValidations: [],
     packageInvocations: [],
     serverActionInvocations: [],
+    resourceInvocations: [],
     routeLoaderInvocations: [],
     environmentPublic: [],
   });
@@ -279,6 +281,7 @@ test("the V2 authoring bridge proves exact named-import package invocations", as
       },
     ],
     serverActionInvocations: [],
+    resourceInvocations: [],
     routeLoaderInvocations: [],
     environmentPublic: [],
   });
@@ -316,6 +319,7 @@ test("the V2 authoring bridge proves canonical route loader fields and package c
     standardValidations: [],
     packageInvocations: [],
     serverActionInvocations: [],
+    resourceInvocations: [],
     routeLoaderInvocations: [{
       id: "route-loader",
       file,
@@ -332,6 +336,58 @@ test("the V2 authoring bridge proves canonical route loader fields and package c
   assert.equal(result.routeLoaderInvocations.length, 1);
   assert.equal(result.routeLoaderInvocations[0].loaderIdentity.name, "loader");
   assert.equal(result.routeLoaderInvocations[0].identity.name, "loadPost");
+});
+
+test("the V2 authoring bridge proves canonical general-purpose Resource fields", async () => {
+  const file = resolve(root, "tests/framework-public-api/src/V2Loader.tsx");
+  const source = readFileSync(file, "utf8");
+  const resourceStart = source.indexOf("resource<PostRecord");
+  const result = await analyzeV2Authoring({
+    schemaVersion: V2_AUTHORED_AUTHORITY_SCHEMA_VERSION,
+    configFile: resolve(root, "tests/framework-public-api/tsconfig.json"),
+    canonical: {
+      component: { file, position: source.indexOf("Component") },
+      resource: { file, position: source.indexOf("resource") },
+      validationRules: [],
+    },
+    components: [{ id: "resource-component", file, position: source.indexOf("V2Resource extends") }],
+    states: [],
+    actions: [],
+    effects: [],
+    slots: [],
+    forms: [],
+    formFields: [],
+    validations: [],
+    standardValidations: [],
+    packageInvocations: [],
+    serverActionInvocations: [],
+    resourceInvocations: [{
+      id: "general-resource",
+      file,
+      position: resourceStart,
+      invocationPosition: source.indexOf("loadProfile(context)"),
+      contextTypePosition: source.indexOf("ResourceContext", resourceStart),
+      importPosition: source.indexOf("loadProfile"),
+      moduleSpecifier: "./V2PackageHelper.js",
+      exportName: "loadProfile",
+    }, {
+      id: "loader-is-not-a-general-resource",
+      file,
+      position: source.indexOf("loader<PostRecord"),
+      invocationPosition: source.indexOf("loadPost(params"),
+      contextTypePosition: source.indexOf("RouteParameters"),
+      importPosition: source.indexOf("loadPost"),
+      moduleSpecifier: "./V2PackageHelper.js",
+      exportName: "loadPost",
+    }],
+    routeLoaderInvocations: [],
+    environmentPublic: [],
+  });
+  assert.equal(result.diagnostics.length, 0);
+  assert.equal(result.resourceInvocations.length, 1);
+  assert.deepEqual(result.resourceInvocations.map(entry => entry.id), ["general-resource"]);
+  assert.equal(result.resourceInvocations[0].resourceIdentity.name, "resource");
+  assert.equal(result.resourceInvocations[0].identity.name, "loadProfile");
 });
 
 test("the V2 authoring bridge resolves canonical decorator-free Form evidence", async () => {
@@ -405,6 +461,7 @@ test("the V2 authoring bridge resolves canonical decorator-free Form evidence", 
       moduleSpecifier: "./V2Schemas.js",
       exportName: "saveProfile",
     }],
+    resourceInvocations: [],
     routeLoaderInvocations: [],
     environmentPublic: [],
   });
@@ -455,6 +512,7 @@ test("the V2 authoring bridge recognizes a direct Component heritage-expression 
     standardValidations: [],
     packageInvocations: [],
     serverActionInvocations: [],
+    resourceInvocations: [],
     routeLoaderInvocations: [],
     environmentPublic: [],
   });
@@ -483,6 +541,7 @@ test("the V2 authoring bridge resolves environment evidence without a component 
     standardValidations: [],
     packageInvocations: [],
     serverActionInvocations: [],
+    resourceInvocations: [],
     routeLoaderInvocations: [],
     environmentPublic: [{
       id: "application-name",
@@ -525,6 +584,7 @@ test("the V2 authoring executable speaks the versioned stdin/stdout bridge proto
         standardValidations: [],
         packageInvocations: [],
         serverActionInvocations: [],
+        resourceInvocations: [],
         routeLoaderInvocations: [],
         environmentPublic: [],
       }),

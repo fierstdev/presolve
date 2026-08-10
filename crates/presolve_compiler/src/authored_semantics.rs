@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use presolve_parser::ParsedFile;
 use serde::{Deserialize, Serialize};
 
-pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 8;
+pub const CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION: u32 = 9;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -80,6 +80,7 @@ pub enum AuthoredSemanticCandidateKindV1 {
     DerivedComputedGetter {
         state_dependencies: Vec<String>,
         computed_dependencies: Vec<String>,
+        resource_dependencies: Vec<String>,
     },
     /// A module export whose value shape TypeScript proved implements
     /// Standard Schema v1 for the owning Form Field.
@@ -89,6 +90,12 @@ pub enum AuthoredSemanticCandidateKindV1 {
         declaration_modules: Vec<String>,
         input_type: Option<String>,
         output_type: Option<String>,
+    },
+    ResolvedResource {
+        intrinsic_identity: ResolvedIntrinsicIdentityV1,
+        module_specifier: String,
+        export_name: String,
+        declaration_modules: Vec<String>,
     },
     ResolvedRouteLoader {
         intrinsic_identity: ResolvedIntrinsicIdentityV1,
@@ -108,6 +115,7 @@ pub enum DerivedAuthoredEvidenceV2 {
     ComputedGetter {
         state_dependencies: Vec<String>,
         computed_dependencies: Vec<String>,
+        resource_dependencies: Vec<String>,
     },
     /// TypeScript-authoritative proof that a canonical Form Field value is an
     /// array of the platform `File` type from the configured DOM library.
@@ -133,6 +141,13 @@ pub enum DerivedAuthoredEvidenceV2 {
     /// A canonical `loader(...)` field whose sole package call and exact
     /// parameter/Promise contract were proven by the TypeScript authority.
     RouteLoaderInvocation {
+        module_specifier: String,
+        export_name: String,
+        declaration_modules: Vec<String>,
+    },
+    /// A canonical `resource(...)` field whose sole package call and exact
+    /// ResourceContext/Promise contract were proven by TypeScript authority.
+    ResourceInvocation {
         module_specifier: String,
         export_name: String,
         declaration_modules: Vec<String>,
@@ -286,12 +301,15 @@ pub fn normalize_authored_semantics_v1(
             if let Some(DerivedAuthoredEvidenceV2::ComputedGetter {
                 state_dependencies,
                 computed_dependencies,
+                resource_dependencies,
             }) = &mut derived_evidence
             {
                 state_dependencies.sort();
                 state_dependencies.dedup();
                 computed_dependencies.sort();
                 computed_dependencies.dedup();
+                resource_dependencies.sort();
+                resource_dependencies.dedup();
             }
             if let Some(DerivedAuthoredEvidenceV2::StandardSchemaValidation {
                 declaration_modules,
@@ -310,6 +328,14 @@ pub fn normalize_authored_semantics_v1(
                 declaration_modules.dedup();
             }
             if let Some(DerivedAuthoredEvidenceV2::RouteLoaderInvocation {
+                declaration_modules,
+                ..
+            }) = &mut derived_evidence
+            {
+                declaration_modules.sort();
+                declaration_modules.dedup();
+            }
+            if let Some(DerivedAuthoredEvidenceV2::ResourceInvocation {
                 declaration_modules,
                 ..
             }) = &mut derived_evidence
@@ -395,12 +421,14 @@ fn declaration_kind(
             AuthoredSemanticCandidateKindV1::DerivedComputedGetter {
                 state_dependencies,
                 computed_dependencies,
+                resource_dependencies,
             } => (
                 CanonicalAuthoredDeclarationKindV1::Computed,
                 None,
                 Some(DerivedAuthoredEvidenceV2::ComputedGetter {
                     state_dependencies,
                     computed_dependencies,
+                    resource_dependencies,
                 }),
             ),
             AuthoredSemanticCandidateKindV1::DerivedStandardSchemaValidation {
@@ -429,6 +457,20 @@ fn declaration_kind(
                 CanonicalAuthoredDeclarationKindV1::RouteLoader,
                 Some(intrinsic_identity),
                 Some(DerivedAuthoredEvidenceV2::RouteLoaderInvocation {
+                    module_specifier,
+                    export_name,
+                    declaration_modules,
+                }),
+            ),
+            AuthoredSemanticCandidateKindV1::ResolvedResource {
+                intrinsic_identity,
+                module_specifier,
+                export_name,
+                declaration_modules,
+            } => (
+                CanonicalAuthoredDeclarationKindV1::Resource,
+                Some(intrinsic_identity),
+                Some(DerivedAuthoredEvidenceV2::ResourceInvocation {
                     module_specifier,
                     export_name,
                     declaration_modules,
@@ -517,7 +559,10 @@ mod tests {
             normalize_authored_semantics_v1(&parsed, [state.clone(), component.clone(), state])
                 .expect("valid resolved candidates");
 
-        assert_eq!(model.schema_version, 8);
+        assert_eq!(
+            model.schema_version,
+            crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION
+        );
         assert_eq!(model.declarations.len(), 2);
         assert_eq!(model.declarations[0].subject, "Card");
         assert_eq!(
@@ -540,7 +585,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&model).expect("serializable model"),
             serde_json::json!({
-                "schema_version": 8,
+                "schema_version": 9,
                 "source_path": "src/Card.tsx",
                 "declarations": [
                     {

@@ -357,6 +357,12 @@ impl SemanticPackageResolutionTable {
     pub fn resolve(&self, specifier: &str, export: &str) -> Option<&SemanticPackageExport> {
         self.contracts.get(specifier)?.exports.get(export)
     }
+
+    pub fn entries(&self) -> impl Iterator<Item = (&str, &SemanticPackageContract)> {
+        self.contracts
+            .iter()
+            .map(|(specifier, contract)| (specifier.as_str(), contract))
+    }
 }
 
 #[cfg(test)]

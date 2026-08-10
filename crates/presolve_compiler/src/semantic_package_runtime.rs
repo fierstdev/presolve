@@ -52,6 +52,12 @@ impl SemanticPackageRuntimeModuleTable {
         self.modules.contains_key(key)
     }
 
+    pub fn entries(&self) -> impl Iterator<Item = (&SemanticPackageRuntimeModuleKey, &str)> {
+        self.modules
+            .iter()
+            .map(|(key, location)| (key, location.as_str()))
+    }
+
     pub fn resolve_contract_module(
         &self,
         contract: &SemanticPackageContract,

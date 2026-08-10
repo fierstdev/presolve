@@ -20,3 +20,9 @@ export async function loadPost(
 ): Promise<PostRecord> {
   return { slug: params.slug ?? "", title: "Post" };
 }
+
+export async function loadProfile(
+  _context: import("presolve").ResourceContext,
+): Promise<PostRecord> {
+  return { slug: "profile", title: "Profile" };
+}

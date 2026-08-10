@@ -8,6 +8,7 @@ needs semantic knowledge depends on how an imported value is used:
 | Types, CSS tooling, media, and build plugins | TypeScript or Vite | No component, reactive, capability, or resume identity. |
 | Pure values used only where the compiler has an admitted value contract | TypeScript + Presolve | The value joins that exact contract; the package does not receive blanket framework semantics. |
 | A result-discarded browser call from an Action | Presolve + TypeScript + Vite | Presolve proves the call shape and lifecycle; Vite bundles the exact named export. |
+| A value-producing client/shared Resource | Presolve + TypeScript + semantic package contract + Vite | Presolve owns codecs, activation, cancellation, reactive invalidation, resume, and the content-addressed endpoint bundle. |
 | Server capability implementation | Presolve capability + server adapter | The declared capability owns the transport and lifecycle. |
 | Arbitrary package behavior | Package only | Not assumed to be compiler-understood. |
 
@@ -107,9 +108,30 @@ Vite never decides that a handler is an Action or that arbitrary package source
 is safe to resume. Presolve never executes the package during compilation or
 serializes the handler's source for runtime evaluation.
 
-## Historical package declarations
+## Value-producing Resource packages
 
-Earlier package declarations are retained only for migration analysis. Current
-applications use the Action forms above; package uses that need values, codecs,
-server execution, or framework-specific adapters require their own admitted
-capability contract.
+A package result that enters rendering or resumability needs more evidence than
+a TypeScript return type. Use `resource()` with one exact named import and a
+package-owned `presolve.contract.json` resource declaration. Presolve joins the
+call site to that integrity-qualified contract, derives closed data/error
+codecs from `Resource<Data, Error>`, and bundles only the selected client/shared
+runtime export.
+
+```tsx
+profile = resource<Profile, ProfileError>(
+  async (context: ResourceContext) => loadProfile(context),
+);
+```
+
+The same package may still provide ordinary types, CSS, or build plugins. Those
+uses remain under TypeScript or Vite and do not acquire Resource semantics.
+Server-only exports require `loader()` or a Form server action and an adapter
+that implements that capability.
+
+## Compatibility package declarations
+
+Earlier decorator declarations are retained only for migration analysis.
+Current applications use `action()`, `resource()`, `loader()`, and
+`defineForm()` according to the exact use-site contracts above. Framework-
+specific component packages still require a dedicated Presolve adapter; a
+package name or JSX spelling never grants component semantics.

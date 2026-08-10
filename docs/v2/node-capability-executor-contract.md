@@ -18,7 +18,7 @@ the canonical component, Form or Resource, route, package, and runtime-module
 products described below.
 
 Status: the canonical Form/server-action gate is implemented in authority
-schema v13, server-action plan schema v2, and Forms artifact schema v7. The
+schema v14, server-action plan schema v2, and Forms artifact schema v7. The
 canonical route-loader gate is implemented in route-loader plan schema v2 and
 Resource artifact schema v4. Node deployment schema v3 carries both digest-bound
 registries. Focused compiler, deterministic preparation, real-request,

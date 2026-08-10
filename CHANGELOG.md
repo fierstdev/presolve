@@ -8,6 +8,36 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.27 - 2026-08-10
+
+### Added
+
+- Components can declare a canonical client/shared
+  `Resource<Data, Error>` with `resource(handler)`. TypeScript authority proves
+  the exact `resource` and `ResourceContext` symbols, Promise completion, and
+  direct named package import before the compiler admits the endpoint.
+- Project-local Vite bundles each selected Resource package module into a
+  content-addressed public asset. The compiler publishes that exact location
+  in Resource artifact schema v4; application callback source is not shipped
+  or evaluated.
+
+### Changed
+
+- Canonical pure getters may derive from Resource `.data`, `.error`, or `.state`
+  as well as State. Resource settlement invalidates the exact compiler-planned
+  getter and DOM bindings, including in instance-qualified runtime plans.
+- The Resource bundling workspace is replaced on every build under
+  `.presolve/resource-build/`, so local builds retain only the current scratch
+  publication rather than an accumulating build history.
+- V2 TypeScript authority request/response schema v14 and authored semantics
+  schema v9 retain exact general-Resource invocation and package evidence.
+
+### Fixed
+
+- Public guides and the capability registry now describe the canonical Form,
+  Resource, route-loader, and Node server-action surfaces instead of stale
+  pre-execution or compatibility-only constraints.
+
 ## 0.2.0-beta.26 - 2026-08-09
 
 ### Changed

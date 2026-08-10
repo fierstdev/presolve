@@ -14,7 +14,7 @@ use crate::{
     slot_field_sites_v1, AuthoredSourceRangeV1, CanonicalAuthoredSemanticModelV1,
 };
 
-pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 13;
+pub const V2_AUTHORITY_REQUEST_SCHEMA_VERSION: u32 = 14;
 const V2_VALIDATION_RULE_NAMES: &[&str] = &[
     "required",
     "min",
@@ -120,6 +120,19 @@ pub struct V2AuthorityRouteLoaderInvocationSiteV1 {
     pub export_name: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct V2AuthorityResourceInvocationSiteV1 {
+    pub id: String,
+    pub file: PathBuf,
+    pub position: usize,
+    pub invocation_position: usize,
+    pub context_type_position: usize,
+    pub import_position: usize,
+    pub module_specifier: String,
+    pub export_name: String,
+}
+
 /// A syntactic member-call candidate.  Rust deliberately records only the
 /// structural object and property positions; the TypeScript authority decides
 /// whether either resolved symbol has framework meaning.
@@ -150,6 +163,8 @@ pub struct V2AuthorityCanonicalV1 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<V2AuthorityPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource: Option<V2AuthorityPositionV1>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub loader: Option<V2AuthorityPositionV1>,
     pub validation_rules: Vec<V2AuthorityNamedPositionV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -173,6 +188,7 @@ pub struct V2AuthorityRequestV1 {
     pub standard_validations: Vec<V2AuthorityStandardValidationSiteV1>,
     pub package_invocations: Vec<V2AuthorityPackageInvocationSiteV1>,
     pub server_action_invocations: Vec<V2AuthorityServerActionInvocationSiteV1>,
+    pub resource_invocations: Vec<V2AuthorityResourceInvocationSiteV1>,
     pub route_loader_invocations: Vec<V2AuthorityRouteLoaderInvocationSiteV1>,
     pub environment_public: Vec<V2AuthorityMemberSiteV1>,
 }
@@ -220,6 +236,7 @@ pub fn build_v2_authority_request_v1(
     let slot = canonical_import(parsed, "slot")?;
     let define_form = canonical_import(parsed, "defineForm")?;
     let field = canonical_import(parsed, "field")?;
+    let resource = canonical_import(parsed, "resource")?;
     let loader = canonical_import(parsed, "loader")?;
     let validation_rules = canonical_validation_imports(parsed)?;
     let environment = canonical_import(parsed, "environment")?;
@@ -415,6 +432,7 @@ pub fn build_v2_authority_request_v1(
         .collect::<Result<Vec<_>, V2AuthorityRequestErrorV1>>()?;
     let package_invocations = terminal_package_invocation_sites(parsed)?;
     let server_action_invocations = server_action_invocation_sites(parsed, component_model)?;
+    let resource_invocations = resource_invocation_sites(parsed, component_model)?;
     let route_loader_invocations = route_loader_invocation_sites(parsed, component_model)?;
     let environment_public = environment_public_member_sites(parsed, environment.is_some())?;
     Ok(V2AuthorityRequestV1 {
@@ -428,6 +446,7 @@ pub fn build_v2_authority_request_v1(
             slot,
             define_form,
             field,
+            resource,
             loader,
             validation_rules,
             environment,
@@ -443,6 +462,7 @@ pub fn build_v2_authority_request_v1(
         standard_validations,
         package_invocations,
         server_action_invocations,
+        resource_invocations,
         route_loader_invocations,
         environment_public,
     })
@@ -480,6 +500,7 @@ pub fn build_v2_authority_component_request_v1(
             slot: canonical_import(parsed, "slot")?,
             define_form: canonical_import(parsed, "defineForm")?,
             field: canonical_import(parsed, "field")?,
+            resource: canonical_import(parsed, "resource")?,
             loader: canonical_import(parsed, "loader")?,
             validation_rules: canonical_validation_imports(parsed)?,
             environment: canonical_import(parsed, "environment")?,
@@ -495,6 +516,7 @@ pub fn build_v2_authority_component_request_v1(
         standard_validations: Vec::new(),
         package_invocations: Vec::new(),
         server_action_invocations: Vec::new(),
+        resource_invocations: Vec::new(),
         route_loader_invocations: Vec::new(),
         environment_public: Vec::new(),
     })
@@ -523,6 +545,7 @@ pub fn build_v2_environment_authority_request_v1(
             slot: None,
             define_form: None,
             field: None,
+            resource: None,
             loader: None,
             validation_rules: Vec::new(),
             environment: Some(environment),
@@ -538,6 +561,7 @@ pub fn build_v2_environment_authority_request_v1(
         standard_validations: Vec::new(),
         package_invocations: Vec::new(),
         server_action_invocations: Vec::new(),
+        resource_invocations: Vec::new(),
         route_loader_invocations: Vec::new(),
         environment_public: environment_public_member_sites(parsed, true)?,
     }))
@@ -882,6 +906,134 @@ fn route_loader_invocation_sites(
     Ok(sites)
 }
 
+/// Select the closed general-purpose Resource field shape. TypeScript proves
+/// the canonical intrinsic, ResourceContext parameter, Promise result, and
+/// exact named package import before the compiler assigns Resource meaning.
+fn resource_invocation_sites(
+    parsed: &ParsedFile,
+    component_model: &CanonicalAuthoredSemanticModelV1,
+) -> Result<Vec<V2AuthorityResourceInvocationSiteV1>, V2AuthorityRequestErrorV1> {
+    let component_names = component_model
+        .declarations
+        .iter()
+        .filter(|declaration| {
+            declaration.kind == crate::CanonicalAuthoredDeclarationKindV1::Component
+        })
+        .map(|declaration| declaration.subject.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut sites = parsed
+        .classes
+        .iter()
+        .filter(|class| component_names.contains(class.name.as_str()))
+        .flat_map(|class| &class.properties)
+        .filter_map(|property| {
+            let resource_call = property.initializer_call.as_ref()?;
+            let handler = resource_call.inline_handler.as_ref()?;
+            let invocation = handler.direct_call.as_ref()?;
+            (!property.is_static
+                && resource_call.argument_count == 1
+                && handler.is_async
+                && handler.parameters.len() == 1
+                && handler.parameters[0].name == "context"
+                && handler.state_updates.is_empty()
+                && handler.local_variables.is_empty()
+                && invocation.arguments.len() == 1
+                && invocation.arguments[0].name == "context")
+                .then_some((
+                    resource_call,
+                    invocation,
+                    handler.parameters[0].type_annotation.as_ref()?,
+                ))
+        })
+        .filter_map(|(resource_call, invocation, context_type)| {
+            parsed
+                .imports
+                .iter()
+                .filter(|import| {
+                    import.source != "presolve"
+                        && !relative_import_targets_server(&parsed.path, &import.source)
+                })
+                .flat_map(|import| {
+                    import
+                        .specifiers
+                        .iter()
+                        .map(move |specifier| (import.source.as_str(), specifier))
+                })
+                .find(|(_, specifier)| {
+                    specifier.local == invocation.callee && specifier.imported != "default"
+                })
+                .map(|(module_specifier, specifier)| {
+                    (
+                        resource_call.callee_span,
+                        invocation.callee_span,
+                        module_specifier.to_owned(),
+                        specifier.imported.clone(),
+                        specifier.local_span,
+                        context_type,
+                    )
+                })
+        })
+        .map(
+            |(
+                resource_span,
+                invocation_span,
+                module_specifier,
+                export_name,
+                import_span,
+                context_type,
+            )| {
+                let selected = site_for(
+                    "resource-invocation",
+                    AuthoredSourceRangeV1 {
+                        start: resource_span.start,
+                        end: resource_span.end,
+                        line: resource_span.line,
+                        column: resource_span.column,
+                    },
+                    &parsed.path,
+                    &parsed.syntax.source,
+                )?;
+                Ok(V2AuthorityResourceInvocationSiteV1 {
+                    id: selected.id,
+                    file: selected.file,
+                    position: selected.position,
+                    invocation_position: utf16_position(
+                        &parsed.syntax.source,
+                        invocation_span.start,
+                    )?,
+                    context_type_position: utf16_position(
+                        &parsed.syntax.source,
+                        type_annotation_name_start(&parsed.syntax.source, context_type)?,
+                    )?,
+                    import_position: utf16_position(&parsed.syntax.source, import_span.start)?,
+                    module_specifier,
+                    export_name,
+                })
+            },
+        )
+        .collect::<Result<Vec<_>, V2AuthorityRequestErrorV1>>()?;
+    sites.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(sites)
+}
+
+fn type_annotation_name_start(
+    source: &str,
+    annotation: &presolve_parser::ParsedTypeAnnotation,
+) -> Result<usize, V2AuthorityRequestErrorV1> {
+    let slice = source
+        .get(annotation.span.start..annotation.span.end)
+        .ok_or(V2AuthorityRequestErrorV1::InvalidSourceOffset(
+            annotation.span.start,
+        ))?;
+    let name = annotation.text.trim();
+    let relative = slice
+        .find(name)
+        .ok_or(V2AuthorityRequestErrorV1::InvalidSourceOffset(
+            annotation.span.start,
+        ))?;
+    Ok(annotation.span.start + relative)
+}
+
 fn environment_public_member_sites(
     parsed: &ParsedFile,
     enabled: bool,
@@ -1138,6 +1290,43 @@ class Profile extends Component {
         assert_eq!(
             &source[request.validations[0].position..][.."mustExist".len()],
             "mustExist"
+        );
+    }
+
+    #[test]
+    fn selects_only_closed_general_resource_invocations() {
+        let source = r#"
+import { Component, resource, type Resource, type ResourceContext } from "presolve";
+import { loadProfile } from "profile-service";
+class Profile extends Component {
+  profile: Resource<string, string> = resource(async (context: ResourceContext) => loadProfile(context));
+  wrong: Resource<string, string> = resource(async (context: ResourceContext) => loadProfile(other));
+}
+"#;
+        let parsed = parse_file("src/Profile.tsx", source);
+        let heritage = component_inheritance_sites_v1(&parsed).pop().unwrap();
+        let components = lower_component_inheritance_v1(
+            &parsed,
+            [ResolvedComponentInheritanceV1 {
+                heritage_source: heritage.heritage_source,
+                component_identity: ResolvedIntrinsicIdentityV1 {
+                    name: "Component".into(),
+                    flags: 32,
+                    declaration_modules: vec!["presolve".into()],
+                },
+            }],
+        )
+        .unwrap()
+        .model;
+        let request =
+            build_v2_authority_request_v1(&parsed, PathBuf::from("tsconfig.json"), &components)
+                .unwrap();
+        assert!(request.canonical.resource.is_some());
+        assert_eq!(request.resource_invocations.len(), 1);
+        assert_eq!(request.resource_invocations[0].export_name, "loadProfile");
+        assert_eq!(
+            &source[request.resource_invocations[0].position..][.."resource".len()],
+            "resource"
         );
     }
 

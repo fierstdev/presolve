@@ -24,6 +24,7 @@ pub struct ComputedGetterSiteV1 {
     pub declaration_source: AuthoredSourceRangeV1,
     pub state_dependencies: Vec<String>,
     pub computed_dependencies: Vec<String>,
+    pub resource_dependencies: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +32,7 @@ struct ComputedGetterCandidateV1 {
     source: AuthoredSourceRangeV1,
     state_reads: BTreeSet<String>,
     computed_reads: BTreeSet<String>,
+    resource_reads: BTreeSet<String>,
 }
 
 /// The canonical derived-getter product for one source file.
@@ -109,6 +111,21 @@ pub fn computed_getter_sites_v1(
                 names
             },
         );
+    let resource_names_by_component = model
+        .declarations
+        .iter()
+        .filter(|declaration| declaration.kind == CanonicalAuthoredDeclarationKindV1::Resource)
+        .filter_map(|declaration| {
+            let (component, name) = declaration.subject.rsplit_once('.')?;
+            Some((component.to_owned(), name.to_owned()))
+        })
+        .fold(
+            BTreeMap::<String, BTreeSet<String>>::new(),
+            |mut names, (component, name)| {
+                names.entry(component).or_default().insert(name);
+                names
+            },
+        );
 
     let mut sites = Vec::new();
     for class in parsed
@@ -117,6 +134,10 @@ pub fn computed_getter_sites_v1(
         .filter(|class| components.contains(&(class.name.clone(), range_key(range(class.span)))))
     {
         let state_names = state_names_by_component
+            .get(&class.name)
+            .cloned()
+            .unwrap_or_default();
+        let resource_names = resource_names_by_component
             .get(&class.name)
             .cloned()
             .unwrap_or_default();
@@ -137,12 +158,15 @@ pub fn computed_getter_sites_v1(
             };
             let mut state_reads = BTreeSet::new();
             let mut computed_reads = BTreeSet::new();
+            let mut resource_reads = BTreeSet::new();
             if !collect_getter_reads(
                 expression,
                 &state_names,
+                &resource_names,
                 &getter_names,
                 &mut state_reads,
                 &mut computed_reads,
+                &mut resource_reads,
             ) {
                 continue;
             }
@@ -152,6 +176,7 @@ pub fn computed_getter_sites_v1(
                     source: range(method.span),
                     state_reads,
                     computed_reads,
+                    resource_reads,
                 },
             );
         }
@@ -161,7 +186,12 @@ pub fn computed_getter_sites_v1(
             else {
                 continue;
             };
-            if state_dependencies.is_empty() {
+            let Some(resource_dependencies) =
+                transitive_resource_dependencies(name, &candidates, &mut BTreeSet::new())
+            else {
+                continue;
+            };
+            if state_dependencies.is_empty() && resource_dependencies.is_empty() {
                 continue;
             }
             sites.push(ComputedGetterSiteV1 {
@@ -174,6 +204,10 @@ pub fn computed_getter_sites_v1(
                 computed_dependencies: candidate
                     .computed_reads
                     .iter()
+                    .map(|name| format!("{}.{}", class.name, name))
+                    .collect(),
+                resource_dependencies: resource_dependencies
+                    .into_iter()
                     .map(|name| format!("{}.{}", class.name, name))
                     .collect(),
             });
@@ -203,6 +237,7 @@ pub fn lower_computed_getters_v1(
             kind: AuthoredSemanticCandidateKindV1::DerivedComputedGetter {
                 state_dependencies: site.state_dependencies.clone(),
                 computed_dependencies: site.computed_dependencies.clone(),
+                resource_dependencies: site.resource_dependencies.clone(),
             },
         });
     let model = normalize_authored_semantics_v1(parsed, candidates)
@@ -213,15 +248,20 @@ pub fn lower_computed_getters_v1(
 fn collect_getter_reads(
     expression: &ParsedComputedExpression,
     state_names: &BTreeSet<String>,
+    resource_names: &BTreeSet<String>,
     getter_names: &BTreeSet<String>,
     state_reads: &mut BTreeSet<String>,
     computed_reads: &mut BTreeSet<String>,
+    resource_reads: &mut BTreeSet<String>,
 ) -> bool {
     match &expression.kind {
         ParsedComputedExpressionKind::Literal(_) => true,
         ParsedComputedExpressionKind::ThisMember(name) => {
             if state_names.contains(name) {
                 state_reads.insert(name.clone());
+                true
+            } else if resource_names.contains(name) {
+                resource_reads.insert(name.clone());
                 true
             } else if getter_names.contains(name) {
                 computed_reads.insert(name.clone());
@@ -233,23 +273,29 @@ fn collect_getter_reads(
         ParsedComputedExpressionKind::MemberAccess { object, .. } => collect_getter_reads(
             object,
             state_names,
+            resource_names,
             getter_names,
             state_reads,
             computed_reads,
+            resource_reads,
         ),
         ParsedComputedExpressionKind::IndexAccess { object, index } => {
             collect_getter_reads(
                 object,
                 state_names,
+                resource_names,
                 getter_names,
                 state_reads,
                 computed_reads,
+                resource_reads,
             ) && collect_getter_reads(
                 index,
                 state_names,
+                resource_names,
                 getter_names,
                 state_reads,
                 computed_reads,
+                resource_reads,
             )
         }
         ParsedComputedExpressionKind::Conditional {
@@ -260,21 +306,27 @@ fn collect_getter_reads(
             collect_getter_reads(
                 condition,
                 state_names,
+                resource_names,
                 getter_names,
                 state_reads,
                 computed_reads,
+                resource_reads,
             ) && collect_getter_reads(
                 when_true,
                 state_names,
+                resource_names,
                 getter_names,
                 state_reads,
                 computed_reads,
+                resource_reads,
             ) && collect_getter_reads(
                 when_false,
                 state_names,
+                resource_names,
                 getter_names,
                 state_reads,
                 computed_reads,
+                resource_reads,
             )
         }
         ParsedComputedExpressionKind::Template { expressions, .. } => {
@@ -282,9 +334,11 @@ fn collect_getter_reads(
                 collect_getter_reads(
                     expression,
                     state_names,
+                    resource_names,
                     getter_names,
                     state_reads,
                     computed_reads,
+                    resource_reads,
                 )
             })
         }
@@ -293,23 +347,53 @@ fn collect_getter_reads(
         | ParsedComputedExpressionKind::Comparison { left, right, .. }
         | ParsedComputedExpressionKind::Logical { left, right, .. }
         | ParsedComputedExpressionKind::NullishCoalescing { left, right } => {
-            collect_getter_reads(left, state_names, getter_names, state_reads, computed_reads)
-                && collect_getter_reads(
-                    right,
-                    state_names,
-                    getter_names,
-                    state_reads,
-                    computed_reads,
-                )
+            collect_getter_reads(
+                left,
+                state_names,
+                resource_names,
+                getter_names,
+                state_reads,
+                computed_reads,
+                resource_reads,
+            ) && collect_getter_reads(
+                right,
+                state_names,
+                resource_names,
+                getter_names,
+                state_reads,
+                computed_reads,
+                resource_reads,
+            )
         }
         ParsedComputedExpressionKind::Unary { operand, .. } => collect_getter_reads(
             operand,
             state_names,
+            resource_names,
             getter_names,
             state_reads,
             computed_reads,
+            resource_reads,
         ),
     }
+}
+
+fn transitive_resource_dependencies(
+    name: &str,
+    candidates: &BTreeMap<String, ComputedGetterCandidateV1>,
+    visiting: &mut BTreeSet<String>,
+) -> Option<BTreeSet<String>> {
+    let candidate = candidates.get(name)?;
+    if !visiting.insert(name.to_owned()) {
+        return None;
+    }
+    let mut resources = candidate.resource_reads.clone();
+    for computed in &candidate.computed_reads {
+        resources.extend(transitive_resource_dependencies(
+            computed, candidates, visiting,
+        )?);
+    }
+    visiting.remove(name);
+    Some(resources)
 }
 
 fn transitive_state_dependencies(
@@ -421,7 +505,10 @@ class Counter extends Base {
         assert_eq!(sites[1].computed_dependencies, ["Counter.doubled"]);
 
         let lowered = lower_computed_getters_v1(&parsed, &input).expect("derived lowering");
-        assert_eq!(lowered.model.schema_version, 8);
+        assert_eq!(
+            lowered.model.schema_version,
+            crate::CANONICAL_AUTHORED_SEMANTICS_SCHEMA_VERSION
+        );
         let declaration = &lowered.model.declarations[0];
         assert_eq!(
             declaration.kind,
@@ -433,6 +520,7 @@ class Counter extends Base {
             Some(DerivedAuthoredEvidenceV2::ComputedGetter {
                 state_dependencies: vec!["Counter.count".to_owned()],
                 computed_dependencies: Vec::new(),
+                resource_dependencies: Vec::new(),
             })
         );
         assert_eq!(lowered.model.declarations[1].subject, "Counter.quadrupled");
@@ -441,6 +529,7 @@ class Counter extends Base {
             Some(DerivedAuthoredEvidenceV2::ComputedGetter {
                 state_dependencies: vec!["Counter.count".to_owned()],
                 computed_dependencies: vec!["Counter.doubled".to_owned()],
+                resource_dependencies: Vec::new(),
             })
         );
     }

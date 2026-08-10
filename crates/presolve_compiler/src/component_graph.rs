@@ -264,6 +264,8 @@ pub struct AuthoredResourceDeclarationFact {
     pub decorator_invoked: bool,
     pub decorator_argument_count: usize,
     pub endpoint_designator: Option<String>,
+    pub canonical_field: bool,
+    pub route_loader: bool,
     pub declared_type: Option<DeclaredStateType>,
     pub provenance: SourceProvenance,
 }
@@ -2056,6 +2058,7 @@ pub fn build_v2_component_graph_for_module(
             let Some(crate::DerivedAuthoredEvidenceV2::ComputedGetter {
                 state_dependencies,
                 computed_dependencies,
+                resource_dependencies,
             }) = candidate.derived_evidence.as_ref()
             else {
                 continue;
@@ -2068,6 +2071,7 @@ pub fn build_v2_component_graph_for_module(
                     && site.declaration_source == candidate.source
                     && site.state_dependencies == *state_dependencies
                     && site.computed_dependencies == *computed_dependencies
+                    && site.resource_dependencies == *resource_dependencies
             }) else {
                 diagnostics.push(ComponentDiagnostic::error(
                     "PSV2C1002",
@@ -2510,18 +2514,60 @@ pub fn build_v2_component_graph_for_module(
                 })
             })
             .collect::<Vec<_>>();
-        let resource_declaration_candidates = route_loader_declaration_candidates
+        let mut resource_declaration_candidates = authored
+            .declarations
             .iter()
-            .map(|loader| AuthoredResourceDeclarationFact {
+            .filter(|candidate| {
+                candidate.kind == crate::CanonicalAuthoredDeclarationKindV1::Resource
+                    && candidate.subject.starts_with(&format!("{}.", class.name))
+            })
+            .filter_map(|candidate| {
+                let name = candidate
+                    .subject
+                    .strip_prefix(&format!("{}.", class.name))?;
+                let property = class
+                    .properties
+                    .iter()
+                    .find(|property| property.name == name)?;
+                let call = property
+                    .initializer_call
+                    .as_ref()?
+                    .inline_handler
+                    .as_ref()?
+                    .direct_call
+                    .as_ref()?;
+                Some(AuthoredResourceDeclarationFact {
+                    owner_component: id.clone(),
+                    field: name.to_owned(),
+                    decorator_invoked: true,
+                    decorator_argument_count: 1,
+                    endpoint_designator: Some(call.callee.clone()),
+                    canonical_field: true,
+                    route_loader: false,
+                    declared_type: property.type_annotation.as_ref().map(|annotation| {
+                        DeclaredStateType {
+                            text: annotation.text.clone(),
+                            provenance: SourceProvenance::new(&parsed.path, annotation.span),
+                            kind: declared_state_type_kind(&annotation.text),
+                        }
+                    }),
+                    provenance: SourceProvenance::new(&parsed.path, property.span),
+                })
+            })
+            .collect::<Vec<_>>();
+        resource_declaration_candidates.extend(route_loader_declaration_candidates.iter().map(
+            |loader| AuthoredResourceDeclarationFact {
                 owner_component: loader.owner_component.clone(),
                 field: loader.field.clone(),
                 decorator_invoked: true,
                 decorator_argument_count: 1,
                 endpoint_designator: loader.endpoint_designator.clone(),
+                canonical_field: true,
+                route_loader: true,
                 declared_type: loader.declared_type.clone(),
                 provenance: loader.provenance.clone(),
-            })
-            .collect();
+            },
+        ));
         components.push(ComponentNode {
             id: id.clone(),
             module_path: parsed.path.clone(),
@@ -4584,6 +4630,8 @@ fn resource_declaration_candidates_from_class(
                 decorator_invoked: decorator.is_invoked,
                 decorator_argument_count: decorator.argument_count,
                 endpoint_designator: decorator.argument.clone(),
+                canonical_field: false,
+                route_loader: false,
                 declared_type: property.type_annotation.as_ref().map(|annotation| {
                     DeclaredStateType {
                         text: annotation.text.clone(),

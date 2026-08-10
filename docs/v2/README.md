@@ -75,6 +75,10 @@ normative source for this handoff.
 - [Resource lifecycle and resume contract](resource-lifecycle-resume-contract.md)
   defines compiler-owned cold, snapshot, reload, cancellation, and fallback
   behavior for declared Resource endpoints.
+- [General-purpose Resource authoring contract](general-resource-authoring-contract.md)
+  defines the canonical `resource(handler)` source form, TypeScript authority,
+  package classification, Vite publication, reactive updates, and browser
+  evidence.
 - [Route-loader execution contract](route-loader-handoff-contract.md) fixes the
   canonical Resource authoring, integrity-bound compiler plan, Node execution,
   cache, cancellation, and browser-bootstrap boundaries.
@@ -173,8 +177,7 @@ normative source for this handoff.
 ## Current boundary
 
 The tracker records repository-owned V2 authority products through canonical
-Form-bound server actions and route-owned loader Resources in the schema-v3
-Node release. The next beta gates are the remaining canonical general-purpose
-package/Resource authoring surfaces, cross-adapter server execution boundaries,
-and refreshed compatibility, docs, scaffold, deterministic-release, and
-hosted-publication evidence.
+Form-bound server actions, route-owned loader Resources, and component-owned
+client/shared Resources. The remaining beta gate is refreshed compatibility,
+diagnostic, scaffold, deterministic-release, and hosted-publication evidence
+for the combined product surface.

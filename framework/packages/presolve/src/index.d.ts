@@ -180,6 +180,18 @@ export interface Resource<Data, Error> {
   readonly state: ResourceState;
   readonly __presolveResourceBrand: unique symbol;
 }
+/** Compiler-owned context passed to an admitted client/shared Resource endpoint. */
+export interface ResourceContext {
+  readonly signal: AbortSignal;
+  readonly inputs: Readonly<Record<string, never>>;
+}
+/**
+ * Declares a component-owned client/shared Resource from one exact named
+ * package import. Presolve owns activation, cancellation, codecs, and resume.
+ */
+export declare function resource<Data, Error>(
+  handler: (context: ResourceContext) => Promise<Data>
+): Resource<Data, Error>;
 /** Canonical, decoded parameters for the current file route. */
 export type RouteParameters = Readonly<Record<string, string>>;
 /**
@@ -203,6 +215,7 @@ export type ServerActionJsonValue =
 export type ServerActionResult =
   | ServerActionJsonValue
   | { readonly location: `/${string}` };
+/** @deprecated Alpha compatibility decorator. */
 export declare function resource(endpoint: string): PresolveFieldDecorator;
 /** @deprecated Alpha compatibility decorator. */
 export declare function loader(endpoint: string): PresolveFieldDecorator;

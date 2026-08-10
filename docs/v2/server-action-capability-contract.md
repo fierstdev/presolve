@@ -27,7 +27,7 @@ application method bodies nor package source are server code.
 handoffs as `legacy_method` records and adds executable `canonical_form`
 records. A canonical record exists only for an authority-proven
 `defineForm({ submit: async ({ formData, signal }) => imported(formData,
-signal) })` declaration. Authority schema v13 proves the surrounding Form,
+signal) })` declaration. Authority schema v14 proves the surrounding Form,
 named-import identity, canonical DOM parameters, and Promise completion before
 lowering. The record adds the Form identity, exact compiler-issued request
 path, and `abort` cancellation policy without making the legacy method

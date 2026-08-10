@@ -36,6 +36,9 @@ pub enum ResourceEndpointResolutionOutcome {
         designator: String,
         kind: SemanticPackageKind,
     },
+    UnsupportedExecutionBoundary {
+        boundary: crate::SemanticPackageResourceExecutionBoundary,
+    },
     Resolved(ResourceEndpointBinding),
 }
 

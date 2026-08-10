@@ -20,8 +20,9 @@ are released as a lockstep compatibility train.
 
 ## Not supported
 
-- SSR, streaming, a generic server runtime, or executable server loaders and
-  actions.
+- SSR, streaming, or a generic application-JavaScript server runtime. The Node
+  adapter executes only compiler-issued route-loader and Form server-action
+  plans; Cloudflare Static Assets remains static-only.
 - Automatic database, authentication, session, environment, or deployment
   provisioning.
 - A promise that arbitrary TypeScript or arbitrary npm packages are semantically

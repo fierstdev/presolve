@@ -6,7 +6,7 @@ on:
       release_version:
         description: Published Presolve beta version, without the v prefix
         required: true
-        default: "0.2.0-beta.26"
+        default: "0.2.0-beta.27"
 
 permissions:
   contents: read

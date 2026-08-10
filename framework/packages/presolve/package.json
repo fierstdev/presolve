@@ -1,6 +1,6 @@
 {
   "name": "@presolve/framework",
-  "version": "0.2.0-beta.26",
+  "version": "0.2.0-beta.27",
   "description": "Presolve compiler authoring vocabulary for TypeScript.",
   "license": "MIT OR Apache-2.0",
   "repository": {

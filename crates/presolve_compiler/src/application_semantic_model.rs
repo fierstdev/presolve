@@ -1945,6 +1945,11 @@ fn retain_v2_runtime_import_bindings(
                     module_specifier,
                     export_name,
                     declaration_modules,
+                }
+                | crate::DerivedAuthoredEvidenceV2::ResourceInvocation {
+                    module_specifier,
+                    export_name,
+                    declaration_modules,
                 } => (module_specifier, export_name, declaration_modules),
                 _ => continue,
             };
@@ -3151,20 +3156,32 @@ fn collect_resource_endpoint_resolutions(
                             resource_endpoint: Some(endpoint),
                             route_loader,
                             ..
-                        } => crate::ResourceEndpointResolutionOutcome::Resolved(
-                            crate::ResourceEndpointBinding {
-                                local_name: binding.local_name.clone(),
-                                package: package.clone(),
-                                version: version.clone(),
-                                integrity: integrity.clone(),
-                                export: export.clone(),
-                                type_signature: type_signature.clone(),
-                                runtime_module: runtime_module.clone(),
-                                resume_policy: resume_policy.clone(),
-                                endpoint: endpoint.clone(),
-                                route_loader: route_loader.clone(),
-                            },
-                        ),
+                        } => {
+                            if resource.canonical_field
+                                && !resource.route_loader
+                                && endpoint.execution_boundary
+                                    == crate::SemanticPackageResourceExecutionBoundary::Server
+                            {
+                                crate::ResourceEndpointResolutionOutcome::UnsupportedExecutionBoundary {
+                                    boundary: endpoint.execution_boundary,
+                                }
+                            } else {
+                                crate::ResourceEndpointResolutionOutcome::Resolved(
+                                    crate::ResourceEndpointBinding {
+                                        local_name: binding.local_name.clone(),
+                                        package: package.clone(),
+                                        version: version.clone(),
+                                        integrity: integrity.clone(),
+                                        export: export.clone(),
+                                        type_signature: type_signature.clone(),
+                                        runtime_module: runtime_module.clone(),
+                                        resume_policy: resume_policy.clone(),
+                                        endpoint: endpoint.clone(),
+                                        route_loader: route_loader.clone(),
+                                    },
+                                )
+                            }
+                        }
                         crate::ImportBindingTarget::SemanticPackage { kind, .. } => {
                             crate::ResourceEndpointResolutionOutcome::NonResourceBinding {
                                 designator: designator.to_string(),
@@ -3392,6 +3409,10 @@ fn collect_resource_lowering_diagnostics(
                 ),
                 crate::ResourceEndpointResolutionOutcome::NonResourceBinding { designator, kind } => format!(
                     "resource declaration `{}` designator `{designator}` resolves to package kind {kind:?}, not resource",
+                    resolution.field
+                ),
+                crate::ResourceEndpointResolutionOutcome::UnsupportedExecutionBoundary { boundary } => format!(
+                    "resource declaration `{}` selects a {boundary:?} endpoint; use loader(...) on a route for server execution",
                     resolution.field
                 ),
                 crate::ResourceEndpointResolutionOutcome::Resolved(_) => unreachable!(
@@ -5236,6 +5257,7 @@ mod tests {
                         form_fields: Vec::new(),
                         validations: Vec::new(),
                         server_action_invocations: Vec::new(),
+                        resource_invocations: Vec::new(),
                         route_loader_invocations: Vec::new(),
                     },
                 )

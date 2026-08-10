@@ -13,7 +13,7 @@ It is admitted as computed only when all of the following inputs agree:
 
 1. its owner is a component admitted by canonical inheritance lowering;
 2. dependency analysis proves at least one direct or transitive read of a
-   canonical State declaration for that component instance;
+   canonical State or Resource declaration for that component instance;
 3. purity/effect analysis proves synchronous execution with no observable
    effect, unsupported call, or unknown call coverage; and
 4. cycle analysis reports no dependency cycle.
@@ -30,8 +30,9 @@ analysis-proven, non-intrinsic getter. Reusing
 `CanonicalIntrinsicKindV1::Computed` would falsely claim that a `computed()`
 intrinsic exists; classifying getters by method name would be equally invalid.
 
-The first implementation admits its finite call-free subset, including
-analysis-proven transitive computed-to-computed State dependencies. Legacy
+The implementation admits its finite call-free subset, including
+analysis-proven transitive computed-to-computed State and Resource
+dependencies. Legacy
 `@computed()` lowering remains alpha compatibility only and is never a
 fallback for a V2 getter. Calls and unknown-call coverage remain an intentional
 proof boundary.
@@ -48,6 +49,8 @@ proof boundary.
 - A decorator-free route built through the installed authority bridge renders
   the derived getter in a real browser, invalidates it after a V2 action, and
   restores and invalidates it again on the resumed path.
+- A canonical general Resource can feed a derived getter; endpoint settlement
+  invalidates that exact getter and updates its browser binding.
 
 Conditional dependency coverage and unknown-call proof remain required
 evidence for a later broader candidate amendment.

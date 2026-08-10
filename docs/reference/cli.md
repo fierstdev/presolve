@@ -11,6 +11,7 @@ package scripts:
 | `pnpm build` | Publish the production artifact set into `dist/`. |
 | `pnpm deploy:prepare` | Create and validate a Cloudflare deployment plan without upload. |
 | `pnpm deploy` | Validate and deploy the prepared static artifact inventory. |
+| `presolve deploy node --prepare` | Build the digest-verified Node host for canonical route loaders and Form server actions without starting it. |
 | `presolve explain <source>` | Project compiler-derived facts for explanation and debugging. |
 | `presolve help` | Show the commands installed by this release. |
 | `presolve version` | Show the installed release version. |

@@ -4,7 +4,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, Mutex,
 };
 use std::thread;
@@ -60,6 +60,62 @@ fn raw_http_request(port: u16, request: &str) -> String {
         thread::sleep(Duration::from_millis(25));
     }
     panic!("Node host did not accept a request on port {port}");
+}
+
+#[cfg(unix)]
+fn start_static_publication_server(
+    root: PathBuf,
+) -> (u16, Arc<AtomicBool>, thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let stop = Arc::new(AtomicBool::new(false));
+    let thread_stop = Arc::clone(&stop);
+    let handle = thread::spawn(move || {
+        while !thread_stop.load(Ordering::Relaxed) {
+            let Ok((mut stream, _)) = listener.accept() else {
+                thread::sleep(Duration::from_millis(5));
+                continue;
+            };
+            let mut request = [0_u8; 4096];
+            let count = stream.read(&mut request).unwrap_or(0);
+            let request = String::from_utf8_lossy(&request[..count]);
+            let path = request
+                .lines()
+                .next()
+                .and_then(|line| line.split_whitespace().nth(1))
+                .unwrap_or("/")
+                .split('?')
+                .next()
+                .unwrap_or("/");
+            let relative = if path == "/" {
+                PathBuf::from("routes/root/index.html")
+            } else {
+                PathBuf::from(path.trim_start_matches('/'))
+            };
+            let target = root.join(relative);
+            let (status, content_type, bytes) = match fs::read(&target) {
+                Ok(bytes) => {
+                    let content_type = match target.extension().and_then(|value| value.to_str()) {
+                        Some("html") => "text/html; charset=utf-8",
+                        Some("js" | "mjs") => "text/javascript; charset=utf-8",
+                        Some("json") => "application/json",
+                        Some("css") => "text/css; charset=utf-8",
+                        _ => "application/octet-stream",
+                    };
+                    ("200 OK", content_type, bytes)
+                }
+                Err(_) => ("404 Not Found", "text/plain", b"not found".to_vec()),
+            };
+            let response = format!(
+                "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                bytes.len()
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+            stream.write_all(&bytes).unwrap();
+        }
+    });
+    (port, stop, handle)
 }
 
 #[cfg(unix)]
@@ -190,7 +246,7 @@ const request = JSON.parse(readFileSync(0, "utf8"));
 writeFileSync("authority-ran", "yes");
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 13,
+  schemaVersion: 14,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
@@ -490,6 +546,7 @@ class Home extends Component {
 
   render() { return <button onClick={this.track}>Buy</button>; }
 }
+
 "#,
     )
     .unwrap();
@@ -519,6 +576,200 @@ class Home extends Component {
     let opaque = fs::read_to_string(root.join("dist/routes/root/opaque.runtime.json")).unwrap();
     assert!(opaque.contains("@acme/analytics"));
     assert!(opaque.contains("dist/track-purchase.js"));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn canonical_general_resource_bundles_and_activates_a_browser_endpoint() {
+    let root = project_root("general-resource");
+    let repository = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap();
+    let framework_types = repository.join("framework/packages/presolve/src/index.d.ts");
+    let authority_module = repository.join("packages/typescript-authority/src/index.js");
+    let package = root.join("node_modules/profile-service");
+    fs::create_dir_all(package.join("dist")).unwrap();
+    fs::write(
+        root.join("app/routes/index.tsx"),
+        r#"
+import { Component, resource, type Resource, type ResourceContext } from "presolve";
+import { loadProfile } from "profile-service";
+type ProfileError = { code: string };
+export class Home extends Component {
+  profile: Resource<string, ProfileError> = resource<string, ProfileError>(
+    async (context: ResourceContext) => loadProfile(context),
+  );
+  get profileName(): string | null { return this.profile.data; }
+  render() { return <main>{this.profileName}</main>; }
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("presolve.contract.json"),
+        r#"{"schema_version":1,"package":"profile-service","version":"1.0.0","integrity":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","exports":{"loadProfile":{"kind":"resource","type_signature":"(ResourceContext) -> Promise<string>","runtime_module":"dist/load-profile.js","resume_policy":"snapshot","resource_endpoint":{"execution_boundary":"shared","cancellation":"abort","resume":"snapshot"}}}}"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("dist/load-profile.js"),
+        r#"export async function loadProfile(context) {
+  if (context.signal.aborted) throw { code: "aborted" };
+  return "Ada";
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("index.d.ts"),
+        r#"import type { ResourceContext } from "presolve";
+export interface ProfileError { code: string; }
+export declare function loadProfile(context: ResourceContext): Promise<string>;
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("package.json"),
+        r#"{"name":"profile-service","version":"1.0.0","type":"module","types":"index.d.ts"}"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("tsconfig.json"),
+        format!(
+            r#"{{"compilerOptions":{{"noEmit":true,"strict":true,"jsx":"preserve","module":"NodeNext","moduleResolution":"NodeNext","paths":{{"presolve":["{}"]}}}}}}"#,
+            framework_types.display()
+        ),
+    )
+    .unwrap();
+    let executable = root.join("node_modules/.bin/presolve-typescript-authority");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(
+        &executable,
+        format!(
+            r#"#!/usr/bin/env node
+import {{ analyzeV2Authoring }} from "{}";
+import {{ readFileSync }} from "node:fs";
+process.stdout.write(JSON.stringify(await analyzeV2Authoring(JSON.parse(readFileSync(0, "utf8")))));
+"#,
+            authority_module.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+    std::os::unix::fs::symlink(
+        repository.join("packages/vite/node_modules/vite"),
+        root.join("node_modules/vite"),
+    )
+    .unwrap();
+
+    let check = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let build = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let resources: serde_json::Value = serde_json::from_slice(
+        &fs::read(root.join("dist/routes/root/resources.runtime.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(resources["schema_version"], 4);
+    assert_eq!(resources["declarations"].as_array().unwrap().len(), 1);
+    assert!(resources["server_bootstraps"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    let runtime_location = resources["declarations"][0]["endpoint"]["runtime_location"]
+        .as_str()
+        .unwrap();
+    assert!(runtime_location.starts_with("/presolve.resource."));
+    assert!(runtime_location.ends_with(".js"));
+    let bundle_path = root
+        .join("dist")
+        .join(runtime_location.trim_start_matches('/'));
+    let bundle = fs::read(&bundle_path).unwrap();
+    assert!(String::from_utf8_lossy(&bundle).contains("Ada"));
+    let page_path = root.join("dist/routes/root/index.html");
+    let page = fs::read_to_string(&page_path).unwrap();
+    assert!(!page.contains("@resource"));
+    let probe = page.replace(
+        "</body>",
+        r#"<script>
+const resourceDeadline = Date.now() + 4000;
+const resourceWait = setInterval(() => {
+  const runtime = window.__PRESOLVE__;
+  const resource = runtime?.resources?.find((record) => record.id.includes("resource:profile"));
+  if (resource?.state === "ready" && document.querySelector("main")?.textContent === "Ada") {
+    clearInterval(resourceWait);
+    document.body.insertAdjacentHTML("beforeend", "<div>PRESOLVE_GENERAL_RESOURCE_BROWSER_TEST_PASS</div>");
+  } else if (Date.now() > resourceDeadline) {
+    clearInterval(resourceWait);
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      `<div>PRESOLVE_GENERAL_RESOURCE_BROWSER_TEST_FAIL:${JSON.stringify({ resource, diagnostics: runtime?.diagnostics ?? [] })}</div>`,
+    );
+  }
+}, 20);
+</script></body>"#,
+    );
+    fs::write(&page_path, probe).unwrap();
+
+    let (port, stop, server) = start_static_publication_server(root.join("dist"));
+    let profile = root.join(".presolve/chrome-general-resource-profile");
+    fs::create_dir_all(&profile).unwrap();
+    let mut chrome_arguments = vec![
+        "--headless=new".to_string(),
+        "--disable-gpu".to_string(),
+        "--no-first-run".to_string(),
+        "--disable-background-networking".to_string(),
+        "--disable-component-update".to_string(),
+        "--disable-default-apps".to_string(),
+        "--disable-extensions".to_string(),
+        "--disable-sync".to_string(),
+        "--virtual-time-budget=5000".to_string(),
+        "--dump-dom".to_string(),
+        format!("--user-data-dir={}", profile.display()),
+        format!("http://127.0.0.1:{port}/"),
+    ];
+    if std::env::var_os("CI").is_some() {
+        chrome_arguments.insert(0, "--no-sandbox".to_string());
+        chrome_arguments.insert(1, "--disable-dev-shm-usage".to_string());
+    }
+    let chrome = run_chrome_with_timeout(chrome_bin(), &chrome_arguments, Duration::from_secs(20));
+    assert!(
+        String::from_utf8_lossy(&chrome.stdout)
+            .contains("PRESOLVE_GENERAL_RESOURCE_BROWSER_TEST_PASS"),
+        "browser Resource probe failed\nstatus: {}\nstdout: {}\nstderr: {}",
+        chrome.status,
+        String::from_utf8_lossy(&chrome.stdout),
+        String::from_utf8_lossy(&chrome.stderr)
+    );
+    stop.store(true, Ordering::Relaxed);
+    let _ = TcpStream::connect(("127.0.0.1", port));
+    server.join().unwrap();
+
+    let second = Command::new(env!("CARGO_BIN_EXE_presolve"))
+        .arg("build")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(second.status.success());
+    assert_eq!(bundle, fs::read(bundle_path).unwrap());
+    assert_eq!(publication_stage_count(&root), 1);
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -2080,7 +2331,7 @@ import { readFileSync } from "node:fs";
 const request = JSON.parse(readFileSync(0, "utf8"));
 const identity = name => ({ name, flags: 32, declarationModules: ["presolve"] });
 process.stdout.write(JSON.stringify({
-  schemaVersion: 13,
+  schemaVersion: 14,
   diagnostics: [],
   components: request.components.map(site => ({ id: site.id, identity: identity("Component") })),
   states: request.states.map(site => ({ id: site.id, identity: identity("state") })),
