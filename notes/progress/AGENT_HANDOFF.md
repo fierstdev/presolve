@@ -561,3 +561,38 @@ main, require hosted CI and release-dry-run success, tag and publish beta.26
 through GitHub Actions, prove the exact public scaffold, then update and deploy
 Presolve.dev. Continue afterward with canonical general-purpose
 Resource/package authoring and the final hardening matrix.
+
+## Beta.26 publication and Presolve.dev adoption
+
+Beta.26 is public from annotated tag `v0.2.0-beta.26`. Hosted main CI
+`31354393589`, hosted release dry run `31354393619`, and Publish beta
+`31355495021` succeeded. The action published every npm/compiler/native-CLI
+package, all Rust crates, VS Code prerelease, and the GitHub prerelease.
+Registry resolution confirms exact beta.26 versions for the creator, framework,
+CLI, TypeScript authority, compiler WASM, language service, LSP, testing, Vite,
+and Darwin arm64 native CLI.
+
+An exact public clean-room scaffold installed, checked, built, prepared its
+Cloudflare publication, and produced no diagnostics from `presolve explain`.
+Real-browser acceptance proves the canonical counter as `0 -> 1`, its derived
+value as `1 -> 2`, and no runtime warnings or errors.
+
+Presolve.dev commit `66482da` updates every current release surface to beta.26
+and replaces obsolete handoff-only documentation with the shipped schema-v3
+Node execution model. The guides now cover route-owned loader Resources,
+Form-bound server actions, package capabilities, codecs, caching, cancellation,
+bootstrap, generated registries, and the static Cloudflare boundary. All 38
+source checks and the production build pass.
+
+Local and production mobile browser proof at 390 by 844 verifies no horizontal
+overflow, contained code samples, an opaque full-width menu that closes on
+navigation, the official versioned favicons, title, canonical root URL,
+content-addressed CSS on first and return visits, and a working counter on both
+visits with zero diagnostics. Cloudflare Worker version
+`f6cb4520-eeb8-4450-b29b-22cc202a23b9` serves release SHA-256
+`9e77cddbb884be730bfd914e36db7300abd408290ad428b9f2ac8dc5a5c4ec2a`.
+The root, stylesheet, SVG favicon, and PNG mark return HTTP 200.
+
+Full-beta completion is 96%. Continue with the authored canonical
+general-purpose Resource/package authoring gate, then complete the final
+compatibility, product, diagnostic, determinism, and release hardening matrix.
