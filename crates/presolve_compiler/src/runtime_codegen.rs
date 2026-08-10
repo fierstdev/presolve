@@ -19,9 +19,9 @@ const RUNTIME_STUB: &str = r#"(() => {
   const ACTION_MANIFEST_SCHEMA_VERSION = 2;
   const FORMS_MANIFEST_SCHEMA_VERSION = 3;
   const LEGACY_MANIFEST_SCHEMA_VERSION = 1;
-  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 12;
+  const SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 13;
   const SUPPORTED_EFFECT_ARTIFACT_SCHEMA_VERSION = __EZ_EFFECT_SCHEMA_VERSION__;
-  const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 2;
+  const SUPPORTED_CONTEXT_ARTIFACT_SCHEMA_VERSION = 3;
   const SUPPORTED_COMPONENT_ARTIFACT_SCHEMA_VERSION = __EZ_COMPONENT_SCHEMA_VERSION__;
   const LEGACY_COMPONENT_ARTIFACT_SCHEMA_VERSION = 2;
   const SUPPORTED_FORMS_ARTIFACT_SCHEMA_VERSION = 7;
@@ -3507,7 +3507,7 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     if (operand?.kind === "constant") {
-      return operand.value;
+      return computedConstantValue(operand.value);
     }
 
     if (operand?.kind === "storage") {
@@ -3515,6 +3515,37 @@ const RUNTIME_STUB: &str = r#"(() => {
     }
 
     return undefined;
+  }
+
+  function computedConstantValue(constant) {
+    switch (constant?.value_type) {
+      case "null":
+        return null;
+      case "boolean":
+        if (typeof constant.value !== "boolean") throw new PresolveBootError("PSR_INVALID_COMPUTED_ARTIFACT");
+        return constant.value;
+      case "number": {
+        if (typeof constant.value !== "string") throw new PresolveBootError("PSR_INVALID_COMPUTED_ARTIFACT");
+        const value = Number(constant.value);
+        if (!Number.isFinite(value)) throw new PresolveBootError("PSR_INVALID_COMPUTED_ARTIFACT");
+        return value;
+      }
+      case "string":
+        if (typeof constant.value !== "string") throw new PresolveBootError("PSR_INVALID_COMPUTED_ARTIFACT");
+        return constant.value;
+      case "array":
+        if (!Array.isArray(constant.value)) throw new PresolveBootError("PSR_INVALID_COMPUTED_ARTIFACT");
+        return constant.value.map(computedConstantValue);
+      case "object":
+        if (constant.value === null || typeof constant.value !== "object" || Array.isArray(constant.value)) {
+          throw new PresolveBootError("PSR_INVALID_COMPUTED_ARTIFACT");
+        }
+        return Object.fromEntries(
+          Object.entries(constant.value).map(([key, value]) => [key, computedConstantValue(value)])
+        );
+      default:
+        throw new PresolveBootError("PSR_INVALID_COMPUTED_ARTIFACT");
+    }
   }
 
   function computedBinary(operation, left, right) {
@@ -3554,7 +3585,7 @@ const RUNTIME_STUB: &str = r#"(() => {
 
   function executePureProgramInstruction(store, values, instruction, subject) {
     if (instruction.kind === "constant") {
-      values.set(instruction.result, instruction.value);
+      values.set(instruction.result, computedConstantValue(instruction.value));
       return true;
     }
 
@@ -7059,7 +7090,7 @@ mod tests {
         assert!(runtime.contains("contextSlots: new Map()"));
         assert!(runtime.contains("RUNTIME_VERSION = \"0.0.0\""));
         assert!(runtime.contains("SUPPORTED_SCHEMA_VERSION = 5"));
-        assert!(runtime.contains("SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 12"));
+        assert!(runtime.contains("SUPPORTED_COMPUTED_ARTIFACT_SCHEMA_VERSION = 13"));
         assert!(runtime.contains("instruction.kind === \"load-resource\""));
         assert!(runtime.contains("resourceInvalidationsByDeclaration"));
         assert!(runtime.contains("case \"abs\""));

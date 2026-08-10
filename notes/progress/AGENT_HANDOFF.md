@@ -529,3 +529,35 @@ candidate to public main, require hosted CI and release-dry-run success, publish
 beta.25 exclusively through GitHub Actions, prove an exact public scaffold,
 then update and deploy Presolve.dev. After publication, continue the canonical
 general-purpose Resource/package authoring gate and final hardening matrix.
+
+## Beta.25 publication and beta.26 typed-constant repair
+
+Beta.25 published successfully through the GitHub Actions release workflow.
+The exact public creator and all package families resolved at beta.25, and a
+clean registry-created project passed check, production build, and Cloudflare
+deployment preparation. Its browser acceptance exposed a genuine release
+regression: Computed addition received preserved number lexemes as JavaScript
+strings, so the generated `this.count + 1` example produced `01` and `11`.
+
+Beta.26 fixes the shared compiler boundary. Computed schema v13, Effect schema
+v8, and Context schema v3 now emit recursively tagged pure-program constants;
+the single runtime evaluator decodes them before execution. State and resume
+serialization remain unchanged. Unit evidence distinguishes numeric, string,
+array, and object constants. Real-browser evidence proves the generated counter
+as `0 -> 1`, its derived value as `1 -> 2`, zero diagnostics, and the complete
+structural Effect lifecycle after the shared artifact change.
+
+An uninterrupted beta.26 `pnpm release:check` passes 665 compiler tests, all 59
+browser tests, all CLI/package/TypeScript checks, 91 public documentation files,
+the packed clean-room scaffold, production determinism and fixed budgets, crate
+packaging, and VSIX packaging. The audited runtime is 316,184 bytes. Framework,
+CLI, and creator hashes are respectively
+`840129d70fcd146b0e7f37807055e45626c6ab7cfefd9f2c579ccfd9dd3f9521`,
+`02233a87f0da435e97c90ee405c76e948d457d8cab82405d8a056f0d04088481`, and
+`872b0d0abacaea3f6b059242555ac4b1eb6d062cef30eb9f504db555d23e5fc2`.
+
+Full-beta completion is 92%. Next: commit and fast-forward beta.26 to public
+main, require hosted CI and release-dry-run success, tag and publish beta.26
+through GitHub Actions, prove the exact public scaffold, then update and deploy
+Presolve.dev. Continue afterward with canonical general-purpose
+Resource/package authoring and the final hardening matrix.

@@ -4541,7 +4541,7 @@ fn build_command_writes_compiler_generated_computed_runtime_metadata() {
     let label = format!("{component}/computed:label");
     let visible = format!("{component}/computed:visible");
 
-    assert_eq!(artifact["schema_version"], 12);
+    assert_eq!(artifact["schema_version"], 13);
     assert_eq!(
         artifact["evaluation_order"],
         serde_json::json!([label, visible])
@@ -4641,7 +4641,7 @@ class PackageComputed extends Component {
         .iter()
         .find(|instruction| instruction["kind"] == "pure-package-call")
         .expect("pure package instruction");
-    assert_eq!(artifact["schema_version"], 12);
+    assert_eq!(artifact["schema_version"], 13);
     assert_eq!(instruction["kind"], "pure-package-call");
     assert_eq!(instruction["package"], "value-kit");
     assert_eq!(
@@ -4943,7 +4943,7 @@ class ContextRuntime extends Component {
     let artifact = std::fs::read_to_string(out_dir.join("context.runtime.json"))
         .expect("failed to read Context runtime artifact");
     let artifact: serde_json::Value = serde_json::from_str(&artifact).expect("artifact JSON");
-    assert_eq!(artifact["schema_version"], 2);
+    assert_eq!(artifact["schema_version"], 3);
     assert_eq!(artifact["sources"].as_array().map(Vec::len), Some(1));
     assert_eq!(artifact["consumers"].as_array().map(Vec::len), Some(1));
     assert!(artifact["sources"][0]["program"]["instructions"]

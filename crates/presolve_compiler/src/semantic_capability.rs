@@ -378,7 +378,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "exactly one compiler-supported numeric operand",
                 "inherits the operand's compiler-derived dependency set",
                 "serializable numeric result; no package or independent resume record",
-                "runtime-computed schema v12, including unary floor/ceil/round operations",
+                "runtime-computed schema v13, retaining unary floor/ceil/round operations and typed constants",
                 "runtime_browser::registered_math_rounding_executes_from_compiler_generated_runtime_programs",
             ),
             deferred(
@@ -400,7 +400,7 @@ pub fn build_semantic_capability_registry() -> SemanticCapabilityRegistry {
                 "one exactly imported semantic-package resource endpoint, Resource<Data, Error> field type, exact host-supplied runtime module location, and client/shared execution boundary; server/shared endpoints are admitted only through a route-loader handoff",
                 "one compiler-owned cold activation per planned component instance; direct same-owner @computed() .data/.error/.state reads and terminal invalidation are admitted, while inputs and retry remain deferred",
                 "snapshot policy restores validated state/data/error triples before dependent Computeds without importing the endpoint; reload has no snapshot slot and starts one post-restore generation; malformed, pending, or cancelled snapshots cold-fallback",
-                "runtime resource schema v4 plus runtime-computed schema v12, embedded page artifacts, exact resume slots/codecs, server bootstrap descriptors, and exact runtime module coordinate",
+                "runtime resource schema v4 plus runtime-computed schema v13, embedded page artifacts, exact resume slots/codecs, server bootstrap descriptors, and exact runtime module coordinate",
                 "runtime_browser::host_bound_resource_endpoint_activates_in_a_real_browser",
             ),
             admitted(

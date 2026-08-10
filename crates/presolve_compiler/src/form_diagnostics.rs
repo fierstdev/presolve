@@ -382,7 +382,7 @@ mod tests {
         assert_eq!(RUNTIME_COMPONENT_ARTIFACT_SCHEMA_VERSION, 20);
         assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 7);
         assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 5);
-        assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
+        assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 3);
         assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
     }
 }

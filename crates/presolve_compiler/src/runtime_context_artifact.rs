@@ -11,7 +11,7 @@ use crate::{
     RuntimeContextEvaluationBatch, RuntimeContextSourceKind, RuntimeContextSourceRecord,
 };
 
-pub const RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION: u32 = 2;
+pub const RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION: u32 = 3;
 
 /// Separate schema-v1 artifact for compiler-owned Context runtime metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

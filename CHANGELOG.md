@@ -8,6 +8,24 @@ not publish or imply a release.
 
 ## Unreleased
 
+## 0.2.0-beta.26 - 2026-08-09
+
+### Changed
+
+- Computed schema v13, Effect schema v8, and Context schema v3 now preserve
+  shared pure-program constant value kinds recursively. Numeric and string
+  literals retain distinct compiler-issued representations without changing
+  serialized State or resume contracts.
+
+### Fixed
+
+- Computed addition now executes authored TypeScript semantics for numeric
+  literals. Expressions such as `this.count + 1` produce `1`, then `2`, rather
+  than concatenating serialized number lexemes as `"01"`, then `"11"`.
+- The canonical generated counter is covered through compiler artifact,
+  production build, and browser interaction evidence so the shipped scaffold
+  cannot regress independently of the computed runtime.
+
 ## 0.2.0-beta.25 - 2026-08-08
 
 ### Added

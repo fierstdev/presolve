@@ -50,9 +50,9 @@ assert.match(readFileSync(join(target, ".env.example"), "utf8"), /PRESOLVE_PUBLI
 assert.match(readFileSync(join(target, ".gitignore"), "utf8"), /!\.env\.example/);
 const manifest = JSON.parse(readFileSync(join(target, "package.json"), "utf8"));
 assert.equal(manifest.packageManager, "pnpm@11.17.0");
-assert.equal(manifest.dependencies.presolve, "npm:@presolve/framework@0.2.0-beta.25");
-assert.equal(manifest.devDependencies["@presolve/cli"], "0.2.0-beta.25");
-assert.equal(manifest.devDependencies["@presolve/typescript-authority"], "0.2.0-beta.25");
+assert.equal(manifest.dependencies.presolve, "npm:@presolve/framework@0.2.0-beta.26");
+assert.equal(manifest.devDependencies["@presolve/cli"], "0.2.0-beta.26");
+assert.equal(manifest.devDependencies["@presolve/typescript-authority"], "0.2.0-beta.26");
 assert.equal(manifest.devDependencies.vite, "^7.0.0");
 const workspace = readFileSync(join(target, "pnpm-workspace.yaml"), "utf8");
 assert.match(workspace, /allowBuilds:/);

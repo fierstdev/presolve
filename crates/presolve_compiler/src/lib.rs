@@ -880,10 +880,10 @@ pub use runtime_computed::{
 };
 pub use runtime_computed_artifact::{
     build_runtime_computed_artifact, runtime_computed_artifact_json, RuntimeComputedArtifact,
-    RuntimeComputedArtifactDirtyFlag, RuntimeComputedArtifactEvaluation,
-    RuntimeComputedArtifactInstruction, RuntimeComputedArtifactInvalidation,
-    RuntimeComputedArtifactResourceInvalidation, RuntimeComputedArtifactSerialization,
-    RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
+    RuntimeComputedArtifactConstant, RuntimeComputedArtifactDirtyFlag,
+    RuntimeComputedArtifactEvaluation, RuntimeComputedArtifactInstruction,
+    RuntimeComputedArtifactInvalidation, RuntimeComputedArtifactResourceInvalidation,
+    RuntimeComputedArtifactSerialization, RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
 };
 pub use runtime_context::{
     build_runtime_context_registry, validate_runtime_context_registry,

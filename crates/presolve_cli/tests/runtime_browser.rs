@@ -3836,7 +3836,7 @@ const waitFor = (predicate, label) => new Promise((resolve, reject) => {
     fail("runtime structural regions were not keyed by compiler IDs");
   }
   const occurrenceCount = artifact.structural_programs.reduce((count, program) => count + program.template_occurrences.length, 0);
-  if (expectStructuralMaterialization && (effectArtifact.schema_version !== 7 || effectArtifact.structural_templates.length === 0
+  if (expectStructuralMaterialization && (effectArtifact.schema_version !== 8 || effectArtifact.structural_templates.length === 0
     || !effectArtifact.structural_templates.every((record) => typeof record.effect_instance === "string"
       && typeof record.component === "string" && typeof record.template_instance === "string"))) {
     fail("structural Effect templates were not published as schema-v7 compiler records");

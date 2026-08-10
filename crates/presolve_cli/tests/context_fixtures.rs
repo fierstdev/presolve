@@ -244,7 +244,7 @@ fn context_compiler_fixture_covers_runtime_registry_and_update_artifact() {
     );
 
     let artifact = build_runtime_context_artifact(&model, &optimized);
-    assert_eq!(artifact.schema_version, 2);
+    assert_eq!(artifact.schema_version, 3);
     let increment = artifact
         .action_updates
         .iter()
@@ -733,7 +733,7 @@ fn phase_g_diagnostic_fixtures_are_canonically_validated() {
 #[test]
 fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
     assert_eq!(SEMANTIC_GRAPH_SCHEMA_VERSION, 6);
-    assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 2);
+    assert_eq!(RUNTIME_CONTEXT_ARTIFACT_SCHEMA_VERSION, 3);
     assert_eq!(TEMPLATE_MANIFEST_SCHEMA_VERSION, 5);
     assert_eq!(RESUME_MANIFEST_SCHEMA_VERSION, 7);
 
@@ -748,7 +748,7 @@ fn phase_g_freezes_schema_versions_runtime_order_and_no_discovery_contract() {
     assert_eq!(build_semantic_graph(&model).schema_version, 6);
     assert_eq!(
         build_runtime_context_artifact(&model, &optimized).schema_version,
-        2
+        3
     );
     let resume = build_resume_manifest(&model);
     assert_eq!(resume.schema_version, 7);

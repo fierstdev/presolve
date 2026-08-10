@@ -8,7 +8,7 @@ use crate::{
     SemanticId, SerializableValue, SerializationCompatibility,
 };
 
-pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 12;
+pub const RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION: u32 = 13;
 
 /// Versioned runtime metadata and executable programs emitted from canonical IR.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -71,9 +71,30 @@ pub struct RuntimeComputedArtifactProgram {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum RuntimeComputedArtifactOperand {
-    Value { value: String },
-    Constant { value: SerializableValue },
-    Storage { storage: String },
+    Value {
+        value: String,
+    },
+    Constant {
+        value: RuntimeComputedArtifactConstant,
+    },
+    Storage {
+        storage: String,
+    },
+}
+
+/// A recursively typed compiler constant. `SerializableValue` intentionally
+/// preserves authored number lexemes as strings, so the runtime artifact must
+/// retain the value kind instead of asking JavaScript to guess whether `"1"`
+/// was authored as a number or a string.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "value_type", content = "value", rename_all = "kebab-case")]
+pub enum RuntimeComputedArtifactConstant {
+    Null,
+    Boolean(bool),
+    Number(String),
+    String(String),
+    Array(Vec<RuntimeComputedArtifactConstant>),
+    Object(BTreeMap<String, RuntimeComputedArtifactConstant>),
 }
 
 /// One supported compiler-lowered computed instruction.
@@ -82,7 +103,7 @@ pub enum RuntimeComputedArtifactOperand {
 pub enum RuntimeComputedArtifactInstruction {
     Constant {
         result: String,
-        value: SerializableValue,
+        value: RuntimeComputedArtifactConstant,
     },
     LoadState {
         result: String,
@@ -546,14 +567,39 @@ fn runtime_operand(operand: &IrOperand) -> RuntimeComputedArtifactOperand {
     }
 }
 
-fn runtime_constant(constant: &IrConstant) -> SerializableValue {
+fn runtime_constant(constant: &IrConstant) -> RuntimeComputedArtifactConstant {
     match constant {
-        IrConstant::Null => SerializableValue::Null,
-        IrConstant::Boolean(value) => SerializableValue::Boolean(*value),
-        IrConstant::Number(value) => SerializableValue::Number(value.clone()),
-        IrConstant::String(value) => SerializableValue::String(value.clone()),
-        IrConstant::Array(value) => SerializableValue::Array(value.clone()),
-        IrConstant::Object(value) => SerializableValue::Object(value.clone()),
+        IrConstant::Null => RuntimeComputedArtifactConstant::Null,
+        IrConstant::Boolean(value) => RuntimeComputedArtifactConstant::Boolean(*value),
+        IrConstant::Number(value) => RuntimeComputedArtifactConstant::Number(value.clone()),
+        IrConstant::String(value) => RuntimeComputedArtifactConstant::String(value.clone()),
+        IrConstant::Array(value) => RuntimeComputedArtifactConstant::Array(
+            value.iter().map(runtime_serializable_constant).collect(),
+        ),
+        IrConstant::Object(value) => RuntimeComputedArtifactConstant::Object(
+            value
+                .iter()
+                .map(|(key, value)| (key.clone(), runtime_serializable_constant(value)))
+                .collect(),
+        ),
+    }
+}
+
+fn runtime_serializable_constant(value: &SerializableValue) -> RuntimeComputedArtifactConstant {
+    match value {
+        SerializableValue::Null => RuntimeComputedArtifactConstant::Null,
+        SerializableValue::Boolean(value) => RuntimeComputedArtifactConstant::Boolean(*value),
+        SerializableValue::Number(value) => RuntimeComputedArtifactConstant::Number(value.clone()),
+        SerializableValue::String(value) => RuntimeComputedArtifactConstant::String(value.clone()),
+        SerializableValue::Array(value) => RuntimeComputedArtifactConstant::Array(
+            value.iter().map(runtime_serializable_constant).collect(),
+        ),
+        SerializableValue::Object(value) => RuntimeComputedArtifactConstant::Object(
+            value
+                .iter()
+                .map(|(key, value)| (key.clone(), runtime_serializable_constant(value)))
+                .collect(),
+        ),
     }
 }
 
@@ -611,11 +657,54 @@ const fn serialization(
 
 #[cfg(test)]
 mod tests {
-    use super::RuntimeComputedArtifactInstruction;
+    use super::{runtime_constant, RuntimeComputedArtifactInstruction};
     use crate::{
         build_application_semantic_model, build_runtime_computed_artifact, lower_components_to_ir,
-        runtime_computed_artifact_json, RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
+        runtime_computed_artifact_json, IrConstant, SerializableValue,
+        RUNTIME_COMPUTED_ARTIFACT_SCHEMA_VERSION,
     };
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn preserves_number_and_string_constant_kinds_recursively() {
+        let number = serde_json::to_value(runtime_constant(&IrConstant::Number("1".into())))
+            .expect("number constant JSON");
+        let string = serde_json::to_value(runtime_constant(&IrConstant::String("1".into())))
+            .expect("string constant JSON");
+        let nested =
+            serde_json::to_value(runtime_constant(&IrConstant::Object(BTreeMap::from([(
+                "values".into(),
+                SerializableValue::Array(vec![
+                    SerializableValue::Number("2".into()),
+                    SerializableValue::String("2".into()),
+                ]),
+            )]))))
+            .expect("nested constant JSON");
+
+        assert_eq!(
+            number,
+            serde_json::json!({"value_type": "number", "value": "1"})
+        );
+        assert_eq!(
+            string,
+            serde_json::json!({"value_type": "string", "value": "1"})
+        );
+        assert_eq!(
+            nested,
+            serde_json::json!({
+                "value_type": "object",
+                "value": {
+                    "values": {
+                        "value_type": "array",
+                        "value": [
+                            {"value_type": "number", "value": "2"},
+                            {"value_type": "string", "value": "2"}
+                        ]
+                    }
+                }
+            })
+        );
+    }
 
     #[test]
     fn emits_deterministic_runtime_programs_from_canonical_ir() {
@@ -678,7 +767,7 @@ class RuntimeComputedArtifact extends Component {
         let second = runtime_computed_artifact_json(&build_runtime_computed_artifact(&model, &ir));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 12);
+        assert_eq!(json["schema_version"], 13);
         assert_eq!(
             json["evaluations"][0]["program"]["instructions"][0]["kind"],
             "load-state"
@@ -686,6 +775,10 @@ class RuntimeComputedArtifact extends Component {
         assert_eq!(
             json["evaluations"][1]["program"]["instructions"][0]["kind"],
             "load-computed"
+        );
+        assert_eq!(
+            json["evaluations"][0]["program"]["instructions"][1]["value"],
+            serde_json::json!({"value_type": "number", "value": "2"})
         );
     }
 

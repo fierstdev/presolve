@@ -12,7 +12,7 @@ use crate::{
     IrInstruction, IrInstructionKind, IrValueId, RuntimeEffectRecord, EFFECT_CAPABILITY_REGISTRY,
 };
 
-pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 7;
+pub const RUNTIME_EFFECT_ARTIFACT_SCHEMA_VERSION: u32 = 8;
 
 /// Versioned compiler-generated runtime metadata and effect programs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -552,7 +552,7 @@ class RuntimeEffectArtifact extends Component {
         ));
         assert_eq!(first, second);
         let json: serde_json::Value = serde_json::from_str(&first).expect("artifact JSON");
-        assert_eq!(json["schema_version"], 7);
+        assert_eq!(json["schema_version"], 8);
         assert_eq!(
             json["effects"][0]["program"]["instructions"][2]["kind"],
             "capability-call"
