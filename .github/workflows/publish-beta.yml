@@ -75,6 +75,26 @@ jobs:
             done
           done
 
+  verify-npm-publisher:
+    name: Verify npm publisher
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.5.0
+          registry-url: https://registry.npmjs.org
+      - name: Verify npm publisher identity
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          publisher="$(npm whoami --registry=https://registry.npmjs.org)"
+          test -n "$publisher"
+          echo "Authenticated npm publisher: $publisher"
+          npm ping --registry=https://registry.npmjs.org
+
   native-cli:
     name: Build ${{ matrix.package }}
     needs: verify
@@ -124,7 +144,7 @@ jobs:
 
   publish-npm:
     name: Publish npm packages
-    needs: [native-cli, publish-crates]
+    needs: [native-cli, publish-crates, verify-npm-publisher]
     runs-on: ubuntu-latest
     environment:
       name: npm
