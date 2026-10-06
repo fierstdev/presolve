@@ -15,6 +15,10 @@ pub enum RuntimeError {
     #[error("failed to configure WASI host interfaces: {0}")]
     WasiLinker(#[source] wasmtime::Error),
 
+    /// An `EdgeZero` capability interface could not be registered.
+    #[error("failed to configure EdgeZero capability interfaces: {0}")]
+    CapabilityLinker(#[source] wasmtime::Error),
+
     /// The supplied bytes are not a valid executable component.
     #[error("failed to compile WebAssembly Component: {0}")]
     ComponentCompile(#[source] wasmtime::Error),

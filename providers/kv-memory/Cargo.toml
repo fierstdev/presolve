@@ -1,22 +1,15 @@
 [package]
-name = "edgezero-runtime"
+name = "edgezero-provider-kv-memory"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 rust-version.workspace = true
+publish = false
 
 [dependencies]
-edgezero-core.workspace = true
 edgezero-provider-sdk.workspace = true
-thiserror.workspace = true
-wasmtime.workspace = true
-wasmtime-wasi.workspace = true
-
-[dev-dependencies]
-anyhow.workspace = true
-edgezero-provider-kv-memory.workspace = true
 
 [lints]
 workspace = true

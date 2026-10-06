@@ -1,0 +1,17 @@
+contract_version = "0.1"
+
+[application]
+name = "kv-demo"
+version = "0.0.1"
+description = "EdgeZero key/value capability example"
+
+[[capabilities]]
+interface = "edgezero:kv/store"
+version = "^0.1"
+
+[resources]
+memory_mib = 64
+cpu_millis = 100
+
+[network]
+outbound = "deny"

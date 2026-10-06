@@ -465,10 +465,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "edgezero-provider-kv-memory"
+version = "0.0.1"
+dependencies = [
+ "edgezero-provider-sdk",
+]
+
+[[package]]
 name = "edgezero-provider-sdk"
 version = "0.0.1"
 dependencies = [
- "edgezero-core",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -484,6 +491,8 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "edgezero-core",
+ "edgezero-provider-kv-memory",
+ "edgezero-provider-sdk",
  "thiserror 2.0.21",
  "wasmtime",
  "wasmtime-wasi",

@@ -1,8 +1,9 @@
-use std::{thread, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 
+use edgezero_provider_sdk::{KeyValueProvider, UnavailableKeyValueProvider};
 use wasmtime::{
     Config, Engine, Store, Trap,
-    component::{Component, Linker},
+    component::{Component, HasSelf, Linker},
 };
 
 use crate::{
@@ -10,26 +11,86 @@ use crate::{
     state::RuntimeState,
 };
 
+/// Builder for an `EdgeZero` runtime.
+///
+/// Providers are configured on the runtime rather than on application
+/// components. This allows the same component artifact to execute against
+/// different environment-specific implementations.
+pub struct RuntimeBuilder {
+    limits: RuntimeLimits,
+    key_value_provider: Arc<dyn KeyValueProvider>,
+}
+
+impl RuntimeBuilder {
+    /// Creates a runtime builder with default limits and unavailable optional
+    /// capabilities.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            limits: RuntimeLimits::default(),
+            key_value_provider: Arc::new(UnavailableKeyValueProvider),
+        }
+    }
+
+    /// Sets the runtime resource limits.
+    #[must_use]
+    pub fn limits(mut self, limits: RuntimeLimits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Supplies the provider for `edgezero:kv/store`.
+    #[must_use]
+    pub fn key_value_provider(mut self, provider: Arc<dyn KeyValueProvider>) -> Self {
+        self.key_value_provider = provider;
+        self
+    }
+
+    /// Builds the runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying Wasmtime runtime, linker, capability
+    /// interfaces, or epoch ticker cannot be initialized.
+    pub fn build(self) -> Result<Runtime, RuntimeError> {
+        Runtime::build(self.limits, self.key_value_provider)
+    }
+}
+
+impl Default for RuntimeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// `EdgeZero` WebAssembly Component runtime.
 ///
-/// A runtime owns the Wasmtime engine, host-side interface linker, and default
-/// execution policy. Individual application invocations receive separate
-/// stores and state.
+/// A runtime owns the Wasmtime engine, host-side interface linker, configured
+/// capability providers, and default execution policy. Individual application
+/// invocations receive separate stores and state.
 pub struct Runtime {
     engine: Engine,
     linker: Linker<RuntimeState>,
     limits: RuntimeLimits,
+    key_value_provider: Arc<dyn KeyValueProvider>,
 }
 
 impl Runtime {
-    /// Creates an `EdgeZero` runtime with default resource limits.
+    /// Creates an `EdgeZero` runtime with default resource limits and no
+    /// configured optional capability providers.
     ///
     /// # Errors
     ///
     /// Returns an error if Wasmtime cannot initialize, the epoch ticker cannot
-    /// start, or the required WASI interfaces cannot be registered.
+    /// start, or required host interfaces cannot be registered.
     pub fn new() -> Result<Self, RuntimeError> {
-        Self::with_limits(RuntimeLimits::default())
+        Self::builder().build()
+    }
+
+    /// Creates a configurable runtime builder.
+    #[must_use]
+    pub fn builder() -> RuntimeBuilder {
+        RuntimeBuilder::new()
     }
 
     /// Creates an `EdgeZero` runtime with explicit resource limits.
@@ -37,27 +98,9 @@ impl Runtime {
     /// # Errors
     ///
     /// Returns an error if Wasmtime cannot initialize, the epoch ticker cannot
-    /// start, or the required WASI interfaces cannot be registered.
+    /// start, or required host interfaces cannot be registered.
     pub fn with_limits(limits: RuntimeLimits) -> Result<Self, RuntimeError> {
-        let mut config = Config::new();
-
-        config.wasm_component_model(true);
-        config.consume_fuel(true);
-        config.epoch_interruption(true);
-
-        let engine = Engine::new(&config).map_err(RuntimeError::Engine)?;
-
-        start_epoch_ticker(&engine)?;
-
-        let mut linker = Linker::new(&engine);
-
-        wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(RuntimeError::WasiLinker)?;
-
-        Ok(Self {
-            engine,
-            linker,
-            limits,
-        })
+        Self::builder().limits(limits).build()
     }
 
     /// Returns the host-enforced invocation limits.
@@ -85,7 +128,9 @@ impl Runtime {
     /// Executes the application's `run` export.
     ///
     /// A fresh Wasmtime store and host state are created for every invocation.
-    /// Fuel and epoch deadlines are therefore isolated between invocations.
+    /// Fuel, memory limits, and epoch deadlines are therefore isolated between
+    /// invocations. Capability provider implementations are shared through
+    /// thread-safe provider handles.
     ///
     /// # Errors
     ///
@@ -97,7 +142,10 @@ impl Runtime {
         application: &CompiledApplication,
         input: &str,
     ) -> Result<String, RuntimeError> {
-        let mut store = Store::new(&self.engine, RuntimeState::new(self.limits));
+        let mut store = Store::new(
+            &self.engine,
+            RuntimeState::new(self.limits, Arc::clone(&self.key_value_provider)),
+        );
 
         store.limiter(RuntimeState::limits_mut);
 
@@ -129,6 +177,38 @@ impl Runtime {
     pub fn run_bytes(&self, bytes: &[u8], input: &str) -> Result<String, RuntimeError> {
         let application = self.compile(bytes)?;
         self.run(&application, input)
+    }
+
+    fn build(
+        limits: RuntimeLimits,
+        key_value_provider: Arc<dyn KeyValueProvider>,
+    ) -> Result<Self, RuntimeError> {
+        let mut config = Config::new();
+
+        config.wasm_component_model(true);
+        config.consume_fuel(true);
+        config.epoch_interruption(true);
+
+        let engine = Engine::new(&config).map_err(RuntimeError::Engine)?;
+
+        start_epoch_ticker(&engine)?;
+
+        let mut linker = Linker::new(&engine);
+
+        wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(RuntimeError::WasiLinker)?;
+
+        crate::bindings::kv::edgezero::kv::store::add_to_linker::<_, HasSelf<_>>(
+            &mut linker,
+            |state| state,
+        )
+        .map_err(RuntimeError::CapabilityLinker)?;
+
+        Ok(Self {
+            engine,
+            linker,
+            limits,
+            key_value_provider,
+        })
     }
 }
 

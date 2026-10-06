@@ -10,10 +10,12 @@ members = [
     "crates/ez-provider-sdk",
     "crates/ez-node",
     "crates/ez-cli",
+    "providers/kv-memory",
 ]
 exclude = [
     "examples/hello",
     "examples/adversarial",
+    "examples/kv-demo",
 ]
 
 [workspace.package]
@@ -51,6 +53,8 @@ edgezero-bundle = { path = "crates/ez-bundle" }
 edgezero-policy = { path = "crates/ez-policy" }
 edgezero-resolver = { path = "crates/ez-resolver" }
 edgezero-provider-sdk = { path = "crates/ez-provider-sdk" }
+
+edgezero-provider-kv-memory = { path = "providers/kv-memory" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

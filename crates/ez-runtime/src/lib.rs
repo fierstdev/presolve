@@ -10,6 +10,7 @@
 
 mod application;
 mod bindings;
+mod capabilities;
 mod error;
 mod limits;
 mod runtime;
@@ -22,7 +23,7 @@ pub use limits::{
     DEFAULT_MAX_MEMORY_BYTES, DEFAULT_MAX_TABLE_ELEMENTS, DEFAULT_MAX_TABLES, EPOCH_TICK_INTERVAL,
     MIB, RuntimeLimits,
 };
-pub use runtime::Runtime;
+pub use runtime::{Runtime, RuntimeBuilder};
 
 #[cfg(test)]
 mod tests {

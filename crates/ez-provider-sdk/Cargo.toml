@@ -8,7 +8,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-edgezero-core.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true
