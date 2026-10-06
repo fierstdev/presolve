@@ -1,5 +1,7 @@
-use wasmtime::component::ResourceTable;
+use wasmtime::{ResourceLimiter, StoreLimits, component::ResourceTable};
 use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
+
+use crate::RuntimeLimits;
 
 /// Per-instance host state.
 ///
@@ -9,17 +11,23 @@ use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
 pub(crate) struct RuntimeState {
     table: ResourceTable,
     wasi: WasiCtx,
+    limits: StoreLimits,
 }
 
 impl RuntimeState {
     #[must_use]
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(runtime_limits: RuntimeLimits) -> Self {
         let mut builder = WasiCtx::builder();
 
         Self {
             table: ResourceTable::new(),
             wasi: builder.build(),
+            limits: runtime_limits.store_limits(),
         }
+    }
+
+    pub(crate) fn limits_mut(&mut self) -> &mut dyn ResourceLimiter {
+        &mut self.limits
     }
 }
 

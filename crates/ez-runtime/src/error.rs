@@ -15,9 +15,17 @@ pub enum RuntimeError {
     #[error("failed to compile WebAssembly Component: {0}")]
     ComponentCompile(#[source] wasmtime::Error),
 
+    /// Per-invocation host state could not be configured.
+    #[error("failed to configure EdgeZero application store: {0}")]
+    StoreConfiguration(#[source] wasmtime::Error),
+
     /// The component could not be instantiated.
     #[error("failed to instantiate EdgeZero application: {0}")]
     Instantiate(#[source] wasmtime::Error),
+
+    /// The component exhausted its deterministic execution budget.
+    #[error("EdgeZero application exhausted its execution fuel budget")]
+    FuelExhausted(#[source] wasmtime::Error),
 
     /// The component trapped or otherwise failed during invocation.
     #[error("EdgeZero application invocation failed: {0}")]
