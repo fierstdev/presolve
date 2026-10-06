@@ -1,0 +1,17 @@
+contract_version = "0.1"
+
+[application]
+name = "hello-edgezero"
+version = "0.0.1"
+description = "The first EdgeZero example application"
+
+[[capabilities]]
+interface = "wasi:http/incoming-handler"
+version = "^0.3"
+
+[resources]
+memory_mib = 64
+cpu_millis = 100
+
+[network]
+outbound = "deny"
