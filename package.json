@@ -1,0 +1,15 @@
+{
+  "name": "edgezero-workspace",
+  "version": "0.0.1",
+  "private": true,
+  "description": "EdgeZero universal software distribution platform",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@12.8.1",
+  "scripts": {
+    "build": "pnpm -r build",
+    "check": "pnpm -r check",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format"
+  }
+}

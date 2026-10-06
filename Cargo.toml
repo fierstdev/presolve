@@ -1,0 +1,49 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/ez-core",
+    "crates/ez-contract",
+    "crates/ez-runtime",
+    "crates/ez-bundle",
+    "crates/ez-policy",
+    "crates/ez-resolver",
+    "crates/ez-provider-sdk",
+    "crates/ez-node",
+    "crates/ez-cli",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/fierstdev/edgezero"
+homepage = "https://edgezero.dev"
+rust-version = "1.85"
+
+[workspace.dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "fmt",
+    "json",
+] }
+
+edgezero-core = { path = "crates/ez-core" }
+edgezero-contract = { path = "crates/ez-contract" }
+edgezero-runtime = { path = "crates/ez-runtime" }
+edgezero-bundle = { path = "crates/ez-bundle" }
+edgezero-policy = { path = "crates/ez-policy" }
+edgezero-resolver = { path = "crates/ez-resolver" }
+edgezero-provider-sdk = { path = "crates/ez-provider-sdk" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

@@ -1,0 +1,37 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Node
+node_modules/
+.pnpm-store/
+
+# TypeScript build output
+dist/
+build/
+coverage/
+
+# EdgeZero generated artifacts
+.edgezero/
+*.ez
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# IDE / editor
+.idea/
+.vscode/
+.zed/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Logs
+*.log
