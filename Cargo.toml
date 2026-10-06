@@ -11,6 +11,9 @@ members = [
     "crates/ez-node",
     "crates/ez-cli",
 ]
+exclude = [
+    "examples/hello",
+]
 
 [workspace.package]
 version = "0.0.1"

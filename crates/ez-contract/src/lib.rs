@@ -40,7 +40,7 @@ version = "0.0.1"
         assert_eq!(contract.contract_version(), CONTRACT_VERSION);
         assert_eq!(contract.application().name(), "hello-edgezero");
         assert_eq!(contract.application().version().to_string(), "0.0.1");
-        assert!(contract.capabilities().is_empty());
+        assert_eq!(contract.capabilities(), []);
         assert_eq!(contract.network().outbound(), OutboundNetworkMode::Deny);
     }
 
