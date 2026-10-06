@@ -9,6 +9,12 @@ rust-version.workspace = true
 
 [dependencies]
 edgezero-core.workspace = true
+thiserror.workspace = true
+wasmtime.workspace = true
+wasmtime-wasi.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
 
 [lints]
 workspace = true

@@ -40,6 +40,8 @@ tracing-subscriber = { version = "0.3", features = [
     "json",
 ] }
 uuid = { version = "1", features = ["v4"] }
+wasmtime = "=48.0.5"
+wasmtime-wasi = "=48.0.5"
 
 edgezero-core = { path = "crates/ez-core" }
 edgezero-contract = { path = "crates/ez-contract" }
