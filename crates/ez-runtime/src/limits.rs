@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use wasmtime::{StoreLimits, StoreLimitsBuilder};
 
 /// Number of bytes in one mebibyte.
@@ -21,6 +23,16 @@ pub const DEFAULT_MAX_TABLES: usize = 256;
 /// Default maximum number of elements in each table.
 pub const DEFAULT_MAX_TABLE_ELEMENTS: usize = 100_000;
 
+/// Default maximum wall-clock duration for active WebAssembly execution.
+pub const DEFAULT_EXECUTION_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Frequency at which the shared Wasmtime engine epoch advances.
+///
+/// Epoch deadlines are coarse-grained rather than precise wall-clock timers.
+/// An application may therefore execute somewhat beyond its requested timeout
+/// before reaching an epoch check.
+pub const EPOCH_TICK_INTERVAL: Duration = Duration::from_millis(10);
+
 /// Resource limits applied to one `EdgeZero` application invocation.
 ///
 /// These are host-enforced ceilings. Application contracts may request fewer
@@ -34,6 +46,7 @@ pub struct RuntimeLimits {
     max_memories: usize,
     max_tables: usize,
     max_table_elements: usize,
+    execution_timeout: Duration,
 }
 
 impl RuntimeLimits {
@@ -47,6 +60,7 @@ impl RuntimeLimits {
             max_memories: DEFAULT_MAX_MEMORIES,
             max_tables: DEFAULT_MAX_TABLES,
             max_table_elements: DEFAULT_MAX_TABLE_ELEMENTS,
+            execution_timeout: DEFAULT_EXECUTION_TIMEOUT,
         }
     }
 
@@ -92,6 +106,17 @@ impl RuntimeLimits {
         self
     }
 
+    /// Sets the maximum wall-clock duration for active WebAssembly execution.
+    ///
+    /// This is a coarse deadline implemented through Wasmtime epoch
+    /// interruption. It does not interrupt a synchronous host function while
+    /// WebAssembly is blocked inside that function.
+    #[must_use]
+    pub const fn with_execution_timeout(mut self, execution_timeout: Duration) -> Self {
+        self.execution_timeout = execution_timeout;
+        self
+    }
+
     /// Returns the deterministic execution fuel budget.
     #[must_use]
     pub const fn fuel(self) -> u64 {
@@ -128,6 +153,12 @@ impl RuntimeLimits {
         self.max_table_elements
     }
 
+    /// Returns the maximum active WebAssembly execution duration.
+    #[must_use]
+    pub const fn execution_timeout(self) -> Duration {
+        self.execution_timeout
+    }
+
     pub(crate) fn store_limits(self) -> StoreLimits {
         StoreLimitsBuilder::new()
             .memory_size(self.max_memory_bytes)
@@ -138,12 +169,26 @@ impl RuntimeLimits {
             .trap_on_grow_failure(true)
             .build()
     }
+
+    pub(crate) fn epoch_deadline_ticks(self) -> u64 {
+        duration_to_ticks(self.execution_timeout, EPOCH_TICK_INTERVAL)
+    }
 }
 
 impl Default for RuntimeLimits {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn duration_to_ticks(duration: Duration, tick_interval: Duration) -> u64 {
+    if duration.is_zero() {
+        return 0;
+    }
+
+    let ticks = duration.as_nanos().div_ceil(tick_interval.as_nanos());
+
+    u64::try_from(ticks).unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]
@@ -160,6 +205,7 @@ mod tests {
         assert_eq!(limits.max_memories(), DEFAULT_MAX_MEMORIES);
         assert_eq!(limits.max_tables(), DEFAULT_MAX_TABLES);
         assert_eq!(limits.max_table_elements(), DEFAULT_MAX_TABLE_ELEMENTS);
+        assert_eq!(limits.execution_timeout(), DEFAULT_EXECUTION_TIMEOUT);
     }
 
     #[test]
@@ -170,7 +216,8 @@ mod tests {
             .with_max_instances(10)
             .with_max_memories(4)
             .with_max_tables(5)
-            .with_max_table_elements(1_000);
+            .with_max_table_elements(1_000)
+            .with_execution_timeout(Duration::from_millis(250));
 
         assert_eq!(limits.fuel(), 123);
         assert_eq!(limits.max_memory_bytes(), 8 * MIB);
@@ -178,5 +225,20 @@ mod tests {
         assert_eq!(limits.max_memories(), 4);
         assert_eq!(limits.max_tables(), 5);
         assert_eq!(limits.max_table_elements(), 1_000);
+        assert_eq!(limits.execution_timeout(), Duration::from_millis(250));
+    }
+
+    #[test]
+    fn timeout_is_rounded_up_to_epoch_ticks() {
+        let limits = RuntimeLimits::new().with_execution_timeout(Duration::from_millis(25));
+
+        assert_eq!(limits.epoch_deadline_ticks(), 3);
+    }
+
+    #[test]
+    fn zero_timeout_expires_immediately() {
+        let limits = RuntimeLimits::new().with_execution_timeout(Duration::ZERO);
+
+        assert_eq!(limits.epoch_deadline_ticks(), 0);
     }
 }

@@ -18,8 +18,9 @@ mod state;
 pub use application::CompiledApplication;
 pub use error::RuntimeError;
 pub use limits::{
-    DEFAULT_FUEL, DEFAULT_MAX_INSTANCES, DEFAULT_MAX_MEMORIES, DEFAULT_MAX_MEMORY_BYTES,
-    DEFAULT_MAX_TABLE_ELEMENTS, DEFAULT_MAX_TABLES, MIB, RuntimeLimits,
+    DEFAULT_EXECUTION_TIMEOUT, DEFAULT_FUEL, DEFAULT_MAX_INSTANCES, DEFAULT_MAX_MEMORIES,
+    DEFAULT_MAX_MEMORY_BYTES, DEFAULT_MAX_TABLE_ELEMENTS, DEFAULT_MAX_TABLES, EPOCH_TICK_INTERVAL,
+    MIB, RuntimeLimits,
 };
 pub use runtime::Runtime;
 
@@ -57,5 +58,13 @@ mod tests {
         let result = runtime.compile(b"not a WebAssembly Component");
 
         assert!(matches!(result, Err(RuntimeError::ComponentCompile(_))));
+    }
+
+    #[test]
+    fn runtime_and_compiled_applications_are_thread_safe() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<Runtime>();
+        assert_send_sync::<CompiledApplication>();
     }
 }
