@@ -482,7 +482,9 @@ dependencies = [
 name = "edgezero-resolver"
 version = "0.0.1"
 dependencies = [
+ "edgezero-contract",
  "edgezero-core",
+ "semver",
 ]
 
 [[package]]

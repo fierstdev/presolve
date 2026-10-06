@@ -8,7 +8,9 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+edgezero-contract.workspace = true
 edgezero-core.workspace = true
+semver.workspace = true
 
 [lints]
 workspace = true
