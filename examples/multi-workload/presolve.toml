@@ -1,0 +1,14 @@
+contract_version = "0.1"
+
+[application]
+name = "multi-workload-demo"
+version = "0.0.1"
+description = "Presolve multi-workload application example"
+
+[[workloads]]
+name = "api"
+kind = "component"
+
+[[workloads]]
+name = "worker"
+kind = "component"

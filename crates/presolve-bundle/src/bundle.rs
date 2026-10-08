@@ -9,7 +9,8 @@ use tar::{Archive, Builder, EntryType, Header};
 use thiserror::Error;
 
 use crate::{
-    BUNDLE_VERSION, BundleManifest, BundleVersion, COMPONENT_ARTIFACT_PATH, MANIFEST_PATH,
+    BUNDLE_VERSION, BundleManifest, BundleVersion, ComponentArtifactInput, MANIFEST_PATH,
+    component_artifact_path,
 };
 
 /// Complete immutable `.presolve` application bundle.
@@ -29,13 +30,62 @@ impl PresolveBundle {
     ///
     /// Returns an error if the component cannot be represented by the bundle
     /// format.
+    /// Creates a bundle containing one WebAssembly Component workload.
+    ///
+    /// Contracts with no explicit workloads use the legacy implicit `main`
+    /// workload. Contracts with exactly one declared workload use that workload's
+    /// name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the contract declares multiple workloads or the
+    /// component cannot be represented by the bundle format.
     pub fn from_component(
         contract: &ApplicationContract,
         component: &[u8],
     ) -> Result<Self, BundleError> {
-        let manifest = BundleManifest::for_component(contract, component)?;
+        let workload = match contract.workloads() {
+            [] => "main",
+            [workload] => workload.name(),
+            workloads => {
+                return Err(BundleError::MultipleWorkloadsRequireExplicitArtifacts {
+                    count: workloads.len(),
+                });
+            }
+        };
 
-        let artifacts = BTreeMap::from([(COMPONENT_ARTIFACT_PATH.to_owned(), component.to_vec())]);
+        Self::from_components(
+            contract,
+            &[ComponentArtifactInput::new(workload, component)],
+        )
+    }
+
+    /// Creates a bundle containing explicit component workload artifacts.
+    ///
+    /// Input ordering does not affect bundle or release identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when supplied artifacts do not exactly match the
+    /// application's declared workloads, when duplicate inputs are supplied, or
+    /// when an artifact cannot be represented by the bundle format.
+    pub fn from_components(
+        contract: &ApplicationContract,
+        components: &[ComponentArtifactInput<'_>],
+    ) -> Result<Self, BundleError> {
+        let manifest = BundleManifest::for_components(contract, components)?;
+
+        let mut artifacts = BTreeMap::new();
+
+        for component in components {
+            let path = component_artifact_path(component.workload());
+
+            if artifacts.insert(path, component.bytes().to_vec()).is_some() {
+                return Err(BundleError::DuplicateWorkloadArtifact(
+                    component.workload().to_owned(),
+                ));
+            }
+        }
 
         Ok(Self {
             manifest,
@@ -80,9 +130,15 @@ impl PresolveBundle {
             ));
         }
 
+        let mut workload_names = BTreeSet::new();
         let mut referenced = BTreeSet::new();
 
         for workload in self.manifest.workloads() {
+            if !workload_names.insert(workload.name().to_owned()) {
+                return Err(BundleError::DuplicateManifestWorkload(
+                    workload.name().to_owned(),
+                ));
+            }
             if workload.artifacts().is_empty() {
                 return Err(BundleError::InvalidManifest(
                     "every workload must reference at least one artifact",
@@ -260,6 +316,29 @@ pub enum BundleError {
         found: BundleVersion,
     },
 
+    /// A single-artifact constructor was used for a multi-workload application.
+    #[error("application declares {count} workloads; explicit workload artifacts are required")]
+    MultipleWorkloadsRequireExplicitArtifacts {
+        /// Number of declared workloads.
+        count: usize,
+    },
+
+    /// More than one artifact was supplied for the same workload.
+    #[error("component artifact for workload `{0}` was supplied more than once")]
+    DuplicateWorkloadArtifact(String),
+
+    /// A declared workload has no supplied component artifact.
+    #[error("component artifact for workload `{0}` is missing")]
+    MissingWorkloadArtifact(String),
+
+    /// An artifact was supplied for a workload not declared by the application.
+    #[error("component artifact was supplied for undeclared workload `{0}`")]
+    UnexpectedWorkloadArtifact(String),
+
+    /// The manifest declares the same workload name more than once.
+    #[error("bundle manifest declares workload `{0}` more than once")]
+    DuplicateManifestWorkload(String),
+
     /// An artifact is too large to represent in the bundle format.
     #[error("artifact size `{size}` cannot be represented by bundle format v0.1")]
     ArtifactSizeOverflow {
@@ -356,11 +435,35 @@ fn validate_path(path: &str) -> Result<(), BundleError> {
 
 #[cfg(test)]
 mod tests {
-    use presolve_contract::parse_contract;
+    use presolve_contract::{ApplicationContract, parse_contract};
 
     use super::*;
+    use crate::{COMPONENT_ARTIFACT_PATH, WorkloadKind};
 
     const COMPONENT: &[u8] = b"example component bytes";
+    const API_COMPONENT: &[u8] = b"api component bytes";
+    const WORKER_COMPONENT: &[u8] = b"worker component bytes";
+
+    fn multi_workload_contract() -> ApplicationContract {
+        parse_contract(
+            r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "multi-example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "api"
+    kind = "component"
+
+    [[workloads]]
+    name = "worker"
+    kind = "component"
+    "#,
+        )
+        .expect("multi-workload contract should parse")
+    }
 
     #[test]
     fn component_bundle_round_trips() {
@@ -461,6 +564,244 @@ version = "^1"
         assert_eq!(
             first_bundle.encode().expect("first bundle should encode"),
             second_bundle.encode().expect("second bundle should encode")
+        );
+    }
+
+    #[test]
+    fn multiple_component_workloads_package_successfully() {
+        let contract = multi_workload_contract();
+
+        let bundle = PresolveBundle::from_components(
+            &contract,
+            &[
+                ComponentArtifactInput::new("api", API_COMPONENT),
+                ComponentArtifactInput::new("worker", WORKER_COMPONENT),
+            ],
+        )
+        .expect("multi-workload bundle should build");
+
+        let workloads = bundle.manifest().workloads();
+
+        assert_eq!(workloads.len(), 2);
+
+        assert_eq!(workloads[0].name(), "api");
+        assert_eq!(workloads[0].kind(), WorkloadKind::Component);
+        assert_eq!(workloads[0].artifacts().len(), 1);
+        assert_eq!(workloads[0].artifacts()[0].path(), "artifacts/api.wasm");
+
+        assert_eq!(workloads[1].name(), "worker");
+        assert_eq!(workloads[1].kind(), WorkloadKind::Component);
+        assert_eq!(workloads[1].artifacts().len(), 1);
+        assert_eq!(workloads[1].artifacts()[0].path(), "artifacts/worker.wasm");
+
+        bundle.verify().expect("bundle should verify");
+
+        let encoded = bundle.encode().expect("bundle should encode");
+
+        let decoded = PresolveBundle::decode(&encoded).expect("bundle should decode");
+
+        assert_eq!(decoded.manifest(), bundle.manifest());
+    }
+
+    #[test]
+    fn contract_workload_order_does_not_change_release_identity() {
+        let first_contract = parse_contract(
+            r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "multi-example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "api"
+    kind = "component"
+
+    [[workloads]]
+    name = "worker"
+    kind = "component"
+    "#,
+        )
+        .expect("first contract should parse");
+
+        let second_contract = parse_contract(
+            r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "multi-example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "worker"
+    kind = "component"
+
+    [[workloads]]
+    name = "api"
+    kind = "component"
+    "#,
+        )
+        .expect("second contract should parse");
+
+        let components = [
+            ComponentArtifactInput::new("api", API_COMPONENT),
+            ComponentArtifactInput::new("worker", WORKER_COMPONENT),
+        ];
+
+        let first = PresolveBundle::from_components(&first_contract, &components)
+            .expect("first bundle should build");
+
+        let second = PresolveBundle::from_components(&second_contract, &components)
+            .expect("second bundle should build");
+
+        assert_eq!(
+            first
+                .release_digest()
+                .expect("first release digest should compute"),
+            second
+                .release_digest()
+                .expect("second release digest should compute")
+        );
+
+        assert_eq!(
+            first.encode().expect("first bundle should encode"),
+            second.encode().expect("second bundle should encode")
+        );
+    }
+
+    #[test]
+    fn missing_workload_artifact_is_rejected() {
+        let contract = multi_workload_contract();
+
+        let error = PresolveBundle::from_components(
+            &contract,
+            &[ComponentArtifactInput::new("api", API_COMPONENT)],
+        )
+        .expect_err("missing worker artifact should fail");
+
+        assert!(matches!(
+            error,
+            BundleError::MissingWorkloadArtifact(workload)
+                if workload == "worker"
+        ));
+    }
+
+    #[test]
+    fn unexpected_workload_artifact_is_rejected() {
+        let contract = multi_workload_contract();
+
+        let error = PresolveBundle::from_components(
+            &contract,
+            &[
+                ComponentArtifactInput::new("api", API_COMPONENT),
+                ComponentArtifactInput::new("worker", WORKER_COMPONENT),
+                ComponentArtifactInput::new("scheduler", b"scheduler"),
+            ],
+        )
+        .expect_err("undeclared workload artifact should fail");
+
+        assert!(matches!(
+            error,
+            BundleError::UnexpectedWorkloadArtifact(workload)
+                if workload == "scheduler"
+        ));
+    }
+
+    #[test]
+    fn duplicate_workload_artifact_is_rejected() {
+        let contract = multi_workload_contract();
+
+        let error = PresolveBundle::from_components(
+            &contract,
+            &[
+                ComponentArtifactInput::new("api", API_COMPONENT),
+                ComponentArtifactInput::new("api", API_COMPONENT),
+                ComponentArtifactInput::new("worker", WORKER_COMPONENT),
+            ],
+        )
+        .expect_err("duplicate workload artifact should fail");
+
+        assert!(matches!(
+            error,
+            BundleError::DuplicateWorkloadArtifact(workload)
+                if workload == "api"
+        ));
+    }
+
+    #[test]
+    fn single_component_constructor_rejects_multi_workload_contract() {
+        let contract = multi_workload_contract();
+
+        let error = PresolveBundle::from_component(&contract, API_COMPONENT)
+            .expect_err("single-component constructor should reject multiple workloads");
+
+        assert!(matches!(
+            error,
+            BundleError::MultipleWorkloadsRequireExplicitArtifacts { count: 2 }
+        ));
+    }
+
+    #[test]
+    fn single_component_constructor_uses_declared_workload_name() {
+        let contract = parse_contract(
+            r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "api"
+    kind = "component"
+    "#,
+        )
+        .expect("contract should parse");
+
+        let bundle =
+            PresolveBundle::from_component(&contract, API_COMPONENT).expect("bundle should build");
+
+        let workloads = bundle.manifest().workloads();
+
+        assert_eq!(workloads.len(), 1);
+        assert_eq!(workloads[0].name(), "api");
+        assert_eq!(workloads[0].artifacts()[0].path(), "artifacts/api.wasm");
+    }
+
+    #[test]
+    fn component_input_order_does_not_change_release_identity() {
+        let contract = multi_workload_contract();
+
+        let first = PresolveBundle::from_components(
+            &contract,
+            &[
+                ComponentArtifactInput::new("api", API_COMPONENT),
+                ComponentArtifactInput::new("worker", WORKER_COMPONENT),
+            ],
+        )
+        .expect("first bundle should build");
+
+        let second = PresolveBundle::from_components(
+            &contract,
+            &[
+                ComponentArtifactInput::new("worker", WORKER_COMPONENT),
+                ComponentArtifactInput::new("api", API_COMPONENT),
+            ],
+        )
+        .expect("second bundle should build");
+
+        assert_eq!(
+            first
+                .release_digest()
+                .expect("first release digest should compute"),
+            second
+                .release_digest()
+                .expect("second release digest should compute")
+        );
+
+        assert_eq!(
+            first.encode().expect("first bundle should encode"),
+            second.encode().expect("second bundle should encode")
         );
     }
 

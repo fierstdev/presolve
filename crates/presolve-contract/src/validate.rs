@@ -6,7 +6,7 @@ use crate::{ApplicationContract, CONTRACT_VERSION, ContractDiagnostics, Outbound
 
 /// Stable numeric codes emitted by Application Contract validation.
 ///
-/// The `EZ1xxx` range is reserved for Application Contract diagnostics.
+/// The `PS1xxx` range is reserved for Application Contract diagnostics.
 pub mod diagnostic_codes {
     /// The source file could not be parsed.
     pub const PARSE_ERROR: u16 = 1_001;
@@ -28,6 +28,12 @@ pub mod diagnostic_codes {
 
     /// The outbound network policy is internally inconsistent.
     pub const INVALID_NETWORK_POLICY: u16 = 1_007;
+
+    /// A workload name is invalid.
+    pub const INVALID_WORKLOAD_NAME: u16 = 1_008;
+
+    /// The same workload name is declared more than once.
+    pub const DUPLICATE_WORKLOAD: u16 = 1_009;
 }
 
 impl ApplicationContract {
@@ -41,6 +47,7 @@ impl ApplicationContract {
 
         self.validate_contract_version(&mut diagnostics);
         self.validate_application(&mut diagnostics);
+        self.validate_workloads(&mut diagnostics);
         self.validate_capabilities(&mut diagnostics);
         self.validate_resources(&mut diagnostics);
         self.validate_network(&mut diagnostics);
@@ -84,6 +91,37 @@ impl ApplicationContract {
                  begin with a letter and end with a letter or digit",
             ),
         );
+    }
+
+    fn validate_workloads(&self, diagnostics: &mut Vec<Diagnostic>) {
+        let mut names = HashSet::new();
+
+        for workload in self.workloads() {
+            let name = workload.name();
+
+            if !valid_application_name(name) {
+                diagnostics.push(
+                    error(
+                        diagnostic_codes::INVALID_WORKLOAD_NAME,
+                        format!("invalid workload name `{name}`"),
+                    )
+                    .with_help(
+                        "use 1-63 lowercase ASCII letters, digits, or hyphens; \
+                         begin with a letter and end with a letter or digit",
+                    ),
+                );
+            }
+
+            if !names.insert(name) {
+                diagnostics.push(
+                    error(
+                        diagnostic_codes::DUPLICATE_WORKLOAD,
+                        format!("workload `{name}` is declared more than once"),
+                    )
+                    .with_help("declare each workload name once within an application"),
+                );
+            }
+        }
     }
 
     fn validate_capabilities(&self, diagnostics: &mut Vec<Diagnostic>) {

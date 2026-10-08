@@ -16,6 +16,7 @@ exclude = [
     "examples/hello",
     "examples/adversarial",
     "examples/kv-demo",
+    "examples/multi-workload",
 ]
 
 [workspace.package]

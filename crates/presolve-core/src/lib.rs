@@ -10,6 +10,7 @@ mod diagnostic;
 mod digest;
 mod id;
 mod version;
+mod workload;
 
 pub use diagnostic::{
     Diagnostic, DiagnosticCode, DiagnosticCodeError, DiagnosticSeverity, MAX_DIAGNOSTIC_CODE,
@@ -20,6 +21,7 @@ pub use id::{ApplicationId, EnvironmentId, IdParseError, ProviderId};
 pub use version::{
     PRODUCT_VERSION, PROTOCOL_VERSION, ProductVersion, ProtocolVersion, ProtocolVersionParseError,
 };
+pub use workload::WorkloadKind;
 
 /// Human-readable product name.
 pub const PRODUCT_NAME: &str = "Presolve";

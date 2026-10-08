@@ -1,14 +1,21 @@
 use presolve_contract::{ApplicationContract, ContractVersion, OutboundNetworkMode};
-use presolve_core::{ArtifactDigest, ProductVersion};
+use presolve_core::{ArtifactDigest, ProductVersion, WorkloadKind};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
-use crate::{BUNDLE_VERSION, BundleError, BundleVersion};
+use crate::{BUNDLE_VERSION, BundleError, BundleVersion, ComponentArtifactInput};
 
 /// Path of the canonical manifest inside a `.presolve` archive.
 pub const MANIFEST_PATH: &str = "manifest.json";
 
 /// Canonical path of the initial component artifact.
 pub const COMPONENT_ARTIFACT_PATH: &str = "artifacts/main.wasm";
+
+/// Returns the canonical component artifact path for `workload`.
+#[must_use]
+pub fn component_artifact_path(workload: &str) -> String {
+    format!("artifacts/{workload}.wasm")
+}
 
 /// MIME media type used for WebAssembly artifacts.
 pub const WASM_MEDIA_TYPE: &str = "application/wasm";
@@ -28,15 +35,18 @@ pub struct BundleManifest {
 }
 
 impl BundleManifest {
-    /// Creates the initial single-component application manifest.
+    /// Creates a manifest from declared workloads and their component artifacts.
+    ///
+    /// Contracts without explicit workloads retain the legacy implicit `main`
+    /// component workload.
     ///
     /// # Errors
     ///
-    /// Returns an error if the component size cannot be represented by bundle
-    /// format v0.1.
-    pub fn for_component(
+    /// Returns an error when component inputs are duplicated, missing, unexpected,
+    /// or too large to represent in bundle format v0.1.
+    pub fn for_components(
         contract: &ApplicationContract,
-        component: &[u8],
+        components: &[ComponentArtifactInput<'_>],
     ) -> Result<Self, BundleError> {
         let application = ApplicationManifest {
             name: contract.application().name().to_owned(),
@@ -78,27 +88,79 @@ impl BundleManifest {
             },
         };
 
-        let size =
-            u64::try_from(component.len()).map_err(|_| BundleError::ArtifactSizeOverflow {
-                size: component.len(),
-            })?;
-
-        let artifact = ArtifactManifest {
-            path: COMPONENT_ARTIFACT_PATH.to_owned(),
-            digest: ArtifactDigest::from_content(component),
-            size,
-            media_type: WASM_MEDIA_TYPE.to_owned(),
+        let mut expected = if contract.workloads().is_empty() {
+            vec![("main".to_owned(), WorkloadKind::Component)]
+        } else {
+            contract
+                .workloads()
+                .iter()
+                .map(|workload| (workload.name().to_owned(), workload.kind()))
+                .collect::<Vec<_>>()
         };
+
+        expected.sort_by(|left, right| left.0.cmp(&right.0));
+
+        let mut supplied = BTreeMap::<String, &[u8]>::new();
+
+        for component in components {
+            let workload = component.workload().to_owned();
+
+            if supplied
+                .insert(workload.clone(), component.bytes())
+                .is_some()
+            {
+                return Err(BundleError::DuplicateWorkloadArtifact(workload));
+            }
+        }
+
+        for (workload, _) in &expected {
+            if !supplied.contains_key(workload) {
+                return Err(BundleError::MissingWorkloadArtifact(workload.clone()));
+            }
+        }
+
+        for workload in supplied.keys() {
+            if !expected
+                .iter()
+                .any(|(expected_name, _)| expected_name == workload)
+            {
+                return Err(BundleError::UnexpectedWorkloadArtifact(workload.clone()));
+            }
+        }
+
+        let mut workloads = Vec::with_capacity(expected.len());
+
+        for (name, kind) in expected {
+            let Some(bytes) = supplied.get(&name) else {
+                return Err(BundleError::MissingWorkloadArtifact(name));
+            };
+
+            match kind {
+                WorkloadKind::Component => {
+                    let size = u64::try_from(bytes.len())
+                        .map_err(|_| BundleError::ArtifactSizeOverflow { size: bytes.len() })?;
+
+                    let artifact = ArtifactManifest {
+                        path: component_artifact_path(&name),
+                        digest: ArtifactDigest::from_content(bytes),
+                        size,
+                        media_type: WASM_MEDIA_TYPE.to_owned(),
+                    };
+
+                    workloads.push(WorkloadManifest {
+                        name,
+                        kind,
+                        artifacts: vec![artifact],
+                    });
+                }
+            }
+        }
 
         Ok(Self {
             bundle_version: BUNDLE_VERSION,
             application,
             requirements,
-            workloads: vec![WorkloadManifest {
-                name: "main".to_owned(),
-                kind: WorkloadKind::Component,
-                artifacts: vec![artifact],
-            }],
+            workloads,
         })
     }
 
@@ -297,14 +359,6 @@ impl NetworkManifest {
     pub fn allow(&self) -> &[String] {
         &self.allow
     }
-}
-
-/// Workload execution class represented in a bundle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum WorkloadKind {
-    /// WebAssembly Component workload.
-    Component,
 }
 
 /// One logical executable constituent of an application.

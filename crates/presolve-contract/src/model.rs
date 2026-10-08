@@ -1,4 +1,4 @@
-use presolve_core::ProductVersion;
+use presolve_core::{ProductVersion, WorkloadKind};
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +14,9 @@ use crate::ContractVersion;
 pub struct ApplicationContract {
     contract_version: ContractVersion,
     application: ApplicationMetadata,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    workloads: Vec<WorkloadDefinition>,
 
     #[serde(default)]
     capabilities: Vec<CapabilityRequirement>,
@@ -36,6 +39,12 @@ impl ApplicationContract {
     #[must_use]
     pub const fn application(&self) -> &ApplicationMetadata {
         &self.application
+    }
+
+    /// Returns workloads declared by the application.
+    #[must_use]
+    pub fn workloads(&self) -> &[WorkloadDefinition] {
+        &self.workloads
     }
 
     /// Returns capability requirements declared by the application.
@@ -97,6 +106,32 @@ impl ApplicationMetadata {
     #[must_use]
     pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
+    }
+}
+
+/// One logical executable constituent of an application.
+///
+/// This declaration describes workload semantics only. Build artifact paths,
+/// deployment placement, environment selection, and provider bindings are not
+/// part of the Application Contract.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadDefinition {
+    name: String,
+    kind: WorkloadKind,
+}
+
+impl WorkloadDefinition {
+    /// Returns the stable workload name within the application.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the workload execution class.
+    #[must_use]
+    pub const fn kind(&self) -> WorkloadKind {
+        self.kind
     }
 }
 

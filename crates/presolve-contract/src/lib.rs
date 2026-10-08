@@ -15,11 +15,13 @@ mod version;
 
 pub use model::{
     ApplicationContract, ApplicationMetadata, CapabilityRequirement, NetworkPolicy,
-    OutboundNetworkMode, ResourceRequirements,
+    OutboundNetworkMode, ResourceRequirements, WorkloadDefinition,
 };
 pub use parse::{CONTRACT_FILE_NAME, ContractDiagnostics, parse_contract};
 pub use validate::diagnostic_codes;
 pub use version::{CONTRACT_VERSION, ContractVersion, ContractVersionParseError};
+
+pub use presolve_core::WorkloadKind;
 
 #[cfg(test)]
 mod tests {
@@ -40,6 +42,7 @@ version = "0.0.1"
         assert_eq!(contract.contract_version(), CONTRACT_VERSION);
         assert_eq!(contract.application().name(), "hello-presolve");
         assert_eq!(contract.application().version().to_string(), "0.0.1");
+        assert_eq!(contract.workloads(), []);
         assert_eq!(contract.capabilities(), []);
         assert_eq!(contract.network().outbound(), OutboundNetworkMode::Deny);
     }
@@ -47,32 +50,45 @@ version = "0.0.1"
     #[test]
     fn full_contract_parses() {
         let source = r#"
-contract_version = "0.1"
+    contract_version = "0.1"
 
-[application]
-name = "fraud-analysis"
-version = "1.4.2"
-description = "Example Presolve application"
+    [application]
+    name = "fraud-analysis"
+    version = "1.4.2"
+    description = "Example Presolve application"
 
-[[capabilities]]
-interface = "presolve:sql/database"
-version = "^1.0"
+    [[workloads]]
+    name = "api"
+    kind = "component"
 
-[[capabilities]]
-interface = "presolve:secrets/store"
-version = "^1.0"
-optional = true
+    [[workloads]]
+    name = "worker"
+    kind = "component"
 
-[resources]
-memory_mib = 256
-cpu_millis = 500
+    [[capabilities]]
+    interface = "presolve:sql/database"
+    version = "^1.0"
 
-[network]
-outbound = "allow_list"
-allow = ["api.stripe.com:443"]
-"#;
+    [[capabilities]]
+    interface = "presolve:secrets/store"
+    version = "^1.0"
+    optional = true
+
+    [resources]
+    memory_mib = 256
+    cpu_millis = 500
+
+    [network]
+    outbound = "allow_list"
+    allow = ["api.stripe.com:443"]
+    "#;
 
         let contract = parse_contract(source).expect("contract should parse");
+
+        assert_eq!(contract.workloads().len(), 2);
+        assert_eq!(contract.workloads()[0].name(), "api");
+        assert_eq!(contract.workloads()[0].kind(), WorkloadKind::Component);
+        assert_eq!(contract.workloads()[1].name(), "worker");
 
         assert_eq!(contract.capabilities().len(), 2);
         assert_eq!(contract.resources().memory_mib(), Some(256));
@@ -127,6 +143,67 @@ version = "0.0.1"
         let error = parse_contract(source).expect_err("name should fail");
 
         assert!(has_code(&error, diagnostic_codes::INVALID_APPLICATION_NAME));
+    }
+
+    #[test]
+    fn invalid_workload_name_is_rejected() {
+        let source = r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "API Server"
+    kind = "component"
+    "#;
+
+        let error = parse_contract(source).expect_err("invalid workload name should fail");
+
+        assert!(has_code(&error, diagnostic_codes::INVALID_WORKLOAD_NAME));
+    }
+
+    #[test]
+    fn duplicate_workloads_are_rejected() {
+        let source = r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "worker"
+    kind = "component"
+
+    [[workloads]]
+    name = "worker"
+    kind = "component"
+    "#;
+
+        let error = parse_contract(source).expect_err("duplicate workload should fail");
+
+        assert!(has_code(&error, diagnostic_codes::DUPLICATE_WORKLOAD));
+    }
+
+    #[test]
+    fn unsupported_workload_kind_is_rejected() {
+        let source = r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "api"
+    kind = "native"
+    "#;
+
+        let error = parse_contract(source).expect_err("unsupported workload kind should fail");
+
+        assert!(has_code(&error, diagnostic_codes::PARSE_ERROR));
     }
 
     #[test]
