@@ -13,6 +13,16 @@ path = "src/main.rs"
 
 [dependencies]
 presolve-core.workspace = true
+presolve-provider-sdk.workspace = true
+presolve-resolver.workspace = true
+presolve-runtime.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+presolve-contract.workspace = true
+presolve-provider-kv-memory.workspace = true
+semver.workspace = true
 
 [lints]
 workspace = true

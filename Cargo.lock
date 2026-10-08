@@ -1072,7 +1072,15 @@ dependencies = [
 name = "presolve-node"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
+ "presolve-contract",
  "presolve-core",
+ "presolve-provider-kv-memory",
+ "presolve-provider-sdk",
+ "presolve-resolver",
+ "presolve-runtime",
+ "semver",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

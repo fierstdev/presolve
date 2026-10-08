@@ -8,4 +8,7 @@
 
 mod kv;
 
-pub use kv::{KeyValueError, KeyValueErrorCode, KeyValueProvider, UnavailableKeyValueProvider};
+pub use kv::{
+    KEY_VALUE_INTERFACE, KeyValueError, KeyValueErrorCode, KeyValueProvider,
+    UnavailableKeyValueProvider,
+};

@@ -1,5 +1,8 @@
 use thiserror::Error;
 
+/// Canonical WIT interface identifier for the key/value capability.
+pub const KEY_VALUE_INTERFACE: &str = "presolve:kv/store";
+
 /// Stable categories for key/value provider failures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyValueErrorCode {
