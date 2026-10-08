@@ -1,13 +1,13 @@
 use std::{env, fs, sync::Arc};
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use presolve_contract::parse_contract;
 use presolve_core::{EnvironmentId, ProviderId};
-use presolve_node::{assemble_runtime, AssemblyError, ProviderRegistry};
+use presolve_node::{AssemblyError, ProviderRegistry, assemble_runtime};
 use presolve_provider_kv_memory::InMemoryKeyValueProvider;
 use presolve_provider_sdk::KEY_VALUE_INTERFACE;
 use presolve_resolver::{
-    resolve, EnvironmentInventory, EnvironmentResources, ProvidedCapability, ProviderDescriptor,
+    EnvironmentInventory, EnvironmentResources, ProvidedCapability, ProviderDescriptor, resolve,
 };
 use semver::Version;
 

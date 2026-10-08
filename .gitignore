@@ -12,9 +12,13 @@ dist/
 build/
 coverage/
 
-# EdgeZero generated artifacts
+# Legacy EdgeZero generated artifacts
 .edgezero/
 *.ez
+
+# Presolve generated artifacts
+.presolve/
+*.presolve
 
 # Local configuration
 .env

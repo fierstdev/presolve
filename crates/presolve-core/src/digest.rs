@@ -109,14 +109,14 @@ impl<'de> Deserialize<'de> for ArtifactDigest {
 mod tests {
     use super::*;
 
-    const EDGEZERO_SHA256: &str =
+    const PRESOLVE_SHA256: &str =
         "sha256:c563861335134ec35db456c15c8ad8ea31125251ee6c4292cac41ae1a2e0f73c";
 
     #[test]
     fn digest_matches_known_sha256() {
         let digest = ArtifactDigest::from_content(b"presolve");
 
-        assert_eq!(digest.to_string(), EDGEZERO_SHA256);
+        assert_eq!(digest.to_string(), PRESOLVE_SHA256);
     }
 
     #[test]
