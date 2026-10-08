@@ -4,7 +4,7 @@ set -euo pipefail
 
 readonly MANIFEST="examples/hello/Cargo.toml"
 readonly TARGET="wasm32-wasip2"
-readonly COMPONENT="examples/hello/target/${TARGET}/debug/edgezero_example_hello.wasm"
+readonly COMPONENT="examples/hello/target/${TARGET}/debug/presolve_example_hello.wasm"
 
 echo "== build hello component =="
 

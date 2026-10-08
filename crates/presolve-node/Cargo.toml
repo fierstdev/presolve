@@ -1,0 +1,18 @@
+[package]
+name = "presolve-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "presolve-node"
+path = "src/main.rs"
+
+[dependencies]
+presolve-core.workspace = true
+
+[lints]
+workspace = true

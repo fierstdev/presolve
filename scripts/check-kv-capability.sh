@@ -4,7 +4,7 @@ set -euo pipefail
 
 readonly MANIFEST="examples/kv-demo/Cargo.toml"
 readonly TARGET="wasm32-wasip2"
-readonly COMPONENT="examples/kv-demo/target/${TARGET}/debug/edgezero_example_kv_demo.wasm"
+readonly COMPONENT="examples/kv-demo/target/${TARGET}/debug/presolve_example_kv_demo.wasm"
 
 echo "== build key/value component =="
 
@@ -25,7 +25,7 @@ COMPONENT_WIT="$(
 )"
 
 if ! grep -q \
-  "edgezero:kv/store@0.1.0" \
+  "presolve:kv/store@0.1.0" \
   <<< "${COMPONENT_WIT}"
 then
   echo "failure: expected key/value capability import"
@@ -34,13 +34,13 @@ then
   exit 1
 fi
 
-echo "✓ component imports edgezero:kv/store@0.1.0"
+echo "✓ component imports presolve:kv/store@0.1.0"
 
 echo
 echo "== execute provider substitution check =="
 
 cargo run \
   --quiet \
-  -p edgezero-runtime \
+  -p presolve-runtime \
   --example capability \
   -- "${COMPONENT}"

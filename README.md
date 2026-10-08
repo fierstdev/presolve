@@ -1,11 +1,11 @@
-# EdgeZero
+# Presolve
 
 **Build once. Run wherever your customer requires.**
 
-EdgeZero is an application runtime and software-distribution platform for
+Presolve is an application runtime and software-distribution platform for
 software that must cross infrastructure boundaries.
 
-An EdgeZero application declares what it needs rather than how its
+An Presolve application declares what it needs rather than how its
 infrastructure must be constructed.
 
 The same application artifact can ultimately run across environments such as:
@@ -19,7 +19,7 @@ The same application artifact can ultimately run across environments such as:
 
 ## Status
 
-EdgeZero is under active early development.
+Presolve is under active early development.
 
 The current version is `0.0.1`.
 
@@ -30,24 +30,24 @@ stable until explicitly documented as stable.
 
 ```text
 crates/
-  ez-core/          Shared foundational types
-  ez-contract/      Application Contract
-  ez-runtime/       WebAssembly Component runtime
-  ez-bundle/        EdgeZero application bundles
-  ez-policy/        Deployment/security policy
-  ez-resolver/      Capability resolution
-  ez-provider-sdk/  Provider implementation SDK
-  ez-node/          Managed/private runtime node
-  ez-cli/           `ez` command-line interface
+  presolve-core/          Shared foundational types
+  presolve-contract/      Application Contract
+  presolve-runtime/       WebAssembly Component runtime
+  presolve-bundle/        Presolve application bundles
+  presolve-policy/        Deployment/security policy
+  presolve-resolver/      Capability resolution
+  presolve-provider-sdk/  Provider implementation SDK
+  presolve-node/          Managed/private runtime node
+  presolve-cli/           `presolve` command-line interface
 
 packages/
   sdk-typescript/       TypeScript guest SDK
   tooling-typescript/   TypeScript build tooling
-  create-edgezero/      Project scaffolding
+  create-presolve/      Project scaffolding
 
 wit/                Versioned WIT interfaces
 providers/          First-party capability providers
-examples/           Example EdgeZero applications
+examples/           Example Presolve applications
 tests/              Cross-crate integration fixtures
 scripts/            Repository automation
 docs/               Design and architecture documentation

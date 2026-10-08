@@ -1,15 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/ez-core",
-    "crates/ez-contract",
-    "crates/ez-runtime",
-    "crates/ez-bundle",
-    "crates/ez-policy",
-    "crates/ez-resolver",
-    "crates/ez-provider-sdk",
-    "crates/ez-node",
-    "crates/ez-cli",
+    "crates/presolve-core",
+    "crates/presolve-contract",
+    "crates/presolve-runtime",
+    "crates/presolve-bundle",
+    "crates/presolve-policy",
+    "crates/presolve-resolver",
+    "crates/presolve-provider-sdk",
+    "crates/presolve-node",
+    "crates/presolve-cli",
     "providers/kv-memory",
 ]
 exclude = [
@@ -22,8 +22,8 @@ exclude = [
 version = "0.0.1"
 edition = "2024"
 license = "Apache-2.0"
-repository = "https://github.com/fierstdev/edgezero"
-homepage = "https://edgezero.dev"
+repository = "https://github.com/fierstdev/presolve"
+homepage = "https://presolve.dev"
 rust-version = "1.85"
 
 [workspace.dependencies]
@@ -46,15 +46,15 @@ uuid = { version = "1", features = ["v4"] }
 wasmtime = "=48.0.5"
 wasmtime-wasi = "=48.0.5"
 
-edgezero-core = { path = "crates/ez-core" }
-edgezero-contract = { path = "crates/ez-contract" }
-edgezero-runtime = { path = "crates/ez-runtime" }
-edgezero-bundle = { path = "crates/ez-bundle" }
-edgezero-policy = { path = "crates/ez-policy" }
-edgezero-resolver = { path = "crates/ez-resolver" }
-edgezero-provider-sdk = { path = "crates/ez-provider-sdk" }
+presolve-core = { path = "crates/presolve-core" }
+presolve-contract = { path = "crates/presolve-contract" }
+presolve-runtime = { path = "crates/presolve-runtime" }
+presolve-bundle = { path = "crates/presolve-bundle" }
+presolve-policy = { path = "crates/presolve-policy" }
+presolve-resolver = { path = "crates/presolve-resolver" }
+presolve-provider-sdk = { path = "crates/presolve-provider-sdk" }
 
-edgezero-provider-kv-memory = { path = "providers/kv-memory" }
+presolve-provider-kv-memory = { path = "providers/kv-memory" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

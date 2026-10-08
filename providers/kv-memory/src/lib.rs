@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! In-memory implementation of the `EdgeZero` key/value capability.
+//! In-memory implementation of the `Presolve` key/value capability.
 //!
 //! This provider exists primarily for development, tests, and local
 //! environments. Applications interact with the same capability interface
@@ -8,7 +8,7 @@
 
 use std::{collections::HashMap, sync::RwLock};
 
-use edgezero_provider_sdk::{KeyValueError, KeyValueProvider};
+use presolve_provider_sdk::{KeyValueError, KeyValueProvider};
 
 /// Process-local key/value provider backed by a hash map.
 #[derive(Debug, Default)]

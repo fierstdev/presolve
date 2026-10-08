@@ -1,6 +1,6 @@
 mod bindings {
     wit_bindgen::generate!({
-        path: "../../wit/edgezero-app",
+        path: "../../wit/presolve-app",
         world: "application",
     });
 }

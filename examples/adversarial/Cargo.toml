@@ -1,5 +1,5 @@
 [package]
-name = "edgezero-example-adversarial"
+name = "presolve-example-adversarial"
 version = "0.0.1"
 edition = "2024"
 publish = false

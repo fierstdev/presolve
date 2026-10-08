@@ -1,0 +1,32 @@
+package presolve:kv@0.1.0;
+
+/// Host-provided key/value storage.
+///
+/// Applications depend on this interface rather than on a database,
+/// filesystem, cache server, or other concrete storage technology.
+interface store {
+    /// A provider-visible failure.
+    variant error {
+        /// The capability is not currently available.
+        unavailable(string),
+
+        /// The supplied key is invalid for this provider.
+        invalid-key(string),
+
+        /// The provider encountered an internal failure.
+        internal(string),
+    }
+
+    /// Fetch a value by key.
+    ///
+    /// `none` means the key does not exist.
+    get: func(key: string) -> result<option<string>, error>;
+
+    /// Store or replace a value.
+    set: func(key: string, value: string) -> result<_, error>;
+
+    /// Delete a value.
+    ///
+    /// Returns true when a value existed and was removed.
+    delete: func(key: string) -> result<bool, error>;
+}

@@ -4,9 +4,9 @@ set -euo pipefail
 
 readonly MANIFEST="examples/hello/Cargo.toml"
 readonly TARGET="wasm32-wasip2"
-readonly COMPONENT="examples/hello/target/${TARGET}/debug/edgezero_example_hello.wasm"
+readonly COMPONENT="examples/hello/target/${TARGET}/debug/presolve_example_hello.wasm"
 readonly INPUT="Austin"
-readonly EXPECTED="Hello from EdgeZero, Austin."
+readonly EXPECTED="Hello from Presolve, Austin."
 
 echo "== build hello component =="
 
@@ -20,12 +20,12 @@ echo "== validate hello component =="
 wasm-tools validate "${COMPONENT}"
 
 echo
-echo "== execute through EdgeZero runtime =="
+echo "== execute through Presolve runtime =="
 
 OUTPUT="$(
   cargo run \
     --quiet \
-    -p edgezero-runtime \
+    -p presolve-runtime \
     --example invoke \
     -- "${COMPONENT}" "${INPUT}"
 )"
@@ -41,4 +41,4 @@ if [[ "${OUTPUT}" != "${EXPECTED}" ]]; then
 fi
 
 echo
-echo "EdgeZero runtime check passed"
+echo "Presolve runtime check passed"

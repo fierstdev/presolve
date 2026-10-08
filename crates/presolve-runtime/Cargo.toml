@@ -1,0 +1,22 @@
+[package]
+name = "presolve-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+presolve-core.workspace = true
+presolve-provider-sdk.workspace = true
+thiserror.workspace = true
+wasmtime.workspace = true
+wasmtime-wasi.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+presolve-provider-kv-memory.workspace = true
+
+[lints]
+workspace = true

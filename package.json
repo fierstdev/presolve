@@ -1,8 +1,8 @@
 {
-  "name": "edgezero-workspace",
+  "name": "presolve-workspace",
   "version": "0.0.1",
   "private": true,
-  "description": "EdgeZero universal software distribution platform",
+  "description": "Presolve universal software distribution platform",
   "license": "Apache-2.0",
   "packageManager": "pnpm@12.8.1",
   "scripts": {

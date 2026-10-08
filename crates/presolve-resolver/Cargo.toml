@@ -1,0 +1,16 @@
+[package]
+name = "presolve-resolver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+presolve-contract.workspace = true
+presolve-core.workspace = true
+semver.workspace = true
+
+[lints]
+workspace = true

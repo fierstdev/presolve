@@ -5,10 +5,10 @@ set -euo pipefail
 readonly TARGET="wasm32-wasip2"
 
 readonly HELLO_MANIFEST="examples/hello/Cargo.toml"
-readonly HELLO_COMPONENT="examples/hello/target/${TARGET}/debug/edgezero_example_hello.wasm"
+readonly HELLO_COMPONENT="examples/hello/target/${TARGET}/debug/presolve_example_hello.wasm"
 
 readonly ADVERSARIAL_MANIFEST="examples/adversarial/Cargo.toml"
-readonly ADVERSARIAL_COMPONENT="examples/adversarial/target/${TARGET}/debug/edgezero_example_adversarial.wasm"
+readonly ADVERSARIAL_COMPONENT="examples/adversarial/target/${TARGET}/debug/presolve_example_adversarial.wasm"
 
 echo "== build hello component =="
 
@@ -34,7 +34,7 @@ echo "== verify wall-clock deadlines and isolation =="
 
 cargo run \
   --quiet \
-  -p edgezero-runtime \
+  -p presolve-runtime \
   --example deadlines \
   -- \
   "${HELLO_COMPONENT}" \

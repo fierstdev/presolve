@@ -1,6 +1,6 @@
 mod bindings {
     wit_bindgen::generate!({
-        path: "../../wit/edgezero-app",
+        path: "../../wit/presolve-app",
         world: "application",
     });
 }
@@ -9,7 +9,7 @@ struct HelloComponent;
 
 impl bindings::Guest for HelloComponent {
     fn run(input: String) -> String {
-        format!("Hello from EdgeZero, {input}.")
+        format!("Hello from Presolve, {input}.")
     }
 }
 

@@ -4,7 +4,7 @@ set -euo pipefail
 
 readonly MANIFEST="examples/adversarial/Cargo.toml"
 readonly TARGET="wasm32-wasip2"
-readonly COMPONENT="examples/adversarial/target/${TARGET}/debug/edgezero_example_adversarial.wasm"
+readonly COMPONENT="examples/adversarial/target/${TARGET}/debug/presolve_example_adversarial.wasm"
 
 echo "== build adversarial component =="
 
@@ -25,7 +25,7 @@ set +e
 SPIN_OUTPUT="$(
   cargo run \
     --quiet \
-    -p edgezero-runtime \
+    -p presolve-runtime \
     --example invoke \
     -- "${COMPONENT}" spin 2>&1
 )"
@@ -56,7 +56,7 @@ set +e
 MEMORY_OUTPUT="$(
   cargo run \
     --quiet \
-    -p edgezero-runtime \
+    -p presolve-runtime \
     --example invoke \
     -- "${COMPONENT}" memory 2>&1
 )"
@@ -75,4 +75,4 @@ fi
 echo "✓ excessive memory growth was rejected"
 
 echo
-echo "EdgeZero runtime limit checks passed"
+echo "Presolve runtime limit checks passed"

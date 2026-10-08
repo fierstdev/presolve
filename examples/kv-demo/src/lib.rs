@@ -1,14 +1,14 @@
 mod bindings {
     wit_bindgen::generate!({
-        path: "../../wit/edgezero-app",
+        path: "../../wit/presolve-app",
         world: "kv-application",
         with: {
-            "edgezero:kv/store@0.1.0": generate,
+            "presolve:kv/store@0.1.0": generate,
         },
     });
 }
 
-use bindings::edgezero::kv::store;
+use bindings::presolve::kv::store;
 
 struct KeyValueComponent;
 

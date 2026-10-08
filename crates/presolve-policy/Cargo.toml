@@ -1,0 +1,14 @@
+[package]
+name = "presolve-policy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+presolve-core.workspace = true
+
+[lints]
+workspace = true

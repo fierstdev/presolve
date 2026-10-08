@@ -1,0 +1,19 @@
+package presolve:app@0.1.0;
+
+/// The minimum application world understood by the initial Presolve runtime.
+///
+/// This world deliberately contains no imported capabilities.
+world application {
+    export run: func(input: string) -> string;
+}
+
+/// An Presolve application that requires key/value storage.
+///
+/// This is currently an explicit world used to prove capability binding.
+/// Later the Presolve build pipeline will derive and validate capability
+/// requirements automatically.
+world kv-application {
+    import presolve:kv/store@0.1.0;
+
+    export run: func(input: string) -> string;
+}
