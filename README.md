@@ -1,6 +1,24 @@
-# Presolve
+<p align="center">
+  <picture>
+    <source
+      media="(prefers-color-scheme: dark)"
+      srcset="./assets/brand/presolve-lockup-dark.svg"
+    >
+    <source
+      media="(prefers-color-scheme: light)"
+      srcset="./assets/brand/presolve-lockup-light.svg"
+    >
+    <img
+      alt="Presolve"
+      src="./assets/brand/presolve-lockup-light.svg"
+      width="360"
+    >
+  </picture>
+</p>
 
-**Build software once. Decide where it runs later.**
+<p align="center">
+  <strong>Build software once. Decide where it runs later.</strong>
+</p>
 
 Presolve is an open application portability and distribution layer.
 

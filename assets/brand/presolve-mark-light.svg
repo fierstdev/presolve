@@ -1,0 +1,19 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 100 120"
+  role="img"
+  aria-labelledby="title"
+>
+  <title id="title">Presolve</title>
+  <path
+    d="M 10 10 H 90 V 34 H 34 V 110 H 10 Z"
+    fill="#09090B"
+  />
+  <rect
+    x="40"
+    y="40"
+    width="50"
+    height="50"
+    fill="#F59E0B"
+  />
+</svg>
