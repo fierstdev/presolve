@@ -1,5 +1,5 @@
 use presolve_contract::{ApplicationContract, ContractVersion, OutboundNetworkMode};
-use presolve_core::{ArtifactDigest, ProductVersion, WorkloadKind};
+use presolve_core::{ArtifactDigest, InterfaceKind, ProductVersion, WorkloadKind};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -32,6 +32,12 @@ pub struct BundleManifest {
     application: ApplicationManifest,
     requirements: RequirementsManifest,
     workloads: Vec<WorkloadManifest>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    interfaces: Vec<InterfaceManifest>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    relationships: Vec<RelationshipManifest>,
 }
 
 impl BundleManifest {
@@ -54,39 +60,8 @@ impl BundleManifest {
             description: contract.application().description().map(str::to_owned),
         };
 
-        let mut capabilities = contract
-            .capabilities()
-            .iter()
-            .map(|capability| CapabilityManifest {
-                interface: capability.interface().to_owned(),
-                version: capability.version().to_string(),
-                optional: capability.optional(),
-            })
-            .collect::<Vec<_>>();
-
-        capabilities.sort_by(|left, right| {
-            left.interface
-                .cmp(&right.interface)
-                .then_with(|| left.version.cmp(&right.version))
-                .then_with(|| left.optional.cmp(&right.optional))
-        });
-
-        let mut allow = contract.network().allow().to_vec();
-        allow.sort();
-        allow.dedup();
-
-        let requirements = RequirementsManifest {
-            contract_version: contract.contract_version(),
-            capabilities,
-            resources: ResourceManifest {
-                memory_mib: contract.resources().memory_mib(),
-                cpu_millis: contract.resources().cpu_millis(),
-            },
-            network: NetworkManifest {
-                outbound: contract.network().outbound(),
-                allow,
-            },
-        };
+        let requirements = canonical_requirements(contract);
+        let (interfaces, relationships) = canonical_topology(contract);
 
         let mut expected = if contract.workloads().is_empty() {
             vec![("main".to_owned(), WorkloadKind::Component)]
@@ -161,6 +136,8 @@ impl BundleManifest {
             application,
             requirements,
             workloads,
+            interfaces,
+            relationships,
         })
     }
 
@@ -188,6 +165,18 @@ impl BundleManifest {
         &self.workloads
     }
 
+    /// Returns application-internal interfaces in canonical order.
+    #[must_use]
+    pub fn interfaces(&self) -> &[InterfaceManifest] {
+        &self.interfaces
+    }
+
+    /// Returns application-internal relationships in canonical order.
+    #[must_use]
+    pub fn relationships(&self) -> &[RelationshipManifest] {
+        &self.relationships
+    }
+
     /// Serializes the semantic manifest into canonical JSON bytes.
     ///
     /// Collections whose source ordering is not semantically significant are
@@ -212,6 +201,80 @@ impl BundleManifest {
     pub fn release_digest(&self) -> Result<ArtifactDigest, serde_json::Error> {
         Ok(ArtifactDigest::from_content(&self.canonical_bytes()?))
     }
+}
+
+fn canonical_requirements(contract: &ApplicationContract) -> RequirementsManifest {
+    let mut capabilities = contract
+        .capabilities()
+        .iter()
+        .map(|capability| CapabilityManifest {
+            interface: capability.interface().to_owned(),
+            version: capability.version().to_string(),
+            optional: capability.optional(),
+        })
+        .collect::<Vec<_>>();
+
+    capabilities.sort_by(|left, right| {
+        left.interface
+            .cmp(&right.interface)
+            .then_with(|| left.version.cmp(&right.version))
+            .then_with(|| left.optional.cmp(&right.optional))
+    });
+
+    let mut allow = contract.network().allow().to_vec();
+    allow.sort();
+    allow.dedup();
+
+    RequirementsManifest {
+        contract_version: contract.contract_version(),
+        capabilities,
+        resources: ResourceManifest {
+            memory_mib: contract.resources().memory_mib(),
+            cpu_millis: contract.resources().cpu_millis(),
+        },
+        network: NetworkManifest {
+            outbound: contract.network().outbound(),
+            allow,
+        },
+    }
+}
+
+fn canonical_topology(
+    contract: &ApplicationContract,
+) -> (Vec<InterfaceManifest>, Vec<RelationshipManifest>) {
+    let mut interfaces = contract
+        .interfaces()
+        .iter()
+        .map(|interface| InterfaceManifest {
+            name: interface.name().to_owned(),
+            kind: interface.kind(),
+        })
+        .collect::<Vec<_>>();
+
+    interfaces.sort_by(|left, right| {
+        left.name
+            .cmp(&right.name)
+            .then_with(|| left.kind.cmp(&right.kind))
+    });
+
+    let mut relationships = contract
+        .relationships()
+        .iter()
+        .map(|relationship| RelationshipManifest {
+            from: relationship.from().to_owned(),
+            to: relationship.to().to_owned(),
+            interface: relationship.interface().to_owned(),
+        })
+        .collect::<Vec<_>>();
+
+    relationships.sort_by(|left, right| {
+        left.from
+            .cmp(&right.from)
+            .then_with(|| left.to.cmp(&right.to))
+            .then_with(|| left.interface.cmp(&right.interface))
+    });
+
+    (interfaces, relationships)
 }
 
 /// Application metadata stored in the release manifest.
@@ -387,6 +450,57 @@ impl WorkloadManifest {
     #[must_use]
     pub fn artifacts(&self) -> &[ArtifactManifest] {
         &self.artifacts
+    }
+}
+
+/// Canonical application-internal interface.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InterfaceManifest {
+    name: String,
+    kind: InterfaceKind,
+}
+
+impl InterfaceManifest {
+    /// Returns the application-local interface name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the interface interaction semantics.
+    #[must_use]
+    pub const fn kind(&self) -> InterfaceKind {
+        self.kind
+    }
+}
+
+/// Canonical directed relationship between application workloads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RelationshipManifest {
+    from: String,
+    to: String,
+    interface: String,
+}
+
+impl RelationshipManifest {
+    /// Returns the workload initiating the interaction.
+    #[must_use]
+    pub fn from(&self) -> &str {
+        &self.from
+    }
+
+    /// Returns the workload receiving the interaction.
+    #[must_use]
+    pub fn to(&self) -> &str {
+        &self.to
+    }
+
+    /// Returns the application-local interface used by the relationship.
+    #[must_use]
+    pub fn interface(&self) -> &str {
+        &self.interface
     }
 }
 

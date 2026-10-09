@@ -438,7 +438,7 @@ mod tests {
     use presolve_contract::{ApplicationContract, parse_contract};
 
     use super::*;
-    use crate::{COMPONENT_ARTIFACT_PATH, WorkloadKind};
+    use crate::{COMPONENT_ARTIFACT_PATH, InterfaceKind, WorkloadKind};
 
     const COMPONENT: &[u8] = b"example component bytes";
     const API_COMPONENT: &[u8] = b"api component bytes";
@@ -463,6 +463,262 @@ mod tests {
     "#,
         )
         .expect("multi-workload contract should parse")
+    }
+
+    fn topology_contract() -> ApplicationContract {
+        parse_contract(
+            r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "topology-example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "api"
+    kind = "component"
+
+    [[workloads]]
+    name = "worker"
+    kind = "component"
+
+    [[interfaces]]
+    name = "jobs"
+    kind = "request_response"
+
+    [[interfaces]]
+    name = "audit"
+    kind = "event"
+
+    [[relationships]]
+    from = "api"
+    to = "worker"
+    interface = "jobs"
+
+    [[relationships]]
+    from = "worker"
+    to = "api"
+    interface = "audit"
+    "#,
+        )
+        .expect("topology contract should parse")
+    }
+
+    #[test]
+    fn application_topology_is_stored_in_manifest() {
+        let contract = topology_contract();
+
+        let bundle = PresolveBundle::from_components(
+            &contract,
+            &[
+                ComponentArtifactInput::new("api", API_COMPONENT),
+                ComponentArtifactInput::new("worker", WORKER_COMPONENT),
+            ],
+        )
+        .expect("bundle should build");
+
+        let interfaces = bundle.manifest().interfaces();
+
+        assert_eq!(interfaces.len(), 2);
+
+        assert_eq!(interfaces[0].name(), "audit");
+        assert_eq!(interfaces[0].kind(), InterfaceKind::Event);
+
+        assert_eq!(interfaces[1].name(), "jobs");
+        assert_eq!(interfaces[1].kind(), InterfaceKind::RequestResponse);
+
+        let relationships = bundle.manifest().relationships();
+
+        assert_eq!(relationships.len(), 2);
+
+        assert_eq!(relationships[0].from(), "api");
+        assert_eq!(relationships[0].to(), "worker");
+        assert_eq!(relationships[0].interface(), "jobs");
+
+        assert_eq!(relationships[1].from(), "worker");
+        assert_eq!(relationships[1].to(), "api");
+        assert_eq!(relationships[1].interface(), "audit");
+    }
+
+    #[test]
+    fn topology_declaration_order_does_not_change_release_identity() {
+        let first_contract = parse_contract(
+            r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "topology-example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "api"
+    kind = "component"
+
+    [[workloads]]
+    name = "worker"
+    kind = "component"
+
+    [[interfaces]]
+    name = "jobs"
+    kind = "request_response"
+
+    [[interfaces]]
+    name = "audit"
+    kind = "event"
+
+    [[relationships]]
+    from = "api"
+    to = "worker"
+    interface = "jobs"
+
+    [[relationships]]
+    from = "worker"
+    to = "api"
+    interface = "audit"
+    "#,
+        )
+        .expect("first contract should parse");
+
+        let second_contract = parse_contract(
+            r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "topology-example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "api"
+    kind = "component"
+
+    [[workloads]]
+    name = "worker"
+    kind = "component"
+
+    [[interfaces]]
+    name = "audit"
+    kind = "event"
+
+    [[interfaces]]
+    name = "jobs"
+    kind = "request_response"
+
+    [[relationships]]
+    from = "worker"
+    to = "api"
+    interface = "audit"
+
+    [[relationships]]
+    from = "api"
+    to = "worker"
+    interface = "jobs"
+    "#,
+        )
+        .expect("second contract should parse");
+
+        let components = [
+            ComponentArtifactInput::new("api", API_COMPONENT),
+            ComponentArtifactInput::new("worker", WORKER_COMPONENT),
+        ];
+
+        let first = PresolveBundle::from_components(&first_contract, &components)
+            .expect("first bundle should build");
+
+        let second = PresolveBundle::from_components(&second_contract, &components)
+            .expect("second bundle should build");
+
+        assert_eq!(
+            first
+                .release_digest()
+                .expect("first release digest should compute"),
+            second
+                .release_digest()
+                .expect("second release digest should compute")
+        );
+
+        assert_eq!(
+            first.encode().expect("first bundle should encode"),
+            second.encode().expect("second bundle should encode")
+        );
+    }
+
+    #[test]
+    fn topology_change_changes_release_identity() {
+        let first_contract = parse_contract(
+            r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "topology-example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "api"
+    kind = "component"
+
+    [[workloads]]
+    name = "worker"
+    kind = "component"
+
+    [[interfaces]]
+    name = "jobs"
+    kind = "request_response"
+
+    [[relationships]]
+    from = "api"
+    to = "worker"
+    interface = "jobs"
+    "#,
+        )
+        .expect("first contract should parse");
+
+        let second_contract = parse_contract(
+            r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "topology-example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "api"
+    kind = "component"
+
+    [[workloads]]
+    name = "worker"
+    kind = "component"
+
+    [[interfaces]]
+    name = "jobs"
+    kind = "request_response"
+
+    [[relationships]]
+    from = "worker"
+    to = "api"
+    interface = "jobs"
+    "#,
+        )
+        .expect("second contract should parse");
+
+        let components = [
+            ComponentArtifactInput::new("api", API_COMPONENT),
+            ComponentArtifactInput::new("worker", WORKER_COMPONENT),
+        ];
+
+        let first = PresolveBundle::from_components(&first_contract, &components)
+            .expect("first bundle should build");
+
+        let second = PresolveBundle::from_components(&second_contract, &components)
+            .expect("second bundle should build");
+
+        assert_ne!(
+            first
+                .release_digest()
+                .expect("first release digest should compute"),
+            second
+                .release_digest()
+                .expect("second release digest should compute")
+        );
     }
 
     #[test]
