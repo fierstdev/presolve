@@ -1,6 +1,6 @@
 use std::{env, fs};
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use presolve_bundle::{ComponentArtifactInput, PresolveBundle};
 use presolve_contract::parse_contract;
 

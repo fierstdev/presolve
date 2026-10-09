@@ -1,4 +1,4 @@
-use presolve_core::{ProductVersion, WorkloadKind};
+use presolve_core::{InterfaceKind, ProductVersion, WorkloadKind};
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 
@@ -6,9 +6,9 @@ use crate::ContractVersion;
 
 /// Complete `Presolve` Application Contract.
 ///
-/// An Application Contract describes what an application requires from an
-/// execution environment without describing how that environment must be
-/// provisioned.
+/// An Application Contract describes application semantics, composition, and
+/// environment requirements without describing how an execution environment
+/// must realize them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ApplicationContract {
@@ -17,6 +17,12 @@ pub struct ApplicationContract {
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     workloads: Vec<WorkloadDefinition>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    interfaces: Vec<InterfaceDefinition>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    relationships: Vec<RelationshipDefinition>,
 
     #[serde(default)]
     capabilities: Vec<CapabilityRequirement>,
@@ -45,6 +51,18 @@ impl ApplicationContract {
     #[must_use]
     pub fn workloads(&self) -> &[WorkloadDefinition] {
         &self.workloads
+    }
+
+    /// Returns application-internal interfaces.
+    #[must_use]
+    pub fn interfaces(&self) -> &[InterfaceDefinition] {
+        &self.interfaces
+    }
+
+    /// Returns application-internal workload relationships.
+    #[must_use]
+    pub fn relationships(&self) -> &[RelationshipDefinition] {
+        &self.relationships
     }
 
     /// Returns capability requirements declared by the application.
@@ -132,6 +150,64 @@ impl WorkloadDefinition {
     #[must_use]
     pub const fn kind(&self) -> WorkloadKind {
         self.kind
+    }
+}
+
+/// A named application-internal communication contract.
+///
+/// Interfaces describe logical interaction semantics. They do not prescribe a
+/// deployment transport such as TCP, HTTP, IPC, or in-process component
+/// linking.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InterfaceDefinition {
+    name: String,
+    kind: InterfaceKind,
+}
+
+impl InterfaceDefinition {
+    /// Returns the application-local interface name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the interface interaction semantics.
+    #[must_use]
+    pub const fn kind(&self) -> InterfaceKind {
+        self.kind
+    }
+}
+
+/// A directed application-internal connection between two workloads.
+///
+/// The relationship declares semantic topology only. How the connection is
+/// realized is a deployment concern.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RelationshipDefinition {
+    from: String,
+    to: String,
+    interface: String,
+}
+
+impl RelationshipDefinition {
+    /// Returns the workload initiating the interaction.
+    #[must_use]
+    pub fn from(&self) -> &str {
+        &self.from
+    }
+
+    /// Returns the workload receiving the interaction.
+    #[must_use]
+    pub fn to(&self) -> &str {
+        &self.to
+    }
+
+    /// Returns the application-local interface used by the relationship.
+    #[must_use]
+    pub fn interface(&self) -> &str {
+        &self.interface
     }
 }
 

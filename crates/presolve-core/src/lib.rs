@@ -9,6 +9,7 @@
 mod diagnostic;
 mod digest;
 mod id;
+mod interface;
 mod version;
 mod workload;
 
@@ -18,6 +19,7 @@ pub use diagnostic::{
 };
 pub use digest::{ArtifactDigest, ArtifactDigestParseError, SHA256_LENGTH, SHA256_PREFIX};
 pub use id::{ApplicationId, EnvironmentId, IdParseError, ProviderId};
+pub use interface::InterfaceKind;
 pub use version::{
     PRODUCT_VERSION, PROTOCOL_VERSION, ProductVersion, ProtocolVersion, ProtocolVersionParseError,
 };

@@ -34,6 +34,24 @@ pub mod diagnostic_codes {
 
     /// The same workload name is declared more than once.
     pub const DUPLICATE_WORKLOAD: u16 = 1_009;
+
+    /// An application-internal interface name is invalid.
+    pub const INVALID_INTERFACE_NAME: u16 = 1_010;
+
+    /// The same application-internal interface is declared more than once.
+    pub const DUPLICATE_INTERFACE: u16 = 1_011;
+
+    /// A relationship references a workload that does not exist.
+    pub const UNKNOWN_RELATIONSHIP_WORKLOAD: u16 = 1_012;
+
+    /// A relationship references an interface that does not exist.
+    pub const UNKNOWN_RELATIONSHIP_INTERFACE: u16 = 1_013;
+
+    /// A relationship connects a workload to itself.
+    pub const SELF_RELATIONSHIP: u16 = 1_014;
+
+    /// The same relationship is declared more than once.
+    pub const DUPLICATE_RELATIONSHIP: u16 = 1_015;
 }
 
 impl ApplicationContract {
@@ -48,6 +66,8 @@ impl ApplicationContract {
         self.validate_contract_version(&mut diagnostics);
         self.validate_application(&mut diagnostics);
         self.validate_workloads(&mut diagnostics);
+        self.validate_interfaces(&mut diagnostics);
+        self.validate_relationships(&mut diagnostics);
         self.validate_capabilities(&mut diagnostics);
         self.validate_resources(&mut diagnostics);
         self.validate_network(&mut diagnostics);
@@ -119,6 +139,114 @@ impl ApplicationContract {
                         format!("workload `{name}` is declared more than once"),
                     )
                     .with_help("declare each workload name once within an application"),
+                );
+            }
+        }
+    }
+
+    fn validate_interfaces(&self, diagnostics: &mut Vec<Diagnostic>) {
+        let mut names = HashSet::new();
+
+        for interface in self.interfaces() {
+            let name = interface.name();
+
+            if !valid_kebab_segment(name) {
+                diagnostics.push(
+                    error(
+                        diagnostic_codes::INVALID_INTERFACE_NAME,
+                        format!("invalid interface name `{name}`"),
+                    )
+                    .with_help(
+                        "use 1-63 lowercase ASCII letters, digits, or hyphens; \
+                         begin with a letter and end with a letter or digit",
+                    ),
+                );
+            }
+
+            if !names.insert(name) {
+                diagnostics.push(
+                    error(
+                        diagnostic_codes::DUPLICATE_INTERFACE,
+                        format!("interface `{name}` is declared more than once"),
+                    )
+                    .with_help("declare each application-internal interface name once"),
+                );
+            }
+        }
+    }
+
+    fn validate_relationships(&self, diagnostics: &mut Vec<Diagnostic>) {
+        let workloads = self
+            .workloads()
+            .iter()
+            .map(crate::WorkloadDefinition::name)
+            .collect::<HashSet<_>>();
+
+        let interfaces = self
+            .interfaces()
+            .iter()
+            .map(crate::InterfaceDefinition::name)
+            .collect::<HashSet<_>>();
+
+        let mut relationships = HashSet::new();
+
+        for relationship in self.relationships() {
+            let from = relationship.from();
+            let to = relationship.to();
+            let interface = relationship.interface();
+
+            if !workloads.contains(from) {
+                diagnostics.push(
+                    error(
+                        diagnostic_codes::UNKNOWN_RELATIONSHIP_WORKLOAD,
+                        format!("relationship references unknown source workload `{from}`"),
+                    )
+                    .with_help("declare the source workload in `[[workloads]]`"),
+                );
+            }
+
+            if !workloads.contains(to) {
+                diagnostics.push(
+                    error(
+                        diagnostic_codes::UNKNOWN_RELATIONSHIP_WORKLOAD,
+                        format!("relationship references unknown target workload `{to}`"),
+                    )
+                    .with_help("declare the target workload in `[[workloads]]`"),
+                );
+            }
+
+            if !interfaces.contains(interface) {
+                diagnostics.push(
+                    error(
+                        diagnostic_codes::UNKNOWN_RELATIONSHIP_INTERFACE,
+                        format!("relationship references unknown interface `{interface}`"),
+                    )
+                    .with_help("declare the interface in `[[interfaces]]`"),
+                );
+            }
+
+            if from == to {
+                diagnostics.push(
+                    error(
+                        diagnostic_codes::SELF_RELATIONSHIP,
+                        format!("relationship connects workload `{from}` to itself"),
+                    )
+                    .with_help(
+                        "application topology relationships must connect distinct workloads",
+                    ),
+                );
+            }
+
+            if !relationships.insert((from, to, interface)) {
+                diagnostics.push(
+                    error(
+                        diagnostic_codes::DUPLICATE_RELATIONSHIP,
+                        format!(
+                            "relationship `{from}` -> `{to}` using `{interface}` \
+                             is declared more than once"
+                        ),
+                    )
+                    .with_help("declare each workload relationship once"),
                 );
             }
         }
