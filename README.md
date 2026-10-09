@@ -5,6 +5,8 @@
 Presolve is an open application portability and distribution layer.
 
 It separates **what an application is** from **where and how that application is realized**.
+A Presolve application declares what it needs rather than how its
+infrastructure must be constructed.
 
 Instead of embedding deployment assumptions into application code, a Presolve application describes its workloads, internal topology, capabilities, resource requirements, and constraints. An environment describes what it can provide. Presolve determines whether the application can run there and produces the plan needed to realize it.
 
