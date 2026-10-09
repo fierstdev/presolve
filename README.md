@@ -5,7 +5,7 @@
 Presolve is an application runtime and software-distribution platform for
 software that must cross infrastructure boundaries.
 
-An Presolve application declares what it needs rather than how its
+A Presolve application declares what it needs rather than how its
 infrastructure must be constructed.
 
 The same application artifact can ultimately run across environments such as:
