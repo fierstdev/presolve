@@ -1,5 +1,5 @@
 [package]
-name = "presolve-provider-sdk"
+name = "presolve-capability"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +8,9 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-presolve-capability.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 
 [lints]

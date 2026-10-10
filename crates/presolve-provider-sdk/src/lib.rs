@@ -2,9 +2,9 @@
 
 //! Provider interfaces implemented by `Presolve` capability backends.
 //!
-//! Application components depend on versioned WIT capabilities. Host-side
-//! infrastructure implements the corresponding provider traits from this
-//! crate.
+//! Capability semantics are defined independently of their binding transport.
+//! Host-side infrastructure implements provider traits from this crate, while
+//! WIT remains one binding target for WebAssembly Component workloads.
 
 mod kv;
 
