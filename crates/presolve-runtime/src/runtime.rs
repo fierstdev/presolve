@@ -93,7 +93,7 @@ pub struct Runtime {
     limits: RuntimeLimits,
     key_value_provider: Arc<dyn KeyValueProvider>,
     // Materialized now; consumed by the object-storage host binding in 13.9.
-    _object_store_provider: Arc<dyn ObjectStoreProvider>,
+    object_store_provider: Arc<dyn ObjectStoreProvider>,
 }
 
 impl Runtime {
@@ -165,7 +165,11 @@ impl Runtime {
     ) -> Result<String, RuntimeError> {
         let mut store = Store::new(
             &self.engine,
-            RuntimeState::new(self.limits, Arc::clone(&self.key_value_provider)),
+            RuntimeState::new(
+                self.limits,
+                Arc::clone(&self.key_value_provider),
+                Arc::clone(&self.object_store_provider),
+            ),
         );
 
         store.limiter(RuntimeState::limits_mut);
@@ -225,12 +229,18 @@ impl Runtime {
         )
         .map_err(RuntimeError::CapabilityLinker)?;
 
+        crate::bindings::objects::presolve::objects::store::add_to_linker::<_, HasSelf<_>>(
+            &mut linker,
+            |state| state,
+        )
+        .map_err(RuntimeError::CapabilityLinker)?;
+
         Ok(Self {
             engine,
             linker,
             limits,
             key_value_provider,
-            _object_store_provider: object_store_provider,
+            object_store_provider,
         })
     }
 }

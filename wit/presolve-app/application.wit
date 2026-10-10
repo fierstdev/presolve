@@ -17,3 +17,11 @@ world kv-application {
 
     export run: func(input: string) -> string;
 }
+
+
+/// A Presolve application that requires object storage.
+world objects-application {
+    import presolve:objects/store@0.1.0;
+
+    export run: func(input: string) -> string;
+}

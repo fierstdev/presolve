@@ -1,10 +1,16 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
-use presolve_provider_sdk::KeyValueProvider;
+use presolve_provider_sdk::{KeyValueProvider, ObjectRead, ObjectStoreProvider};
 use wasmtime::{ResourceLimiter, StoreLimits, component::ResourceTable};
 use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
 
 use crate::RuntimeLimits;
+
+pub(crate) struct PendingObjectWrite {
+    pub(crate) key: String,
+    pub(crate) size: u64,
+    pub(crate) body: Vec<u8>,
+}
 
 /// Per-instance host state.
 ///
@@ -15,6 +21,10 @@ pub(crate) struct RuntimeState {
     wasi: WasiCtx,
     limits: StoreLimits,
     key_value_provider: Arc<dyn KeyValueProvider>,
+    object_store_provider: Arc<dyn ObjectStoreProvider>,
+    object_reads: BTreeMap<u64, ObjectRead>,
+    object_writes: BTreeMap<u64, PendingObjectWrite>,
+    next_object_handle: u64,
 }
 
 impl RuntimeState {
@@ -22,6 +32,7 @@ impl RuntimeState {
     pub(crate) fn new(
         runtime_limits: RuntimeLimits,
         key_value_provider: Arc<dyn KeyValueProvider>,
+        object_store_provider: Arc<dyn ObjectStoreProvider>,
     ) -> Self {
         let mut builder = WasiCtx::builder();
 
@@ -30,6 +41,10 @@ impl RuntimeState {
             wasi: builder.build(),
             limits: runtime_limits.store_limits(),
             key_value_provider,
+            object_store_provider,
+            object_reads: BTreeMap::new(),
+            object_writes: BTreeMap::new(),
+            next_object_handle: 1,
         }
     }
 
@@ -39,6 +54,40 @@ impl RuntimeState {
 
     pub(crate) fn key_value_provider(&self) -> &dyn KeyValueProvider {
         self.key_value_provider.as_ref()
+    }
+
+    pub(crate) fn object_store_provider(&self) -> &dyn ObjectStoreProvider {
+        self.object_store_provider.as_ref()
+    }
+
+    pub(crate) fn allocate_object_handle(&mut self) -> Option<u64> {
+        let handle = self.next_object_handle;
+        self.next_object_handle = self.next_object_handle.checked_add(1)?;
+        Some(handle)
+    }
+
+    pub(crate) fn insert_object_read(&mut self, handle: u64, read: ObjectRead) {
+        self.object_reads.insert(handle, read);
+    }
+
+    pub(crate) fn object_read_mut(&mut self, handle: u64) -> Option<&mut ObjectRead> {
+        self.object_reads.get_mut(&handle)
+    }
+
+    pub(crate) fn remove_object_read(&mut self, handle: u64) -> Option<ObjectRead> {
+        self.object_reads.remove(&handle)
+    }
+
+    pub(crate) fn insert_object_write(&mut self, handle: u64, write: PendingObjectWrite) {
+        self.object_writes.insert(handle, write);
+    }
+
+    pub(crate) fn object_write_mut(&mut self, handle: u64) -> Option<&mut PendingObjectWrite> {
+        self.object_writes.get_mut(&handle)
+    }
+
+    pub(crate) fn remove_object_write(&mut self, handle: u64) -> Option<PendingObjectWrite> {
+        self.object_writes.remove(&handle)
     }
 }
 

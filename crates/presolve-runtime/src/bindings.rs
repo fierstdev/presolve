@@ -16,4 +16,13 @@ pub(crate) mod kv {
     });
 }
 
+pub(crate) mod objects {
+    wasmtime::component::bindgen!({
+        path: "../../wit/presolve-app",
+        interfaces: "
+            import presolve:objects/store@0.1.0;
+        ",
+    });
+}
+
 pub(crate) use application::Application;

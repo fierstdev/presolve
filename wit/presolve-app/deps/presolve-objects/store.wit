@@ -1,0 +1,50 @@
+package presolve:objects@0.1.0;
+
+/// Host-provided object storage.
+///
+/// The semantic capability is provider-neutral. This WIT interface is one
+/// transport projection of that capability and uses opaque handles so object
+/// bodies can cross the Component Model boundary incrementally.
+interface store {
+    record object-info {
+        key: string,
+        size: u64,
+    }
+
+    record read-session {
+        handle: u64,
+        info: object-info,
+    }
+
+    variant error {
+        unavailable(string),
+        invalid-key(string),
+        invalid-body(string),
+        invalid-handle(string),
+        invalid-request(string),
+        internal(string),
+    }
+
+    get: func(key: string) -> result<option<read-session>, error>;
+
+    /// Returns an empty byte list at end-of-object.
+    read: func(handle: u64, max-bytes: u64) -> result<list<u8>, error>;
+
+    close-read: func(handle: u64) -> result<_, error>;
+
+    /// Begin a complete object replacement.
+    put: func(key: string, size: u64) -> result<u64, error>;
+
+    write: func(handle: u64, chunk: list<u8>) -> result<_, error>;
+
+    finish-put: func(handle: u64) -> result<object-info, error>;
+
+    abort-put: func(handle: u64) -> result<_, error>;
+
+    head: func(key: string) -> result<option<object-info>, error>;
+
+    delete: func(key: string) -> result<bool, error>;
+
+    /// Ordering is intentionally unspecified by the semantic contract.
+    list-objects: func(prefix: string) -> result<list<object-info>, error>;
+}
