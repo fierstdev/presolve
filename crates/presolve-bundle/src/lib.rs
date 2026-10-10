@@ -2,7 +2,7 @@
 
 //! Canonical immutable application bundles for `Presolve`.
 //!
-//! A `.presolve` bundle captures application semantics and immutable workload
+//! A `.presolved` bundle captures application semantics and immutable workload
 //! artifacts without embedding environment-specific deployment decisions.
 
 mod bundle;

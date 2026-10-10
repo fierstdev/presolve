@@ -3,7 +3,7 @@ use std::{fmt, num::ParseIntError, str::FromStr};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use thiserror::Error;
 
-/// Version of the `.presolve` bundle format.
+/// Version of the `.presolved` bundle format.
 ///
 /// Bundle format compatibility evolves independently from the product,
 /// Application Contract, and wire protocol versions.
@@ -33,7 +33,7 @@ impl BundleVersion {
     }
 }
 
-/// Initial `.presolve` bundle format.
+/// Initial `.presolved` bundle format.
 pub const BUNDLE_VERSION: BundleVersion = BundleVersion::new(0, 1);
 
 /// Error returned when a bundle format version cannot be parsed.

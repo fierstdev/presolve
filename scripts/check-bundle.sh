@@ -7,8 +7,8 @@ readonly CONTRACT="examples/kv-demo/presolve.toml"
 readonly TARGET="wasm32-wasip2"
 readonly COMPONENT="examples/kv-demo/target/${TARGET}/debug/presolve_example_kv_demo.wasm"
 
-readonly OUTPUT_A="${TMPDIR:-/tmp}/presolve-kv-demo-a.presolve"
-readonly OUTPUT_B="${TMPDIR:-/tmp}/presolve-kv-demo-b.presolve"
+readonly OUTPUT_A="${TMPDIR:-/tmp}/presolve-kv-demo-a.presolved"
+readonly OUTPUT_B="${TMPDIR:-/tmp}/presolve-kv-demo-b.presolved"
 
 cleanup() {
   rm -f "${OUTPUT_A}" "${OUTPUT_B}"
@@ -49,7 +49,7 @@ echo
 echo "== verify deterministic bundle bytes =="
 
 if ! cmp -s "${OUTPUT_A}" "${OUTPUT_B}"; then
-  echo "failure: identical inputs produced different .presolve bundles"
+  echo "failure: identical inputs produced different .presolved bundles"
   exit 1
 fi
 

@@ -9,8 +9,8 @@ readonly TARGET="wasm32-wasip2"
 readonly API="examples/multi-workload/target/${TARGET}/debug/presolve_example_multi_api.wasm"
 readonly WORKER="examples/multi-workload/target/${TARGET}/debug/presolve_example_multi_worker.wasm"
 
-readonly OUTPUT_A="${TMPDIR:-/tmp}/presolve-multi-a.presolve"
-readonly OUTPUT_B="${TMPDIR:-/tmp}/presolve-multi-b.presolve"
+readonly OUTPUT_A="${TMPDIR:-/tmp}/presolve-multi-a.presolved"
+readonly OUTPUT_B="${TMPDIR:-/tmp}/presolve-multi-b.presolved"
 
 cleanup() {
   rm -f "${OUTPUT_A}" "${OUTPUT_B}"

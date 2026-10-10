@@ -34,7 +34,7 @@ Application
 Application Contract
     │
     ▼
-Application Release (.presolve)
+Application Release (.presolved)
     │
     ├───────────────┐
     ▼               ▼
@@ -217,12 +217,12 @@ Depending on the eventual environment and deployment model, the same relationshi
 
 ## Application releases
 
-Presolve packages immutable application releases as `.presolve` bundles.
+Presolve packages immutable application releases as `.presolved` bundles.
 
 A release contains application semantics and workload artifacts, but does not contain deployment-specific provider selections or infrastructure configuration.
 
 ```text
-application.presolve
+application.presolved
 ├── manifest.json
 └── artifacts/
     ├── api.wasm
@@ -293,7 +293,7 @@ Implemented foundations include:
 - deterministic capability resolution
 - symbolic deployment plans
 - deployment-plan materialization
-- deterministic `.presolve` bundles
+- deterministic `.presolved` bundles
 - SHA-256 application release identity
 - multiple workloads per application
 - application-internal interfaces and topology at the contract layer

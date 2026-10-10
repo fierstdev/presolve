@@ -18,7 +18,7 @@ coverage/
 
 # Presolve generated artifacts
 .presolve/
-*.presolve
+*.presolved
 
 # Local configuration
 .env

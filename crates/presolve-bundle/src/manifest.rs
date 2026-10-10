@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use crate::{BUNDLE_VERSION, BundleError, BundleVersion, ComponentArtifactInput};
 
-/// Path of the canonical manifest inside a `.presolve` archive.
+/// Path of the canonical manifest inside a `.presolved` archive.
 pub const MANIFEST_PATH: &str = "manifest.json";
 
 /// Canonical path of the initial component artifact.

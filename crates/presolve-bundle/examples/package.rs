@@ -9,18 +9,18 @@ fn main() -> Result<()> {
 
     let contract_path = args
         .next()
-        .context("usage: package <presolve.toml> <component.wasm> <output.presolve>")?;
+        .context("usage: package <presolve.toml> <component.wasm> <output.presolved>")?;
 
     let component_path = args
         .next()
-        .context("usage: package <presolve.toml> <component.wasm> <output.presolve>")?;
+        .context("usage: package <presolve.toml> <component.wasm> <output.presolved>")?;
 
     let output_path = args
         .next()
-        .context("usage: package <presolve.toml> <component.wasm> <output.presolve>")?;
+        .context("usage: package <presolve.toml> <component.wasm> <output.presolved>")?;
 
     if args.next().is_some() {
-        bail!("usage: package <presolve.toml> <component.wasm> <output.presolve>");
+        bail!("usage: package <presolve.toml> <component.wasm> <output.presolved>");
     }
 
     let contract_source = fs::read_to_string(&contract_path)

@@ -13,7 +13,7 @@ use crate::{
     component_artifact_path,
 };
 
-/// Complete immutable `.presolve` application bundle.
+/// Complete immutable `.presolved` application bundle.
 ///
 /// Application release identity is derived from the canonical manifest rather
 /// than archive-container metadata.
@@ -240,7 +240,7 @@ impl PresolveBundle {
         Ok(())
     }
 
-    /// Encodes the bundle as a deterministic `.presolve` archive.
+    /// Encodes the bundle as a deterministic `.presolved` archive.
     ///
     /// Archive metadata is normalized and entries are emitted in stable order.
     /// Release identity nevertheless comes from the canonical manifest, not
@@ -269,7 +269,7 @@ impl PresolveBundle {
         builder.into_inner().map_err(BundleError::Archive)
     }
 
-    /// Decodes and verifies a `.presolve` archive.
+    /// Decodes and verifies a `.presolved` archive.
     ///
     /// # Errors
     ///
@@ -325,7 +325,7 @@ impl PresolveBundle {
     }
 }
 
-/// Failure while creating, decoding, or validating a `.presolve` bundle.
+/// Failure while creating, decoding, or validating a `.presolved` bundle.
 #[derive(Debug, Error)]
 pub enum BundleError {
     /// Archive encoding or decoding failed.

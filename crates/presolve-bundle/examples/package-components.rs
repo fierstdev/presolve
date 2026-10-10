@@ -8,12 +8,12 @@ fn main() -> Result<()> {
     let mut args = env::args().skip(1);
 
     let contract_path = args.next().context(
-        "usage: package-components <presolve.toml> <output.presolve> \
+        "usage: package-components <presolve.toml> <output.presolved> \
          <workload=component.wasm>...",
     )?;
 
     let output_path = args.next().context(
-        "usage: package-components <presolve.toml> <output.presolve> \
+        "usage: package-components <presolve.toml> <output.presolved> \
          <workload=component.wasm>...",
     )?;
 
@@ -21,7 +21,7 @@ fn main() -> Result<()> {
 
     if artifact_args.is_empty() {
         bail!(
-            "usage: package-components <presolve.toml> <output.presolve> \
+            "usage: package-components <presolve.toml> <output.presolved> \
              <workload=component.wasm>..."
         );
     }
