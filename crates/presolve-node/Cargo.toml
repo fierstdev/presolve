@@ -22,6 +22,7 @@ thiserror.workspace = true
 anyhow.workspace = true
 presolve-contract.workspace = true
 presolve-provider-kv-memory.workspace = true
+presolve-provider-objects-memory.workspace = true
 semver.workspace = true
 
 [lints]

@@ -1,5 +1,5 @@
 use presolve_core::ProviderId;
-use presolve_provider_sdk::KEY_VALUE_INTERFACE;
+use presolve_provider_sdk::{KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE};
 use presolve_resolver::DeploymentPlan;
 use presolve_runtime::{Runtime, RuntimeError};
 use thiserror::Error;
@@ -69,6 +69,19 @@ pub fn assemble_runtime(
                 builder = builder.key_value_provider(provider);
             }
 
+            OBJECT_STORE_INTERFACE => {
+                let provider_id = *binding.provider_id();
+
+                let provider = registry.object_store(provider_id).ok_or_else(|| {
+                    AssemblyError::MissingProvider {
+                        interface: binding.interface().to_owned(),
+                        provider_id,
+                    }
+                })?;
+
+                builder = builder.object_store_provider(provider);
+            }
+
             interface => {
                 return Err(AssemblyError::UnsupportedCapability {
                     interface: interface.to_owned(),
@@ -78,4 +91,91 @@ pub fn assemble_runtime(
     }
 
     builder.build().map_err(AssemblyError::Runtime)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use presolve_contract::parse_contract;
+    use presolve_core::{EnvironmentId, ProviderId};
+    use presolve_provider_objects_memory::InMemoryObjectStoreProvider;
+    use presolve_resolver::{
+        EnvironmentInventory, EnvironmentResources, ProvidedCapability, ProviderDescriptor, resolve,
+    };
+    use semver::Version;
+
+    use super::*;
+
+    fn object_storage_plan(provider_id: ProviderId) -> presolve_resolver::DeploymentPlan {
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "node-object-test"
+version = "0.0.1"
+
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+
+[resources]
+
+[network]
+outbound = "deny"
+"#,
+        )
+        .expect("test contract should parse");
+
+        let environment = EnvironmentInventory::new(
+            EnvironmentId::new(),
+            EnvironmentResources::new(512, 1_000),
+            vec![ProviderDescriptor::new(
+                provider_id,
+                "memory-objects",
+                vec![ProvidedCapability::new(
+                    OBJECT_STORE_INTERFACE,
+                    Version::new(0, 1, 0),
+                )],
+            )],
+        );
+
+        resolve(&contract, &environment)
+            .plan()
+            .expect("object-storage requirement should resolve")
+            .clone()
+    }
+
+    #[test]
+    fn assembles_object_storage_provider_from_resolved_plan() {
+        let provider_id = ProviderId::new();
+        let plan = object_storage_plan(provider_id);
+        let mut registry = ProviderRegistry::new();
+
+        registry
+            .register_object_store(provider_id, Arc::new(InMemoryObjectStoreProvider::new()))
+            .expect("object-store registration should succeed");
+
+        assemble_runtime(&plan, &registry).expect("object-store plan should materialize");
+    }
+
+    #[test]
+    fn missing_object_storage_provider_is_reported() {
+        let provider_id = ProviderId::new();
+        let plan = object_storage_plan(provider_id);
+        let registry = ProviderRegistry::new();
+
+        let Err(error) = assemble_runtime(&plan, &registry) else {
+            panic!("missing provider should be rejected");
+        };
+
+        assert!(matches!(
+            error,
+            AssemblyError::MissingProvider {
+                interface,
+                provider_id: missing_provider_id,
+            } if interface == OBJECT_STORE_INTERFACE && missing_provider_id == provider_id
+        ));
+    }
 }

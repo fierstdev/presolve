@@ -1,6 +1,9 @@
 use std::{sync::Arc, thread, time::Duration};
 
-use presolve_provider_sdk::{KeyValueProvider, UnavailableKeyValueProvider};
+use presolve_provider_sdk::{
+    KeyValueProvider, ObjectStoreProvider, UnavailableKeyValueProvider,
+    UnavailableObjectStoreProvider,
+};
 use wasmtime::{
     Config, Engine, Store, Trap,
     component::{Component, HasSelf, Linker},
@@ -19,6 +22,7 @@ use crate::{
 pub struct RuntimeBuilder {
     limits: RuntimeLimits,
     key_value_provider: Arc<dyn KeyValueProvider>,
+    object_store_provider: Arc<dyn ObjectStoreProvider>,
 }
 
 impl RuntimeBuilder {
@@ -29,6 +33,7 @@ impl RuntimeBuilder {
         Self {
             limits: RuntimeLimits::default(),
             key_value_provider: Arc::new(UnavailableKeyValueProvider),
+            object_store_provider: Arc::new(UnavailableObjectStoreProvider),
         }
     }
 
@@ -46,6 +51,16 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Supplies the provider for `presolve:objects/store`.
+    ///
+    /// The provider is materialized into runtime configuration here. Guest
+    /// Component Model bindings are added separately.
+    #[must_use]
+    pub fn object_store_provider(mut self, provider: Arc<dyn ObjectStoreProvider>) -> Self {
+        self.object_store_provider = provider;
+        self
+    }
+
     /// Builds the runtime.
     ///
     /// # Errors
@@ -53,7 +68,11 @@ impl RuntimeBuilder {
     /// Returns an error if the underlying Wasmtime runtime, linker, capability
     /// interfaces, or epoch ticker cannot be initialized.
     pub fn build(self) -> Result<Runtime, RuntimeError> {
-        Runtime::build(self.limits, self.key_value_provider)
+        Runtime::build(
+            self.limits,
+            self.key_value_provider,
+            self.object_store_provider,
+        )
     }
 }
 
@@ -73,6 +92,8 @@ pub struct Runtime {
     linker: Linker<RuntimeState>,
     limits: RuntimeLimits,
     key_value_provider: Arc<dyn KeyValueProvider>,
+    // Materialized now; consumed by the object-storage host binding in 13.9.
+    _object_store_provider: Arc<dyn ObjectStoreProvider>,
 }
 
 impl Runtime {
@@ -182,6 +203,7 @@ impl Runtime {
     fn build(
         limits: RuntimeLimits,
         key_value_provider: Arc<dyn KeyValueProvider>,
+        object_store_provider: Arc<dyn ObjectStoreProvider>,
     ) -> Result<Self, RuntimeError> {
         let mut config = Config::new();
 
@@ -208,6 +230,7 @@ impl Runtime {
             linker,
             limits,
             key_value_provider,
+            _object_store_provider: object_store_provider,
         })
     }
 }
