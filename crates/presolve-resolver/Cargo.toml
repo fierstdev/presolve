@@ -8,6 +8,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+presolve-capability.workspace = true
 presolve-contract.workspace = true
 presolve-core.workspace = true
 semver.workspace = true

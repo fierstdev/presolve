@@ -1,3 +1,4 @@
+use presolve_capability::CapabilityContract;
 use presolve_core::{EnvironmentId, ProviderId};
 use semver::Version;
 
@@ -39,6 +40,7 @@ impl EnvironmentResources {
 pub struct ProvidedCapability {
     interface: String,
     version: Version,
+    semantic_contract: Option<CapabilityContract>,
 }
 
 impl ProvidedCapability {
@@ -48,10 +50,22 @@ impl ProvidedCapability {
         Self {
             interface: interface.into(),
             version,
+            semantic_contract: None,
         }
     }
 
-    /// Returns the WIT capability interface identifier.
+    /// Creates a provider capability declaration from a canonical semantic
+    /// contract.
+    #[must_use]
+    pub fn from_contract(contract: CapabilityContract) -> Self {
+        Self {
+            interface: contract.interface().to_owned(),
+            version: contract.version().clone(),
+            semantic_contract: Some(contract),
+        }
+    }
+
+    /// Returns the capability interface identifier.
     #[must_use]
     pub fn interface(&self) -> &str {
         &self.interface
@@ -61,6 +75,13 @@ impl ProvidedCapability {
     #[must_use]
     pub const fn version(&self) -> &Version {
         &self.version
+    }
+
+    /// Returns the canonical semantic contract retained by this declaration,
+    /// when one was supplied.
+    #[must_use]
+    pub fn semantic_contract(&self) -> Option<&CapabilityContract> {
+        self.semantic_contract.as_ref()
     }
 }
 
@@ -147,5 +168,44 @@ impl EnvironmentInventory {
     #[must_use]
     pub fn providers(&self) -> &[ProviderDescriptor] {
         &self.providers
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use presolve_capability::{OBJECT_STORE_INTERFACE, object_store_contract};
+
+    use super::*;
+
+    #[test]
+    fn canonical_object_store_contract_can_be_advertised_by_environment() {
+        let contract = object_store_contract().expect("object-store contract should be valid");
+        let expected_version = contract.version().clone();
+        let provider_id = ProviderId::new();
+
+        let environment = EnvironmentInventory::new(
+            EnvironmentId::new(),
+            EnvironmentResources::new(512, 1_000),
+            vec![ProviderDescriptor::new(
+                provider_id,
+                "memory-objects",
+                vec![ProvidedCapability::from_contract(contract.clone())],
+            )],
+        );
+
+        let capability = &environment.providers()[0].capabilities()[0];
+
+        assert_eq!(capability.interface(), OBJECT_STORE_INTERFACE);
+        assert_eq!(capability.version(), &expected_version);
+        assert_eq!(capability.semantic_contract(), Some(&contract));
+    }
+
+    #[test]
+    fn generic_capability_declaration_remains_supported() {
+        let capability = ProvidedCapability::new("example:custom/service", Version::new(1, 2, 3));
+
+        assert_eq!(capability.interface(), "example:custom/service");
+        assert_eq!(capability.version(), &Version::new(1, 2, 3));
+        assert_eq!(capability.semantic_contract(), None);
     }
 }

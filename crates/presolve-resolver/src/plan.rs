@@ -1,3 +1,4 @@
+use presolve_capability::CapabilityContract;
 use presolve_core::{EnvironmentId, ProviderId};
 use semver::Version;
 
@@ -8,6 +9,7 @@ pub struct CapabilityBinding {
     provider_id: ProviderId,
     provider_name: String,
     provider_version: Version,
+    semantic_contract: Option<CapabilityContract>,
 }
 
 impl CapabilityBinding {
@@ -16,12 +18,14 @@ impl CapabilityBinding {
         provider_id: ProviderId,
         provider_name: String,
         provider_version: Version,
+        semantic_contract: Option<CapabilityContract>,
     ) -> Self {
         Self {
             interface,
             provider_id,
             provider_name,
             provider_version,
+            semantic_contract,
         }
     }
 
@@ -47,6 +51,13 @@ impl CapabilityBinding {
     #[must_use]
     pub const fn provider_version(&self) -> &Version {
         &self.provider_version
+    }
+
+    /// Returns the canonical semantic contract selected for this binding,
+    /// when the provider advertised one.
+    #[must_use]
+    pub fn semantic_contract(&self) -> Option<&CapabilityContract> {
+        self.semantic_contract.as_ref()
     }
 }
 

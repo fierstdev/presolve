@@ -1,3 +1,4 @@
+use presolve_capability::{OBJECT_STORE_INTERFACE, object_store_contract};
 use presolve_contract::parse_contract;
 use presolve_core::{EnvironmentId, ProviderId};
 use presolve_resolver::{
@@ -39,6 +40,16 @@ fn kv_provider(version: &str) -> ProviderDescriptor {
     )
 }
 
+fn object_provider(provider_id: ProviderId, name: &str) -> ProviderDescriptor {
+    ProviderDescriptor::new(
+        provider_id,
+        name,
+        vec![ProvidedCapability::from_contract(
+            object_store_contract().expect("object-store contract should be valid"),
+        )],
+    )
+}
+
 #[test]
 fn resolves_matching_required_capability() {
     let contract = contract(
@@ -71,6 +82,108 @@ cpu_millis = 100
         plan.bindings()[0].provider_version(),
         &Version::parse("0.1.7").expect("version should parse")
     );
+}
+
+#[test]
+fn resolves_required_object_storage_capability() {
+    let contract = contract(
+        r#"
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+"#,
+        "",
+    );
+
+    let provider_id = ProviderId::new();
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        vec![object_provider(provider_id, "memory-objects")],
+    );
+
+    let report = resolve(&contract, &environment);
+
+    assert!(
+        report.is_resolved(),
+        "canonical object-storage capability should resolve"
+    );
+
+    let plan = report.plan().expect("resolved report should contain plan");
+
+    assert_eq!(plan.bindings().len(), 1);
+    assert_eq!(plan.bindings()[0].interface(), OBJECT_STORE_INTERFACE);
+    assert_eq!(plan.bindings()[0].provider_id(), &provider_id);
+    assert_eq!(plan.bindings()[0].provider_name(), "memory-objects");
+
+    let expected_contract = object_store_contract().expect("object-store contract should be valid");
+
+    assert_eq!(
+        plan.bindings()[0].provider_version(),
+        expected_contract.version()
+    );
+    assert_eq!(
+        plan.bindings()[0].semantic_contract(),
+        Some(&expected_contract)
+    );
+}
+
+#[test]
+fn object_storage_requirement_does_not_bind_unrelated_capability() {
+    let contract = contract(
+        r#"
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+"#,
+        "",
+    );
+
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        vec![kv_provider("0.1.9")],
+    );
+
+    let report = resolve(&contract, &environment);
+
+    assert!(!report.is_resolved());
+    assert!(matches!(
+        report.problems(),
+        [ResolutionProblem::MissingCapability { interface, .. }]
+            if interface == OBJECT_STORE_INTERFACE
+    ));
+}
+
+#[test]
+fn object_storage_provider_is_selected_by_capability_identity() {
+    let contract = contract(
+        r#"
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+"#,
+        "",
+    );
+
+    let object_provider_id = ProviderId::new();
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        vec![
+            kv_provider("0.1.9"),
+            object_provider(object_provider_id, "memory-objects"),
+        ],
+    );
+
+    let report = resolve(&contract, &environment);
+    let plan = report
+        .plan()
+        .expect("object-storage environment should resolve");
+
+    assert_eq!(plan.bindings().len(), 1);
+    assert_eq!(plan.bindings()[0].interface(), OBJECT_STORE_INTERFACE);
+    assert_eq!(plan.bindings()[0].provider_id(), &object_provider_id);
 }
 
 #[test]

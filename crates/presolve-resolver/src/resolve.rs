@@ -26,6 +26,7 @@ pub fn resolve(
                     *provider.id(),
                     provider.name().to_owned(),
                     capability.version().clone(),
+                    capability.semantic_contract().cloned(),
                 ));
             }
             None if requirement.optional() => {
