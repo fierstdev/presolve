@@ -1,0 +1,15 @@
+[package]
+name = "presolve-provider-objects-memory"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+presolve-provider-sdk.workspace = true
+
+[lints]
+workspace = true
