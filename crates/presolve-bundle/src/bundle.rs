@@ -312,7 +312,10 @@ impl PresolveBundle {
             .remove(MANIFEST_PATH)
             .ok_or(BundleError::MissingManifest)?;
 
-        let manifest = serde_json::from_slice(&manifest_bytes).map_err(BundleError::Manifest)?;
+        let mut manifest: BundleManifest =
+            serde_json::from_slice(&manifest_bytes).map_err(BundleError::Manifest)?;
+
+        manifest.normalize();
 
         let bundle = Self {
             manifest,
@@ -610,6 +613,34 @@ mod tests {
 
         bundle.manifest =
             serde_json::from_value(manifest).expect("mutated manifest should deserialize");
+    }
+
+    fn decode_mutated_manifest(
+        bundle: &PresolveBundle,
+        mutate: impl FnOnce(&mut serde_json::Value),
+    ) -> Result<PresolveBundle, BundleError> {
+        let mut manifest =
+            serde_json::to_value(bundle.manifest()).expect("manifest should serialize");
+
+        mutate(&mut manifest);
+
+        let manifest = serde_json::to_vec(&manifest).expect("mutated manifest should serialize");
+
+        let mut builder = Builder::new(Vec::new());
+
+        append_entry(&mut builder, MANIFEST_PATH, &manifest)
+            .expect("manifest should append to adversarial archive");
+
+        for (path, bytes) in &bundle.artifacts {
+            append_entry(&mut builder, path, bytes)
+                .expect("artifact should append to adversarial archive");
+        }
+
+        let encoded = builder
+            .into_inner()
+            .expect("adversarial archive should finalize");
+
+        PresolveBundle::decode(&encoded)
     }
 
     #[test]
@@ -1380,5 +1411,213 @@ version = "1.0.0"
                 .release_digest()
                 .expect("second digest should compute")
         );
+    }
+
+    #[test]
+    fn decode_normalizes_manifest_collection_order() {
+        let bundle = topology_bundle();
+
+        let decoded = decode_mutated_manifest(&bundle, |manifest| {
+            for key in ["workloads", "interfaces", "relationships"] {
+                manifest
+                    .get_mut(key)
+                    .and_then(serde_json::Value::as_array_mut)
+                    .expect("manifest collection should be an array")
+                    .reverse();
+            }
+        })
+        .expect("non-canonical collection order should normalize during decode");
+
+        assert_eq!(decoded.manifest(), bundle.manifest());
+
+        assert_eq!(
+            decoded
+                .release_digest()
+                .expect("decoded release digest should compute"),
+            bundle
+                .release_digest()
+                .expect("original release digest should compute")
+        );
+    }
+
+    #[test]
+    fn decode_rejects_unknown_manifest_field() {
+        let bundle = topology_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            manifest
+                .as_object_mut()
+                .expect("manifest should be an object")
+                .insert("unexpected".to_owned(), serde_json::json!(true));
+        })
+        .expect_err("unknown manifest fields should fail decoding");
+
+        assert!(matches!(error, BundleError::Manifest(_)));
+    }
+
+    #[test]
+    fn decode_rejects_duplicate_manifest_workload() {
+        let bundle = topology_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let workloads = manifest
+                .get_mut("workloads")
+                .and_then(serde_json::Value::as_array_mut)
+                .expect("workloads should be an array");
+
+            let duplicate = workloads
+                .first()
+                .expect("manifest should contain a workload")
+                .clone();
+
+            workloads.push(duplicate);
+        })
+        .expect_err("duplicate workload should fail decoding");
+
+        assert!(matches!(
+            error,
+            BundleError::DuplicateManifestWorkload(workload) if workload == "api"
+        ));
+    }
+
+    #[test]
+    fn decode_rejects_duplicate_manifest_interface() {
+        let bundle = topology_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let interfaces = manifest
+                .get_mut("interfaces")
+                .and_then(serde_json::Value::as_array_mut)
+                .expect("interfaces should be an array");
+
+            let duplicate = interfaces
+                .first()
+                .expect("manifest should contain an interface")
+                .clone();
+
+            interfaces.push(duplicate);
+        })
+        .expect_err("duplicate interface should fail decoding");
+
+        assert!(matches!(
+            error,
+            BundleError::DuplicateManifestInterface(interface) if interface == "audit"
+        ));
+    }
+
+    #[test]
+    fn decode_rejects_unknown_relationship_source_workload() {
+        let bundle = topology_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let relationship = manifest
+                .get_mut("relationships")
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|relationships| relationships.first_mut())
+                .expect("manifest should contain a relationship");
+
+            relationship["from"] = serde_json::json!("scheduler");
+        })
+        .expect_err("unknown relationship source should fail decoding");
+
+        assert!(matches!(
+            error,
+            BundleError::UnknownRelationshipSourceWorkload(workload)
+                if workload == "scheduler"
+        ));
+    }
+
+    #[test]
+    fn decode_rejects_unknown_relationship_target_workload() {
+        let bundle = topology_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let relationship = manifest
+                .get_mut("relationships")
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|relationships| relationships.first_mut())
+                .expect("manifest should contain a relationship");
+
+            relationship["to"] = serde_json::json!("scheduler");
+        })
+        .expect_err("unknown relationship target should fail decoding");
+
+        assert!(matches!(
+            error,
+            BundleError::UnknownRelationshipTargetWorkload(workload)
+                if workload == "scheduler"
+        ));
+    }
+
+    #[test]
+    fn decode_rejects_unknown_relationship_interface() {
+        let bundle = topology_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let relationship = manifest
+                .get_mut("relationships")
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|relationships| relationships.first_mut())
+                .expect("manifest should contain a relationship");
+
+            relationship["interface"] = serde_json::json!("missing");
+        })
+        .expect_err("unknown relationship interface should fail decoding");
+
+        assert!(matches!(
+            error,
+            BundleError::UnknownRelationshipInterface(interface)
+                if interface == "missing"
+        ));
+    }
+
+    #[test]
+    fn decode_rejects_self_relationship() {
+        let bundle = topology_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let relationship = manifest
+                .get_mut("relationships")
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|relationships| relationships.first_mut())
+                .expect("manifest should contain a relationship");
+
+            relationship["to"] = serde_json::json!("api");
+        })
+        .expect_err("self relationship should fail decoding");
+
+        assert!(matches!(
+            error,
+            BundleError::SelfRelationship(workload) if workload == "api"
+        ));
+    }
+
+    #[test]
+    fn decode_rejects_duplicate_manifest_relationship() {
+        let bundle = topology_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let relationships = manifest
+                .get_mut("relationships")
+                .and_then(serde_json::Value::as_array_mut)
+                .expect("relationships should be an array");
+
+            let duplicate = relationships
+                .first()
+                .expect("manifest should contain a relationship")
+                .clone();
+
+            relationships.push(duplicate);
+        })
+        .expect_err("duplicate relationship should fail decoding");
+
+        assert!(matches!(
+            error,
+            BundleError::DuplicateManifestRelationship {
+                from,
+                to,
+                interface
+            } if from == "api" && to == "worker" && interface == "jobs"
+        ));
     }
 }

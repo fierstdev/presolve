@@ -177,17 +177,60 @@ impl BundleManifest {
         &self.relationships
     }
 
+    /// Normalizes collections whose ordering is not application semantics.
+    pub(crate) fn normalize(&mut self) {
+        self.requirements.capabilities.sort_by(|left, right| {
+            left.interface
+                .cmp(&right.interface)
+                .then_with(|| left.version.cmp(&right.version))
+                .then_with(|| left.optional.cmp(&right.optional))
+        });
+
+        self.requirements.network.allow.sort();
+        self.requirements.network.allow.dedup();
+
+        self.workloads
+            .sort_by(|left, right| left.name.cmp(&right.name));
+
+        for workload in &mut self.workloads {
+            workload.artifacts.sort_by(|left, right| {
+                left.path
+                    .cmp(&right.path)
+                    .then_with(|| left.media_type.cmp(&right.media_type))
+                    .then_with(|| left.size.cmp(&right.size))
+                    .then_with(|| left.digest.cmp(&right.digest))
+            });
+        }
+
+        self.interfaces.sort_by(|left, right| {
+            left.name
+                .cmp(&right.name)
+                .then_with(|| left.kind.cmp(&right.kind))
+        });
+
+        self.relationships.sort_by(|left, right| {
+            left.from
+                .cmp(&right.from)
+                .then_with(|| left.to.cmp(&right.to))
+                .then_with(|| left.interface.cmp(&right.interface))
+        });
+    }
+
     /// Serializes the semantic manifest into canonical JSON bytes.
     ///
-    /// Collections whose source ordering is not semantically significant are
-    /// normalized before the manifest is created. Struct field order is fixed
-    /// by the bundle schema.
+    /// Collections whose ordering is not semantically significant are
+    /// normalized before serialization. Struct field order is fixed by the
+    /// bundle schema.
     ///
     /// # Errors
     ///
     /// Returns an error if JSON serialization fails.
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
-        serde_json::to_vec(self)
+        let mut manifest = self.clone();
+
+        manifest.normalize();
+
+        serde_json::to_vec(&manifest)
     }
 
     /// Returns the immutable application release digest.
