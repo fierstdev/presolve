@@ -110,13 +110,14 @@ impl PresolveBundle {
             .map_err(BundleError::Manifest)
     }
 
-    /// Validates all manifest-to-artifact integrity relationships.
+    /// Validates manifest topology and all manifest-to-artifact integrity
+    /// relationships.
     ///
     /// # Errors
     ///
-    /// Returns an error when the bundle version is unsupported, an artifact is
-    /// missing or unexpected, or artifact size/digest metadata does not match
-    /// the bundled bytes.
+    /// Returns an error when the bundle version is unsupported, topology is
+    /// internally inconsistent, an artifact is missing or unexpected, or
+    /// artifact size/digest metadata does not match the bundled bytes.
     pub fn verify(&self) -> Result<(), BundleError> {
         if self.manifest.bundle_version() != BUNDLE_VERSION {
             return Err(BundleError::UnsupportedBundleVersion {
@@ -177,6 +178,56 @@ impl PresolveBundle {
                         actual: actual_digest,
                     });
                 }
+            }
+        }
+
+        let mut interface_names = BTreeSet::new();
+
+        for interface in self.manifest.interfaces() {
+            if !interface_names.insert(interface.name().to_owned()) {
+                return Err(BundleError::DuplicateManifestInterface(
+                    interface.name().to_owned(),
+                ));
+            }
+        }
+
+        let mut relationships = BTreeSet::new();
+
+        for relationship in self.manifest.relationships() {
+            if !workload_names.contains(relationship.from()) {
+                return Err(BundleError::UnknownRelationshipSourceWorkload(
+                    relationship.from().to_owned(),
+                ));
+            }
+
+            if !workload_names.contains(relationship.to()) {
+                return Err(BundleError::UnknownRelationshipTargetWorkload(
+                    relationship.to().to_owned(),
+                ));
+            }
+
+            if !interface_names.contains(relationship.interface()) {
+                return Err(BundleError::UnknownRelationshipInterface(
+                    relationship.interface().to_owned(),
+                ));
+            }
+
+            if relationship.from() == relationship.to() {
+                return Err(BundleError::SelfRelationship(
+                    relationship.from().to_owned(),
+                ));
+            }
+
+            if !relationships.insert((
+                relationship.from(),
+                relationship.to(),
+                relationship.interface(),
+            )) {
+                return Err(BundleError::DuplicateManifestRelationship {
+                    from: relationship.from().to_owned(),
+                    to: relationship.to().to_owned(),
+                    interface: relationship.interface().to_owned(),
+                });
             }
         }
 
@@ -338,6 +389,42 @@ pub enum BundleError {
     /// The manifest declares the same workload name more than once.
     #[error("bundle manifest declares workload `{0}` more than once")]
     DuplicateManifestWorkload(String),
+
+    /// The manifest declares the same application-internal interface more than
+    /// once.
+    #[error("bundle manifest declares interface `{0}` more than once")]
+    DuplicateManifestInterface(String),
+
+    /// A manifest relationship references a source workload that does not exist.
+    #[error("bundle manifest relationship references unknown source workload `{0}`")]
+    UnknownRelationshipSourceWorkload(String),
+
+    /// A manifest relationship references a target workload that does not exist.
+    #[error("bundle manifest relationship references unknown target workload `{0}`")]
+    UnknownRelationshipTargetWorkload(String),
+
+    /// A manifest relationship references an interface that does not exist.
+    #[error("bundle manifest relationship references unknown interface `{0}`")]
+    UnknownRelationshipInterface(String),
+
+    /// A manifest relationship connects a workload to itself.
+    #[error("bundle manifest relationship connects workload `{0}` to itself")]
+    SelfRelationship(String),
+
+    /// The manifest declares the same workload relationship more than once.
+    #[error(
+        "bundle manifest declares relationship `{from}` -> `{to}` using `{interface}` more than once"
+    )]
+    DuplicateManifestRelationship {
+        /// Workload initiating the interaction.
+        from: String,
+
+        /// Workload receiving the interaction.
+        to: String,
+
+        /// Application-local interface used by the relationship.
+        interface: String,
+    },
 
     /// An artifact is too large to represent in the bundle format.
     #[error("artifact size `{size}` cannot be represented by bundle format v0.1")]
@@ -504,6 +591,27 @@ mod tests {
         .expect("topology contract should parse")
     }
 
+    fn topology_bundle() -> PresolveBundle {
+        PresolveBundle::from_components(
+            &topology_contract(),
+            &[
+                ComponentArtifactInput::new("api", API_COMPONENT),
+                ComponentArtifactInput::new("worker", WORKER_COMPONENT),
+            ],
+        )
+        .expect("topology bundle should build")
+    }
+
+    fn mutate_manifest(bundle: &mut PresolveBundle, mutate: impl FnOnce(&mut serde_json::Value)) {
+        let mut manifest =
+            serde_json::to_value(bundle.manifest()).expect("manifest should serialize");
+
+        mutate(&mut manifest);
+
+        bundle.manifest =
+            serde_json::from_value(manifest).expect("mutated manifest should deserialize");
+    }
+
     #[test]
     fn application_topology_is_stored_in_manifest() {
         let contract = topology_contract();
@@ -538,6 +646,165 @@ mod tests {
         assert_eq!(relationships[1].from(), "worker");
         assert_eq!(relationships[1].to(), "api");
         assert_eq!(relationships[1].interface(), "audit");
+    }
+
+    #[test]
+    fn duplicate_manifest_interface_is_rejected() {
+        let mut bundle = topology_bundle();
+
+        mutate_manifest(&mut bundle, |manifest| {
+            let interfaces = manifest
+                .get_mut("interfaces")
+                .and_then(serde_json::Value::as_array_mut)
+                .expect("interfaces should be an array");
+
+            let duplicate = interfaces
+                .first()
+                .expect("topology should contain an interface")
+                .clone();
+
+            interfaces.push(duplicate);
+        });
+
+        let error = bundle
+            .verify()
+            .expect_err("duplicate interface should fail verification");
+
+        assert!(matches!(
+            error,
+            BundleError::DuplicateManifestInterface(name) if name == "audit"
+        ));
+    }
+
+    #[test]
+    fn unknown_relationship_source_workload_is_rejected() {
+        let mut bundle = topology_bundle();
+
+        mutate_manifest(&mut bundle, |manifest| {
+            let relationship = manifest
+                .get_mut("relationships")
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|relationships| relationships.first_mut())
+                .expect("topology should contain a relationship");
+
+            relationship["from"] = serde_json::json!("scheduler");
+        });
+
+        let error = bundle
+            .verify()
+            .expect_err("unknown source workload should fail verification");
+
+        assert!(matches!(
+            error,
+            BundleError::UnknownRelationshipSourceWorkload(workload)
+                if workload == "scheduler"
+        ));
+    }
+
+    #[test]
+    fn unknown_relationship_target_workload_is_rejected() {
+        let mut bundle = topology_bundle();
+
+        mutate_manifest(&mut bundle, |manifest| {
+            let relationship = manifest
+                .get_mut("relationships")
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|relationships| relationships.first_mut())
+                .expect("topology should contain a relationship");
+
+            relationship["to"] = serde_json::json!("scheduler");
+        });
+
+        let error = bundle
+            .verify()
+            .expect_err("unknown target workload should fail verification");
+
+        assert!(matches!(
+            error,
+            BundleError::UnknownRelationshipTargetWorkload(workload)
+                if workload == "scheduler"
+        ));
+    }
+
+    #[test]
+    fn unknown_relationship_interface_is_rejected() {
+        let mut bundle = topology_bundle();
+
+        mutate_manifest(&mut bundle, |manifest| {
+            let relationship = manifest
+                .get_mut("relationships")
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|relationships| relationships.first_mut())
+                .expect("topology should contain a relationship");
+
+            relationship["interface"] = serde_json::json!("missing");
+        });
+
+        let error = bundle
+            .verify()
+            .expect_err("unknown relationship interface should fail verification");
+
+        assert!(matches!(
+            error,
+            BundleError::UnknownRelationshipInterface(interface)
+                if interface == "missing"
+        ));
+    }
+
+    #[test]
+    fn self_relationship_is_rejected() {
+        let mut bundle = topology_bundle();
+
+        mutate_manifest(&mut bundle, |manifest| {
+            let relationship = manifest
+                .get_mut("relationships")
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|relationships| relationships.first_mut())
+                .expect("topology should contain a relationship");
+
+            relationship["to"] = serde_json::json!("api");
+        });
+
+        let error = bundle
+            .verify()
+            .expect_err("self relationship should fail verification");
+
+        assert!(matches!(
+            error,
+            BundleError::SelfRelationship(workload) if workload == "api"
+        ));
+    }
+
+    #[test]
+    fn duplicate_manifest_relationship_is_rejected() {
+        let mut bundle = topology_bundle();
+
+        mutate_manifest(&mut bundle, |manifest| {
+            let relationships = manifest
+                .get_mut("relationships")
+                .and_then(serde_json::Value::as_array_mut)
+                .expect("relationships should be an array");
+
+            let duplicate = relationships
+                .first()
+                .expect("topology should contain a relationship")
+                .clone();
+
+            relationships.push(duplicate);
+        });
+
+        let error = bundle
+            .verify()
+            .expect_err("duplicate relationship should fail verification");
+
+        assert!(matches!(
+            error,
+            BundleError::DuplicateManifestRelationship {
+                from,
+                to,
+                interface
+            } if from == "api" && to == "worker" && interface == "jobs"
+        ));
     }
 
     #[test]
