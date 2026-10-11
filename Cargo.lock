@@ -1116,6 +1116,7 @@ dependencies = [
  "presolve-capability",
  "presolve-contract",
  "presolve-core",
+ "presolve-environment",
  "presolve-provider-kv-memory",
  "presolve-provider-objects-memory",
  "presolve-provider-sdk",

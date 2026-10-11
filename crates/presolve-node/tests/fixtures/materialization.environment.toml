@@ -1,0 +1,24 @@
+specification_version = "0.1"
+
+[environment]
+id = "env_00000000-0000-4000-8000-000000000101"
+name = "materialization-test"
+
+[resources]
+memory_mib = 2048
+cpu_millis = 2000
+
+[execution]
+workloads = ["component"]
+
+[[providers]]
+id = "prv_00000000-0000-4000-8000-000000000102"
+name = "memory-services"
+
+[[providers.capabilities]]
+interface = "presolve:kv/store"
+version = "0.1.0"
+
+[[providers.capabilities]]
+interface = "presolve:objects/store"
+version = "0.1.0"
