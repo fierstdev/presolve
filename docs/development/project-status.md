@@ -50,7 +50,9 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Container KV/object provider routing | Implemented |
 | Authenticated container capability discovery | Implemented |
 | End-to-end OCI/container execution checkpoint | Implemented |
-| TypeScript SDK workspace/kernel | In progress |
+| TypeScript SDK workspace/kernel | Implemented |
+| TypeScript KV/object capability APIs | Implemented |
+| TypeScript container bridge adapter | Implemented |
 
 ## Next
 

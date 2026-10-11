@@ -77,3 +77,37 @@ Chunk 17.1 establishes this boundary. It deliberately does not yet expose KV/obj
 The repository's existing pnpm workspace hosts TypeScript packages and examples alongside the Cargo workspace.
 
 The Rust workspace remains authoritative for Rust crates and execution internals; pnpm exists only for language-facing packages and examples.
+
+## Typed baseline capabilities
+
+Chunk 17.2 adds functional TypeScript APIs for Presolve's baseline KV and object-storage capabilities:
+
+```ts
+import { kv, objects } from "@presolve/sdk";
+
+await kv.set("session", "abc");
+const session = await kv.get("session");
+
+await objects.put("images/logo.bin", bytes);
+const logo = await objects.get("images/logo.bin");
+```
+
+The public object API uses `Uint8Array`. The HTTP/JSON bridge's byte-array encoding remains an adapter detail.
+
+Typed clients validate transport output before returning it to application code. Malformed output raises `CapabilityProtocolError`; provider/bridge error envelopes raise `CapabilityInvocationError`.
+
+## Container adapter
+
+The initial execution-target adapter lives at `@presolve/sdk/container`.
+
+It implements `CapabilityTransport` using the existing `presolve-http-json/0.1` bridge and injected Presolve discovery variables.
+
+```text
+@presolve/sdk             application-facing semantics
+@presolve/sdk/runtime     low-level transport installation
+@presolve/sdk/container   OCI/container HTTP/JSON projection
+```
+
+The adapter is separate from the main package surface, so normal TypeScript application code remains transport-neutral.
+
+Chunk 17.3 uses this adapter from a real TypeScript OCI workload.

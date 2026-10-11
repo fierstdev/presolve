@@ -97,8 +97,8 @@ This should fit under existing TypeScript tooling rather than requiring Presolve
 Current subdivision:
 
 ```text
-17.1  TypeScript workspace + transport-neutral SDK kernel
-17.2  typed KV/object clients + container bridge adapter
+17.1  TypeScript workspace + transport-neutral SDK kernel (complete)
+17.2  typed KV/object clients + container bridge adapter (complete)
 17.3  real TypeScript OCI workload proof
 17.4  execution-target adapter boundary / Component projection
 17.5  TypeScript authoring checkpoint + docs

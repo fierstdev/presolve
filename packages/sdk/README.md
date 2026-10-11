@@ -4,20 +4,30 @@
 
 The SDK does not define a second Application Contract. `presolve.toml` remains the canonical application-level declaration of workloads, capabilities, resources, topology, and network policy.
 
-The SDK's job is narrower:
+Application code uses the main package surface:
 
-```text
-TypeScript application code
-        ↓
-typed Presolve capability APIs
-        ↓
-transport-neutral capability call
-        ↓
-execution-target adapter
+```ts
+import { kv, objects } from "@presolve/sdk";
+
+await kv.set("session", "abc");
+const value = await kv.get("session");
+
+await objects.put("images/logo.bin", Uint8Array.from([1, 2, 3]));
+const object = await objects.get("images/logo.bin");
 ```
 
-Chunk 17.1 establishes only the transport-neutral kernel. KV/object clients and the initial container bridge adapter are added in 17.2.
+These APIs are transport-neutral. They invoke semantic capability operations rather than a concrete provider or runtime.
 
-Application code should import capability APIs from `@presolve/sdk`. Execution adapters use the low-level `@presolve/sdk/runtime` entry point to install a transport during workload bootstrap.
+Execution adapters are separate. The current OCI/container projection is exposed through:
 
-No Docker, HTTP, WIT, provider identity, registry location, or provider credential is part of the public application-facing model.
+```ts
+import { installContainerBridge } from "@presolve/sdk/container";
+
+installContainerBridge();
+```
+
+That adapter discovers `PRESOLVE_CAPABILITY_ENDPOINT`, `PRESOLVE_CAPABILITY_TOKEN`, and `PRESOLVE_CAPABILITY_PROTOCOL`, then installs the authenticated `presolve-http-json/0.1` transport.
+
+Ordinary application imports do not expose Docker, HTTP, WIT, provider identity, registry location, or provider credentials.
+
+The low-level `@presolve/sdk/runtime` export remains available for execution adapters and deterministic tests.
