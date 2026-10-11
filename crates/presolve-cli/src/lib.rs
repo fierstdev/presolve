@@ -14,7 +14,7 @@ use clap::Parser;
 use crate::{
     cli::{Cli, EnvironmentCommand, EnvironmentProviderCommand, RootCommand},
     environment::{create_environment, load_environment},
-    provider::{add_provider, list_providers, remove_provider},
+    provider::{add_provider, expand_provider_supply, list_providers, remove_provider},
 };
 
 /// Runs the Presolve CLI using process arguments and the current directory.
@@ -60,12 +60,15 @@ fn execute(cli: Cli, current_directory: &Path) -> Result<()> {
 
             EnvironmentCommand::Provider { command } => match command {
                 EnvironmentProviderCommand::Add(args) => {
-                    let mutation = add_provider(
-                        current_directory,
-                        &args.name,
+                    let (capabilities, features) = expand_provider_supply(
                         &args.capabilities,
                         &args.features,
+                        &args.provides,
+                        &args.builtin_features,
                     )?;
+
+                    let mutation =
+                        add_provider(current_directory, &args.name, &capabilities, &features)?;
 
                     println!("Added provider `{}`", mutation.provider.name());
                     println!("  id: {}", mutation.provider.id());

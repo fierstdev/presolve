@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use presolve_capability::{key_value_contract, object_store_contract};
 use presolve_core::ProviderId;
 use presolve_environment::{
     EnvironmentSpecification, ProvidedCapabilitySpecification, ProviderSpecification,
@@ -11,7 +12,10 @@ use presolve_environment::{
 };
 use semver::Version;
 
-use crate::environment::{EnvironmentDocument, load_environment, replace_environment};
+use crate::{
+    cli::BuiltinCapabilityAlias,
+    environment::{EnvironmentDocument, load_environment, replace_environment},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct CapabilityKey {
@@ -23,6 +27,71 @@ struct CapabilityKey {
 pub(crate) struct ProviderMutation {
     pub(crate) path: std::path::PathBuf,
     pub(crate) provider: ProviderSpecification,
+}
+
+pub(crate) fn expand_provider_supply(
+    capabilities: &[String],
+    features: &[String],
+    provides: &[BuiltinCapabilityAlias],
+    builtin_features: &[String],
+) -> Result<(Vec<String>, Vec<String>)> {
+    let mut expanded_capabilities = capabilities.to_vec();
+    let mut expanded_features = features.to_vec();
+
+    for alias in provides {
+        let key = builtin_capability(*alias)?;
+        expanded_capabilities.push(format!("{}@{}", key.interface, key.version));
+    }
+
+    for value in builtin_features {
+        let (alias_name, feature_list) = value.split_once('=').ok_or_else(|| {
+            anyhow::anyhow!(
+                "invalid built-in feature declaration `{value}`; expected `CAPABILITY=FEATURE[,FEATURE...]`"
+            )
+        })?;
+
+        let alias = BuiltinCapabilityAlias::parse(alias_name).ok_or_else(|| {
+            anyhow::anyhow!(
+                "unknown built-in capability alias `{alias_name}`; expected `kv` or `objects`"
+            )
+        })?;
+
+        if feature_list.is_empty() {
+            bail!(
+                "invalid built-in feature declaration `{value}`; at least one feature is required"
+            );
+        }
+
+        let key = builtin_capability(alias)?;
+
+        for feature in feature_list.split(',') {
+            if feature.is_empty() {
+                bail!(
+                    "invalid built-in feature declaration `{value}`; feature names may not be empty"
+                );
+            }
+
+            expanded_features.push(format!("{}@{}={feature}", key.interface, key.version));
+        }
+    }
+
+    Ok((expanded_capabilities, expanded_features))
+}
+
+fn builtin_capability(alias: BuiltinCapabilityAlias) -> Result<CapabilityKey> {
+    let contract = match alias {
+        BuiltinCapabilityAlias::Kv => {
+            key_value_contract().context("built-in `kv` capability contract is invalid")?
+        }
+        BuiltinCapabilityAlias::Objects => {
+            object_store_contract().context("built-in `objects` capability contract is invalid")?
+        }
+    };
+
+    Ok(CapabilityKey {
+        interface: contract.interface().to_owned(),
+        version: contract.version().clone(),
+    })
 }
 
 pub(crate) fn add_provider(
@@ -428,5 +497,84 @@ mod tests {
                 .to_string()
                 .contains("provider supply is not semantically valid")
         );
+    }
+
+    #[test]
+    fn shorthand_expands_from_canonical_builtin_contracts() {
+        let (capabilities, features) = expand_provider_supply(
+            &[],
+            &[],
+            &[BuiltinCapabilityAlias::Kv, BuiltinCapabilityAlias::Objects],
+            &["objects=range-read,user-metadata".to_owned()],
+        )
+        .expect("built-in shorthand should expand");
+
+        assert_eq!(
+            capabilities,
+            ["presolve:kv/store@0.1.0", "presolve:objects/store@0.1.0"]
+        );
+        assert_eq!(
+            features,
+            [
+                "presolve:objects/store@0.1.0=range-read",
+                "presolve:objects/store@0.1.0=user-metadata"
+            ]
+        );
+    }
+
+    #[test]
+    fn shorthand_features_can_target_explicit_builtin_capability() {
+        let (capabilities, features) = expand_provider_supply(
+            &["presolve:objects/store@0.1.0".to_owned()],
+            &[],
+            &[],
+            &["objects=range-read".to_owned()],
+        )
+        .expect("shorthand features should compose with explicit capability");
+
+        let supply =
+            parse_provider_supply(&capabilities, &features).expect("expanded supply should parse");
+
+        assert_eq!(supply.len(), 1);
+        assert_eq!(
+            supply
+                .values()
+                .next()
+                .expect("object capability should be present"),
+            &["range-read".to_owned()]
+        );
+    }
+
+    #[test]
+    fn shorthand_rejects_unknown_alias_in_features() {
+        let error = expand_provider_supply(
+            &["presolve:objects/store@0.1.0".to_owned()],
+            &[],
+            &[],
+            &["blob=range-read".to_owned()],
+        )
+        .expect_err("unknown alias should fail");
+
+        assert!(
+            error
+                .to_string()
+                .contains("unknown built-in capability alias")
+        );
+    }
+
+    #[test]
+    fn shorthand_feature_requires_supplied_target_after_expansion() {
+        let (capabilities, features) = expand_provider_supply(
+            &["presolve:kv/store@0.1.0".to_owned()],
+            &[],
+            &[],
+            &["objects=range-read".to_owned()],
+        )
+        .expect("shorthand should expand before semantic validation");
+
+        let error = parse_provider_supply(&capabilities, &features)
+            .expect_err("feature without object capability should fail");
+
+        assert!(error.to_string().contains("targets undeclared capability"));
     }
 }

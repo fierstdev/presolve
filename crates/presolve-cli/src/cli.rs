@@ -1,4 +1,4 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 
 pub(crate) const DEFAULT_LOCAL_MEMORY_MIB: u64 = 1_024;
 pub(crate) const DEFAULT_LOCAL_CPU_MILLIS: u32 = 1_000;
@@ -51,6 +51,25 @@ pub(crate) enum EnvironmentProviderCommand {
     Remove(ProviderRemoveArgs),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum BuiltinCapabilityAlias {
+    /// Presolve key-value storage.
+    Kv,
+
+    /// Presolve object storage.
+    Objects,
+}
+
+impl BuiltinCapabilityAlias {
+    pub(crate) fn parse(value: &str) -> Option<Self> {
+        match value {
+            "kv" => Some(Self::Kv),
+            "objects" => Some(Self::Objects),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Args)]
 pub(crate) struct EnvironmentInitArgs {
     /// Human-readable environment name.
@@ -67,16 +86,29 @@ pub(crate) struct EnvironmentInitArgs {
 }
 
 #[derive(Debug, Args)]
+#[command(group(
+    ArgGroup::new("provider-supply")
+        .required(true)
+        .args(["capabilities", "provides"])
+))]
 pub(crate) struct ProviderAddArgs {
     /// Human-readable provider name, unique within the environment.
     #[arg(value_name = "NAME")]
     pub(crate) name: String,
 
-    /// Exact supplied capability as INTERFACE@VERSION. Repeat for multiple capabilities.
-    #[arg(long = "capability", value_name = "INTERFACE@VERSION", required = true)]
+    /// Built-in capability alias (`kv` or `objects`). Repeat or comma-separate.
+    #[arg(long = "provides", value_name = "CAPABILITY", value_delimiter = ',')]
+    pub(crate) provides: Vec<BuiltinCapabilityAlias>,
+
+    /// Built-in features as CAPABILITY=FEATURE[,FEATURE...]. Repeat as needed.
+    #[arg(long = "features", value_name = "CAPABILITY=FEATURE[,FEATURE...]")]
+    pub(crate) builtin_features: Vec<String>,
+
+    /// Exact supplied capability as INTERFACE@VERSION. Repeat for custom/advanced use.
+    #[arg(long = "capability", value_name = "INTERFACE@VERSION")]
     pub(crate) capabilities: Vec<String>,
 
-    /// Optional semantic feature as INTERFACE@VERSION=FEATURE. Repeat as needed.
+    /// Exact semantic feature as INTERFACE@VERSION=FEATURE. Repeat for advanced use.
     #[arg(long = "feature", value_name = "INTERFACE@VERSION=FEATURE")]
     pub(crate) features: Vec<String>,
 }
@@ -151,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    fn provider_add_collects_capabilities_and_features() {
+    fn provider_add_collects_explicit_capabilities_and_features() {
         let cli = Cli::try_parse_from([
             "presolve",
             "env",
@@ -165,7 +197,7 @@ mod tests {
             "--feature",
             "presolve:objects/store@0.1.0=range-read",
         ])
-        .expect("provider add command should parse");
+        .expect("explicit provider add command should parse");
 
         let RootCommand::Env {
             command:
@@ -178,6 +210,7 @@ mod tests {
         };
 
         assert_eq!(args.name, "memory-services");
+        assert_eq!(args.provides, []);
         assert_eq!(
             args.capabilities,
             ["presolve:kv/store@0.1.0", "presolve:objects/store@0.1.0"]
@@ -186,7 +219,41 @@ mod tests {
     }
 
     #[test]
-    fn provider_add_requires_at_least_one_capability() {
+    fn provider_add_collects_builtin_shorthand() {
+        let cli = Cli::try_parse_from([
+            "presolve",
+            "env",
+            "provider",
+            "add",
+            "memory-services",
+            "--provides",
+            "kv,objects",
+            "--features",
+            "objects=range-read,user-metadata",
+        ])
+        .expect("shorthand provider add command should parse");
+
+        let RootCommand::Env {
+            command:
+                EnvironmentCommand::Provider {
+                    command: EnvironmentProviderCommand::Add(args),
+                },
+        } = cli.command
+        else {
+            panic!("expected env provider add command");
+        };
+
+        assert_eq!(
+            args.provides,
+            [BuiltinCapabilityAlias::Kv, BuiltinCapabilityAlias::Objects]
+        );
+        assert_eq!(args.builtin_features, ["objects=range-read,user-metadata"]);
+        assert_eq!(args.capabilities, Vec::<String>::new());
+        assert_eq!(args.features, Vec::<String>::new());
+    }
+
+    #[test]
+    fn provider_add_requires_at_least_one_supply_declaration() {
         let result = Cli::try_parse_from(["presolve", "env", "provider", "add", "empty-provider"]);
 
         assert!(result.is_err());

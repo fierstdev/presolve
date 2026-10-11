@@ -17,6 +17,7 @@ clap.workspace = true
 presolve-environment.workspace = true
 semver.workspace = true
 presolve-core.workspace = true
+presolve-capability.workspace = true
 
 [lints]
 workspace = true

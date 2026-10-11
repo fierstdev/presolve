@@ -126,7 +126,7 @@ Environment Inventory │
 
 Chunk 15 is continuing with:
 
-- provider declaration and local realization
+- local provider realization
 - Application Contract discovery
 - application/environment compatibility checking
 - local materialization and execution
@@ -146,31 +146,61 @@ For the underlying model, start with [Application portability](../concepts/appli
 
 An Environment Specification describes provider **semantic supply**. It still does not contain concrete runtime implementation configuration.
 
-Add a provider with at least one exact capability:
+For built-in Presolve capabilities, use the short form:
 
 ```bash
 presolve env provider add memory-services \
-  --capability presolve:kv/store@0.1.0 \
-  --capability presolve:objects/store@0.1.0
+  --provides kv \
+  --provides objects
 ```
 
-Presolve generates and persists a stable `ProviderId`.
+`--provides` can also use a comma-separated list:
 
-Advertise supported optional semantic features by targeting the exact supplied capability:
+```bash
+presolve env provider add memory-services --provides kv,objects
+```
+
+Current built-in aliases are:
+
+| Alias | Canonical capability |
+| --- | --- |
+| `kv` | current `presolve:kv/store` contract |
+| `objects` | current `presolve:objects/store` contract |
+
+The CLI resolves these aliases through Presolve's canonical built-in capability contracts. The generated `presolve.env.toml` still records the exact interface and semantic version.
+
+Advertise built-in optional features with:
+
+```bash
+presolve env provider add object-services \
+  --provides objects \
+  --features objects=range-read,user-metadata
+```
+
+For custom capabilities or when exact control is needed, the explicit form remains available:
+
+```bash
+presolve env provider add search-services \
+  --capability example:search/index@1.2.3
+```
+
+The low-level feature form also remains available:
 
 ```bash
 presolve env provider add object-services \
   --capability presolve:objects/store@0.1.0 \
-  --feature presolve:objects/store@0.1.0=range-read \
-  --feature presolve:objects/store@0.1.0=user-metadata
+  --feature presolve:objects/store@0.1.0=range-read
 ```
 
-The syntax is intentionally explicit:
+The two forms compose. For example, shorthand features may target an explicitly supplied built-in capability:
 
-```text
---capability INTERFACE@VERSION
---feature    INTERFACE@VERSION=FEATURE
+```bash
+presolve env provider add object-services \
+  --capability presolve:objects/store@0.1.0 \
+  --features objects=range-read,user-metadata
 ```
+
+Presolve generates and persists a stable `ProviderId`.
 
 Known Presolve capability versions and feature claims are checked against canonical semantic contracts before the Environment Specification is rewritten.
 
