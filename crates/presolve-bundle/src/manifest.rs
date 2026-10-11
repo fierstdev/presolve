@@ -3,7 +3,9 @@ use presolve_core::{ArtifactDigest, InterfaceKind, ProductVersion, WorkloadKind}
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use crate::{BUNDLE_VERSION, BundleError, BundleVersion, ComponentArtifactInput};
+use crate::{
+    BUNDLE_VERSION, BundleError, BundleVersion, ComponentArtifactInput, WorkloadArtifactInput,
+};
 
 /// Path of the canonical manifest inside a `.presolved` archive.
 pub const MANIFEST_PATH: &str = "manifest.json";
@@ -19,6 +21,12 @@ pub fn component_artifact_path(workload: &str) -> String {
 
 /// MIME media type used for WebAssembly artifacts.
 pub const WASM_MEDIA_TYPE: &str = "application/wasm";
+
+/// OCI media type for a platform-specific image manifest.
+pub const OCI_IMAGE_MANIFEST_MEDIA_TYPE: &str = "application/vnd.oci.image.manifest.v1+json";
+
+/// OCI media type for a multi-platform image index.
+pub const OCI_IMAGE_INDEX_MEDIA_TYPE: &str = "application/vnd.oci.image.index.v1+json";
 
 /// Canonical application-release manifest.
 ///
@@ -43,16 +51,39 @@ pub struct BundleManifest {
 impl BundleManifest {
     /// Creates a manifest from declared workloads and their component artifacts.
     ///
-    /// Contracts without explicit workloads retain the legacy implicit `main`
-    /// component workload.
+    /// This compatibility constructor remains Component-only. Use
+    /// [`Self::for_workload_artifacts`] for mixed Component/container releases.
     ///
     /// # Errors
     ///
-    /// Returns an error when component inputs are duplicated, missing, unexpected,
-    /// or too large to represent in bundle format v0.1.
+    /// Returns an error when supplied artifacts do not exactly match the
+    /// Application Contract.
     pub fn for_components(
         contract: &ApplicationContract,
         components: &[ComponentArtifactInput<'_>],
+    ) -> Result<Self, BundleError> {
+        let artifacts = components
+            .iter()
+            .copied()
+            .map(WorkloadArtifactInput::Component)
+            .collect::<Vec<_>>();
+
+        Self::for_workload_artifacts(contract, &artifacts)
+    }
+
+    /// Creates a canonical manifest from explicit workload artifact identities.
+    ///
+    /// Component bytes are embedded in the surrounding `.presolved` archive.
+    /// Container workloads are represented by immutable OCI content descriptors;
+    /// registry/repository/tag information is deliberately absent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for duplicate, missing, unexpected, kind-mismatched, or
+    /// invalid OCI workload artifact inputs.
+    pub fn for_workload_artifacts(
+        contract: &ApplicationContract,
+        artifacts: &[WorkloadArtifactInput<'_>],
     ) -> Result<Self, BundleError> {
         let application = ApplicationManifest {
             name: contract.application().name().to_owned(),
@@ -75,24 +106,12 @@ impl BundleManifest {
 
         expected.sort_by(|left, right| left.0.cmp(&right.0));
 
-        for (workload, kind) in &expected {
-            if *kind != WorkloadKind::Component {
-                return Err(BundleError::UnsupportedWorkloadKind {
-                    workload: workload.clone(),
-                    kind: *kind,
-                });
-            }
-        }
+        let mut supplied = BTreeMap::<String, WorkloadArtifactInput<'_>>::new();
 
-        let mut supplied = BTreeMap::<String, &[u8]>::new();
+        for artifact in artifacts {
+            let workload = artifact.workload().to_owned();
 
-        for component in components {
-            let workload = component.workload().to_owned();
-
-            if supplied
-                .insert(workload.clone(), component.bytes())
-                .is_some()
-            {
+            if supplied.insert(workload.clone(), *artifact).is_some() {
                 return Err(BundleError::DuplicateWorkloadArtifact(workload));
             }
         }
@@ -115,25 +134,54 @@ impl BundleManifest {
         let mut workloads = Vec::with_capacity(expected.len());
 
         for (name, kind) in expected {
-            let Some(bytes) = supplied.get(&name) else {
+            let Some(input) = supplied.get(&name) else {
                 return Err(BundleError::MissingWorkloadArtifact(name));
             };
 
-            let size = u64::try_from(bytes.len())
-                .map_err(|_| BundleError::ArtifactSizeOverflow { size: bytes.len() })?;
+            if input.kind() != kind {
+                return Err(BundleError::WorkloadArtifactKindMismatch {
+                    workload: name,
+                    expected: kind,
+                    supplied: input.kind(),
+                });
+            }
 
-            let artifact = ArtifactManifest {
-                path: component_artifact_path(&name),
-                digest: ArtifactDigest::from_content(bytes),
-                size,
-                media_type: WASM_MEDIA_TYPE.to_owned(),
-            };
+            match input {
+                WorkloadArtifactInput::Component(component) => {
+                    let bytes = component.bytes();
+                    let size = u64::try_from(bytes.len())
+                        .map_err(|_| BundleError::ArtifactSizeOverflow { size: bytes.len() })?;
 
-            workloads.push(WorkloadManifest {
-                name,
-                kind,
-                artifacts: vec![artifact],
-            });
+                    let artifact = ArtifactManifest {
+                        path: component_artifact_path(&name),
+                        digest: ArtifactDigest::from_content(bytes),
+                        size,
+                        media_type: WASM_MEDIA_TYPE.to_owned(),
+                    };
+
+                    workloads.push(WorkloadManifest {
+                        name,
+                        kind,
+                        artifacts: vec![artifact],
+                        oci_image: None,
+                    });
+                }
+
+                WorkloadArtifactInput::OciImage(image) => {
+                    validate_oci_image_descriptor(&name, image.media_type(), image.digest())?;
+
+                    workloads.push(WorkloadManifest {
+                        name,
+                        kind,
+                        artifacts: Vec::new(),
+                        oci_image: Some(OciImageDescriptor {
+                            media_type: image.media_type().to_owned(),
+                            digest: image.digest().to_owned(),
+                            size: image.size(),
+                        }),
+                    });
+                }
+            }
         }
 
         Ok(Self {
@@ -256,6 +304,39 @@ impl BundleManifest {
     pub fn release_digest(&self) -> Result<ArtifactDigest, serde_json::Error> {
         Ok(ArtifactDigest::from_content(&self.canonical_bytes()?))
     }
+}
+
+pub(crate) fn validate_oci_image_descriptor(
+    workload: &str,
+    media_type: &str,
+    digest: &str,
+) -> Result<(), BundleError> {
+    if media_type != OCI_IMAGE_MANIFEST_MEDIA_TYPE && media_type != OCI_IMAGE_INDEX_MEDIA_TYPE {
+        return Err(BundleError::InvalidOciImageMediaType {
+            workload: workload.to_owned(),
+            media_type: media_type.to_owned(),
+        });
+    }
+
+    if !valid_oci_sha256_digest(digest) {
+        return Err(BundleError::InvalidOciImageDigest {
+            workload: workload.to_owned(),
+            digest: digest.to_owned(),
+        });
+    }
+
+    Ok(())
+}
+
+fn valid_oci_sha256_digest(value: &str) -> bool {
+    let Some(encoded) = value.strip_prefix("sha256:") else {
+        return false;
+    };
+
+    encoded.len() == 64
+        && encoded
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn canonical_requirements(contract: &ApplicationContract) -> RequirementsManifest {
@@ -517,7 +598,12 @@ impl NetworkManifest {
 pub struct WorkloadManifest {
     name: String,
     kind: WorkloadKind,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     artifacts: Vec<ArtifactManifest>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    oci_image: Option<OciImageDescriptor>,
 }
 
 impl WorkloadManifest {
@@ -533,10 +619,49 @@ impl WorkloadManifest {
         self.kind
     }
 
-    /// Returns artifact variants capable of realizing this workload.
+    /// Returns embedded artifact variants capable of realizing this workload.
     #[must_use]
     pub fn artifacts(&self) -> &[ArtifactManifest] {
         &self.artifacts
+    }
+
+    /// Returns the immutable OCI image descriptor for a container workload.
+    #[must_use]
+    pub const fn oci_image(&self) -> Option<&OciImageDescriptor> {
+        self.oci_image.as_ref()
+    }
+}
+
+/// Immutable OCI content descriptor used by a container workload.
+///
+/// Presolve stores only the descriptor properties required for immutable content
+/// identity. Registry names, tags, URLs, credentials, and other transport hints
+/// are intentionally excluded from application release identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OciImageDescriptor {
+    media_type: String,
+    digest: String,
+    size: u64,
+}
+
+impl OciImageDescriptor {
+    /// Returns the OCI image manifest or index media type.
+    #[must_use]
+    pub fn media_type(&self) -> &str {
+        &self.media_type
+    }
+
+    /// Returns the immutable OCI content digest.
+    #[must_use]
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    /// Returns the target content size in bytes.
+    #[must_use]
+    pub const fn size(&self) -> u64 {
+        self.size
     }
 }
 

@@ -6,7 +6,9 @@ It captures application semantics and workload artifacts without embedding envir
 
 ## Current archive format
 
-Bundle format `0.1` is encoded as a deterministic tar archive.
+The current bundle format is `0.2`, encoded as a deterministic tar archive.
+
+Presolve continues to decode valid `0.1` Component-only bundles. New bundles are emitted as `0.2`.
 
 Its canonical manifest path is:
 
@@ -56,13 +58,37 @@ WebAssembly artifacts currently use:
 application/wasm
 ```
 
-Bundle format `0.1` currently packages Component workload artifacts only. Although the Application Contract and resolver now recognize `container` workloads, OCI artifact identity and packaging are intentionally not guessed here. Component bundle constructors and bundle verification reject container workloads until the OCI artifact model is defined.
+Bundle format `0.2` supports two workload artifact models:
+
+```text
+component
+    embedded artifacts/<workload>.wasm
+    digest + size + application/wasm recorded in manifest
+
+container
+    no registry name or image bytes embedded
+    immutable OCI image descriptor recorded in manifest
+```
+
+A container workload records only the OCI descriptor identity required by Presolve:
+
+```json
+{
+  "media_type": "application/vnd.oci.image.manifest.v1+json",
+  "digest": "sha256:...",
+  "size": 1234
+}
+```
+
+The descriptor may identify either an OCI image manifest or an OCI image index. The current implementation requires canonical SHA-256 digests.
+
+Registry hostnames, repositories, tags, credentials, and pull URLs are not application release identity and are therefore excluded from `.presolved`. A later materialization layer is responsible for locating content matching the immutable descriptor.
 
 ## Release identity
 
 Application release identity is derived from the canonical serialization of `manifest.json`.
 
-Artifact bytes participate transitively because the manifest records their content digests.
+Embedded artifact bytes participate transitively because the manifest records their content digests. Container image content participates through its immutable OCI descriptor digest.
 
 Therefore:
 
@@ -99,7 +125,9 @@ Bundle decoding verifies structural and semantic integrity, including:
 - no unexpected paths
 - manifest topology consistency
 - no duplicate workload/interface/relationship declarations
-- required workload artifacts are present
+- workload artifact shape matches the workload kind
+- required embedded Component artifacts are present
+- OCI container descriptors use supported media types and canonical SHA-256 digests
 - no unreferenced artifacts exist
 - artifact size matches the manifest
 - artifact content digest matches the manifest

@@ -33,8 +33,14 @@ impl BundleVersion {
     }
 }
 
-/// Initial `.presolved` bundle format.
-pub const BUNDLE_VERSION: BundleVersion = BundleVersion::new(0, 1);
+/// Initial Component-only `.presolved` bundle format.
+pub const BUNDLE_VERSION_0_1: BundleVersion = BundleVersion::new(0, 1);
+
+/// Current `.presolved` bundle format.
+///
+/// Version 0.2 adds immutable OCI image descriptors for container workloads
+/// while retaining decode compatibility with 0.1 Component bundles.
+pub const BUNDLE_VERSION: BundleVersion = BundleVersion::new(0, 2);
 
 /// Error returned when a bundle format version cannot be parsed.
 #[derive(Debug, Error)]
@@ -111,6 +117,12 @@ mod tests {
     fn version_serializes_as_string() {
         let json = serde_json::to_string(&BUNDLE_VERSION).expect("version should serialize");
 
-        assert_eq!(json, "\"0.1\"");
+        assert_eq!(json, "\"0.2\"");
+    }
+
+    #[test]
+    fn initial_bundle_version_remains_addressable() {
+        assert_eq!(BUNDLE_VERSION_0_1.to_string(), "0.1");
+        assert_ne!(BUNDLE_VERSION_0_1, BUNDLE_VERSION);
     }
 }

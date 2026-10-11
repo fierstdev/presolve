@@ -11,12 +11,13 @@ mod manifest;
 mod version;
 
 pub use bundle::{BundleError, PresolveBundle};
-pub use input::ComponentArtifactInput;
+pub use input::{ComponentArtifactInput, OciImageArtifactInput, WorkloadArtifactInput};
 pub use manifest::{
     ApplicationManifest, ArtifactManifest, BundleManifest, COMPONENT_ARTIFACT_PATH,
-    CapabilityManifest, InterfaceManifest, MANIFEST_PATH, NetworkManifest, RelationshipManifest,
-    RequirementsManifest, ResourceManifest, WASM_MEDIA_TYPE, WorkloadManifest,
-    component_artifact_path,
+    CapabilityManifest, InterfaceManifest, MANIFEST_PATH, NetworkManifest,
+    OCI_IMAGE_INDEX_MEDIA_TYPE, OCI_IMAGE_MANIFEST_MEDIA_TYPE, OciImageDescriptor,
+    RelationshipManifest, RequirementsManifest, ResourceManifest, WASM_MEDIA_TYPE,
+    WorkloadManifest, component_artifact_path,
 };
 pub use presolve_core::{InterfaceKind, WorkloadKind};
-pub use version::{BUNDLE_VERSION, BundleVersion, BundleVersionParseError};
+pub use version::{BUNDLE_VERSION, BUNDLE_VERSION_0_1, BundleVersion, BundleVersionParseError};

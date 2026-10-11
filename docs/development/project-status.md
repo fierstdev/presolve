@@ -38,12 +38,15 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | `presolve dev` single-workload local Component execution | Implemented |
 | Container workload schema/resolution vocabulary | Implemented |
 | Explicit resolved workloads in `DeploymentPlan` | Implemented |
+| `.presolved` bundle format `0.2` | Implemented |
+| OCI image descriptor workload identity | Implemented |
+| Bundle `0.1` decode compatibility | Implemented |
 
 ## Next
 
 Chunk 15 local developer experience is complete for the current WebAssembly Component/Rust authoring path.
 
-OCI/container workload execution is now in progress. The Application Contract, Environment Specification, resolver, and `DeploymentPlan` recognize container workloads; OCI artifact packaging and actual container execution are the next steps.
+OCI/container workload execution is in progress. The Application Contract, Environment Specification, resolver, `DeploymentPlan`, and `.presolved` bundle now preserve container workload identity. The next step is the container executor/materialization boundary.
 
 ## Planned after OCI/container execution
 

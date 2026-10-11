@@ -10,8 +10,9 @@ use tar::{Archive, Builder, EntryType, Header};
 use thiserror::Error;
 
 use crate::{
-    BUNDLE_VERSION, BundleManifest, BundleVersion, ComponentArtifactInput, MANIFEST_PATH,
-    component_artifact_path,
+    BUNDLE_VERSION, BUNDLE_VERSION_0_1, BundleManifest, BundleVersion, ComponentArtifactInput,
+    MANIFEST_PATH, OciImageArtifactInput, WorkloadArtifactInput, component_artifact_path,
+    manifest::validate_oci_image_descriptor,
 };
 
 /// Complete immutable `.presolved` application bundle.
@@ -68,23 +69,61 @@ impl PresolveBundle {
     /// # Errors
     ///
     /// Returns an error when supplied artifacts do not exactly match the
-    /// application's declared workloads, when duplicate inputs are supplied, or
-    /// when an artifact cannot be represented by the bundle format.
+    /// application's declared workloads.
     pub fn from_components(
         contract: &ApplicationContract,
         components: &[ComponentArtifactInput<'_>],
     ) -> Result<Self, BundleError> {
-        let manifest = BundleManifest::for_components(contract, components)?;
+        let artifacts = components
+            .iter()
+            .copied()
+            .map(WorkloadArtifactInput::Component)
+            .collect::<Vec<_>>();
 
+        Self::from_workload_artifacts(contract, &artifacts)
+    }
+
+    /// Creates a bundle containing one immutable OCI container image descriptor.
+    ///
+    /// The image bytes are not embedded in `.presolved`; the OCI digest is the
+    /// immutable workload artifact identity. Registry location is resolved later.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the descriptor does not exactly match the
+    /// Application Contract or violates the supported OCI descriptor subset.
+    pub fn from_oci_image(
+        contract: &ApplicationContract,
+        image: OciImageArtifactInput<'_>,
+    ) -> Result<Self, BundleError> {
+        Self::from_workload_artifacts(contract, &[WorkloadArtifactInput::OciImage(image)])
+    }
+
+    /// Creates a bundle from explicit Component and/or OCI workload artifacts.
+    ///
+    /// Component bytes are embedded in the archive. OCI images remain external
+    /// content-addressed artifacts represented by their immutable descriptors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when supplied workload artifacts do not exactly match
+    /// the Application Contract or when OCI descriptor validation fails.
+    pub fn from_workload_artifacts(
+        contract: &ApplicationContract,
+        workload_artifacts: &[WorkloadArtifactInput<'_>],
+    ) -> Result<Self, BundleError> {
+        let manifest = BundleManifest::for_workload_artifacts(contract, workload_artifacts)?;
         let mut artifacts = BTreeMap::new();
 
-        for component in components {
-            let path = component_artifact_path(component.workload());
+        for artifact in workload_artifacts {
+            if let WorkloadArtifactInput::Component(component) = artifact {
+                let path = component_artifact_path(component.workload());
 
-            if artifacts.insert(path, component.bytes().to_vec()).is_some() {
-                return Err(BundleError::DuplicateWorkloadArtifact(
-                    component.workload().to_owned(),
-                ));
+                if artifacts.insert(path, component.bytes().to_vec()).is_some() {
+                    return Err(BundleError::DuplicateWorkloadArtifact(
+                        component.workload().to_owned(),
+                    ));
+                }
             }
         }
 
@@ -120,9 +159,11 @@ impl PresolveBundle {
     /// internally inconsistent, an artifact is missing or unexpected, or
     /// artifact size/digest metadata does not match the bundled bytes.
     pub fn verify(&self) -> Result<(), BundleError> {
-        if self.manifest.bundle_version() != BUNDLE_VERSION {
+        let bundle_version = self.manifest.bundle_version();
+
+        if bundle_version != BUNDLE_VERSION && bundle_version != BUNDLE_VERSION_0_1 {
             return Err(BundleError::UnsupportedBundleVersion {
-                found: self.manifest.bundle_version(),
+                found: bundle_version,
             });
         }
 
@@ -137,12 +178,6 @@ impl PresolveBundle {
                     workload.name().to_owned(),
                 ));
             }
-            if workload.artifacts().is_empty() {
-                return Err(BundleError::InvalidManifest(
-                    "every workload must reference at least one artifact",
-                ));
-            }
-
             for artifact in workload.artifacts() {
                 if !referenced.insert(artifact.path().to_owned()) {
                     return Err(BundleError::DuplicateManifestArtifact(
@@ -348,7 +383,7 @@ pub enum BundleError {
     #[error("bundle contains a non-UTF-8 entry path")]
     NonUtf8Path,
 
-    /// Only regular files are valid bundle entries in format v0.1.
+    /// Only regular files are valid bundle archive entries.
     #[error("bundle contains a non-file archive entry")]
     NonFileEntry,
 
@@ -356,7 +391,7 @@ pub enum BundleError {
     #[error("bundle contains duplicate archive entry `{0}`")]
     DuplicateEntry(String),
 
-    /// An entry is not defined by bundle format v0.1.
+    /// An entry is not defined by the bundle archive format.
     #[error("bundle contains unexpected archive entry `{0}`")]
     UnexpectedEntry(String),
 
@@ -374,27 +409,76 @@ pub enum BundleError {
         count: usize,
     },
 
-    /// The current bundle artifact model cannot package this workload kind.
-    #[error("bundle format v0.1 does not yet support workload `{workload}` of kind `{kind}`")]
+    /// The selected bundle version does not support this workload kind.
+    #[error("bundle version does not support workload `{workload}` of kind `{kind}`")]
     UnsupportedWorkloadKind {
-        /// Workload whose artifact model is not implemented.
+        /// Workload whose execution class is unsupported by that bundle version.
         workload: String,
 
         /// Unsupported workload execution class.
         kind: WorkloadKind,
     },
 
-    /// More than one artifact was supplied for the same workload.
-    #[error("component artifact for workload `{0}` was supplied more than once")]
+    /// A supplied workload artifact does not match the declared workload kind.
+    #[error(
+        "workload `{workload}` requires `{expected}` artifact semantics, \
+         but `{supplied}` artifact semantics were supplied"
+    )]
+    WorkloadArtifactKindMismatch {
+        /// Workload whose artifact kind was mismatched.
+        workload: String,
+
+        /// Workload kind declared by the Application Contract.
+        expected: WorkloadKind,
+
+        /// Workload kind represented by the supplied artifact.
+        supplied: WorkloadKind,
+    },
+
+    /// More than one artifact identity was supplied for the same workload.
+    #[error("workload artifact for `{0}` was supplied more than once")]
     DuplicateWorkloadArtifact(String),
 
-    /// A declared workload has no supplied component artifact.
-    #[error("component artifact for workload `{0}` is missing")]
+    /// A declared workload has no supplied artifact identity.
+    #[error("workload artifact for `{0}` is missing")]
     MissingWorkloadArtifact(String),
 
-    /// An artifact was supplied for a workload not declared by the application.
-    #[error("component artifact was supplied for undeclared workload `{0}`")]
+    /// An artifact identity was supplied for an undeclared workload.
+    #[error("workload artifact was supplied for undeclared workload `{0}`")]
     UnexpectedWorkloadArtifact(String),
+
+    /// An OCI image descriptor uses an unsupported media type.
+    #[error("container workload `{workload}` has unsupported OCI image media type `{media_type}`")]
+    InvalidOciImageMediaType {
+        /// Container workload containing the descriptor.
+        workload: String,
+
+        /// Unsupported descriptor media type.
+        media_type: String,
+    },
+
+    /// An OCI image descriptor does not use the supported canonical SHA-256 form.
+    #[error("container workload `{workload}` has invalid OCI image digest `{digest}`")]
+    InvalidOciImageDigest {
+        /// Container workload containing the descriptor.
+        workload: String,
+
+        /// Invalid digest.
+        digest: String,
+    },
+
+    /// Workload artifact fields do not match the workload execution class.
+    #[error("bundle workload `{workload}` ({kind}) has invalid artifact shape: {message}")]
+    InvalidWorkloadArtifactShape {
+        /// Invalid workload.
+        workload: String,
+
+        /// Workload execution class.
+        kind: WorkloadKind,
+
+        /// Shape violation.
+        message: &'static str,
+    },
 
     /// The manifest declares the same capability interface more than once.
     #[error("bundle manifest declares capability `{0}` more than once")]
@@ -478,7 +562,7 @@ pub enum BundleError {
     },
 
     /// An artifact is too large to represent in the bundle format.
-    #[error("artifact size `{size}` cannot be represented by bundle format v0.1")]
+    #[error("artifact size `{size}` cannot be represented by the bundle format")]
     ArtifactSizeOverflow {
         /// Host-side artifact length.
         size: usize,
@@ -565,12 +649,46 @@ fn verify_manifest_requirements(manifest: &BundleManifest) -> Result<(), BundleE
         ));
     }
 
+    let version = manifest.bundle_version();
+
     for workload in manifest.workloads() {
-        if workload.kind() != WorkloadKind::Component {
+        if version == BUNDLE_VERSION_0_1 && workload.kind() != WorkloadKind::Component {
             return Err(BundleError::UnsupportedWorkloadKind {
                 workload: workload.name().to_owned(),
                 kind: workload.kind(),
             });
+        }
+
+        match workload.kind() {
+            WorkloadKind::Component => {
+                if workload.artifacts().len() != 1 || workload.oci_image().is_some() {
+                    return Err(BundleError::InvalidWorkloadArtifactShape {
+                        workload: workload.name().to_owned(),
+                        kind: workload.kind(),
+                        message: "component workloads require exactly one embedded artifact and no OCI image descriptor",
+                    });
+                }
+            }
+
+            WorkloadKind::Container => {
+                if !workload.artifacts().is_empty() {
+                    return Err(BundleError::InvalidWorkloadArtifactShape {
+                        workload: workload.name().to_owned(),
+                        kind: workload.kind(),
+                        message: "container workloads may not contain embedded Component artifacts",
+                    });
+                }
+
+                let Some(image) = workload.oci_image() else {
+                    return Err(BundleError::InvalidWorkloadArtifactShape {
+                        workload: workload.name().to_owned(),
+                        kind: workload.kind(),
+                        message: "container workloads require one immutable OCI image descriptor",
+                    });
+                };
+
+                validate_oci_image_descriptor(workload.name(), image.media_type(), image.digest())?;
+            }
         }
     }
 
@@ -824,6 +942,11 @@ preferred_features = ["user-metadata"]
         PresolveBundle::decode(&encoded)
     }
 
+    const OCI_IMAGE_DIGEST: &str =
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const OTHER_OCI_IMAGE_DIGEST: &str =
+        "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
     #[test]
     fn component_bundle_constructor_rejects_container_workload() {
         let contract = parse_contract(
@@ -847,10 +970,220 @@ kind = "container"
 
         assert!(matches!(
             error,
-            BundleError::UnsupportedWorkloadKind {
+            BundleError::WorkloadArtifactKindMismatch {
                 workload,
-                kind: WorkloadKind::Container,
+                expected: WorkloadKind::Container,
+                supplied: WorkloadKind::Component,
             } if workload == "api"
+        ));
+    }
+
+    #[test]
+    fn component_bundle_v0_1_remains_decodable() {
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "legacy-component"
+version = "1.0.0"
+"#,
+        )
+        .expect("component contract should parse");
+
+        let bundle = PresolveBundle::from_component(&contract, COMPONENT)
+            .expect("current component bundle should build");
+
+        let decoded = decode_mutated_manifest(&bundle, |manifest| {
+            manifest["bundle_version"] = serde_json::json!("0.1");
+        })
+        .expect("valid 0.1 component bundle should remain decodable");
+
+        assert_eq!(
+            decoded.manifest().bundle_version(),
+            crate::BUNDLE_VERSION_0_1
+        );
+    }
+
+    #[test]
+    fn container_bundle_records_immutable_oci_descriptor() {
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "container-example"
+version = "1.0.0"
+
+[[workloads]]
+name = "api"
+kind = "container"
+"#,
+        )
+        .expect("container contract should parse");
+
+        let bundle = PresolveBundle::from_oci_image(
+            &contract,
+            OciImageArtifactInput::new(
+                "api",
+                crate::OCI_IMAGE_MANIFEST_MEDIA_TYPE,
+                OCI_IMAGE_DIGEST,
+                1_024,
+            ),
+        )
+        .expect("OCI descriptor bundle should build");
+
+        let workload = &bundle.manifest().workloads()[0];
+        assert_eq!(workload.kind(), WorkloadKind::Container);
+        assert_eq!(workload.artifacts(), []);
+
+        let image = workload
+            .oci_image()
+            .expect("container workload should contain OCI image descriptor");
+
+        assert_eq!(image.media_type(), crate::OCI_IMAGE_MANIFEST_MEDIA_TYPE);
+        assert_eq!(image.digest(), OCI_IMAGE_DIGEST);
+        assert_eq!(image.size(), 1_024);
+
+        let encoded = bundle.encode().expect("container bundle should encode");
+        let decoded = PresolveBundle::decode(&encoded).expect("container bundle should decode");
+
+        assert_eq!(
+            decoded
+                .release_digest()
+                .expect("decoded release should hash"),
+            bundle
+                .release_digest()
+                .expect("original release should hash")
+        );
+    }
+
+    #[test]
+    fn mixed_component_and_container_release_round_trips() {
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "mixed-example"
+version = "1.0.0"
+
+[[workloads]]
+name = "api"
+kind = "component"
+
+[[workloads]]
+name = "worker"
+kind = "container"
+"#,
+        )
+        .expect("mixed contract should parse");
+
+        let inputs = [
+            WorkloadArtifactInput::Component(ComponentArtifactInput::new("api", API_COMPONENT)),
+            WorkloadArtifactInput::OciImage(OciImageArtifactInput::new(
+                "worker",
+                crate::OCI_IMAGE_INDEX_MEDIA_TYPE,
+                OCI_IMAGE_DIGEST,
+                2_048,
+            )),
+        ];
+
+        let bundle = PresolveBundle::from_workload_artifacts(&contract, &inputs)
+            .expect("mixed bundle should build");
+        let encoded = bundle.encode().expect("mixed bundle should encode");
+        let decoded = PresolveBundle::decode(&encoded).expect("mixed bundle should decode");
+
+        assert_eq!(decoded.manifest().workloads().len(), 2);
+        assert_eq!(decoded.manifest().workloads()[0].name(), "api");
+        assert_eq!(
+            decoded.manifest().workloads()[0].kind(),
+            WorkloadKind::Component
+        );
+        assert_eq!(decoded.manifest().workloads()[1].name(), "worker");
+        assert_eq!(
+            decoded.manifest().workloads()[1].kind(),
+            WorkloadKind::Container
+        );
+    }
+
+    #[test]
+    fn changing_oci_digest_changes_release_identity() {
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "container-identity"
+version = "1.0.0"
+
+[[workloads]]
+name = "api"
+kind = "container"
+"#,
+        )
+        .expect("container contract should parse");
+
+        let first = PresolveBundle::from_oci_image(
+            &contract,
+            OciImageArtifactInput::new(
+                "api",
+                crate::OCI_IMAGE_MANIFEST_MEDIA_TYPE,
+                OCI_IMAGE_DIGEST,
+                1_024,
+            ),
+        )
+        .expect("first OCI bundle should build");
+
+        let second = PresolveBundle::from_oci_image(
+            &contract,
+            OciImageArtifactInput::new(
+                "api",
+                crate::OCI_IMAGE_MANIFEST_MEDIA_TYPE,
+                OTHER_OCI_IMAGE_DIGEST,
+                1_024,
+            ),
+        )
+        .expect("second OCI bundle should build");
+
+        assert_ne!(
+            first.release_digest().expect("first release should hash"),
+            second.release_digest().expect("second release should hash")
+        );
+    }
+
+    #[test]
+    fn invalid_oci_digest_is_rejected() {
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "bad-container"
+version = "1.0.0"
+
+[[workloads]]
+name = "api"
+kind = "container"
+"#,
+        )
+        .expect("container contract should parse");
+
+        let Err(error) = PresolveBundle::from_oci_image(
+            &contract,
+            OciImageArtifactInput::new(
+                "api",
+                crate::OCI_IMAGE_MANIFEST_MEDIA_TYPE,
+                "sha256:not-a-digest",
+                10,
+            ),
+        ) else {
+            panic!("invalid OCI digest should fail");
+        };
+
+        assert!(matches!(
+            error,
+            BundleError::InvalidOciImageDigest { workload, .. } if workload == "api"
         ));
     }
 
