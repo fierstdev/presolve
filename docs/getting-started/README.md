@@ -328,6 +328,18 @@ The output must use the `.presolved` extension.
 
 Environment compatibility remains a separate operation handled by `presolve check`.
 
+## Inspect an application
+
+To inspect what Presolve understands from the nearest Application Contract:
+
+```bash
+presolve inspect
+```
+
+Inspection is environment-independent. It shows the normalized application semantics, including workloads, capability requirements and features, topology, resource requirements, and outbound network policy.
+
+It does not load `presolve.env.toml` or select providers.
+
 ## Check application compatibility
 
 From an application directory or any descendant, run:

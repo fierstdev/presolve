@@ -400,6 +400,12 @@ From an application directory, construct an immutable release independently of a
 presolve build
 ```
 
+Inspect the nearest Application Contract without requiring an environment:
+
+```bash
+presolve inspect
+```
+
 For compatibility checking and local execution against the nearest environment:
 
 ```bash

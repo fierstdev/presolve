@@ -66,6 +66,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | OCI/container and mixed-workload release packaging | Implemented |
 | Automated TypeScript-to-Component release build | Implemented |
 | Build/package reproducibility checkpoint | Implemented |
+| `presolve inspect` application semantic view | Implemented |
 
 ## Next
 
@@ -79,7 +80,9 @@ Chunk 18 real cloud-provider portability is complete. Presolve can resolve a pro
 
 Chunk 19 build/package workflow is complete. `presolve build` constructs verified environment-independent releases from Rust Component source, TypeScript Component source, prebuilt Components, immutable OCI descriptors, and mixed workload inputs. CLI-level checkpoint coverage proves deterministic `.presolved` packaging for equal artifact identity and exercises repeated clean TypeScript Component builds with the pinned checkpoint toolchain.
 
-The next roadmap chunk is richer `check`/`inspect`/`plan` UX over the application, environment, resolver, and release models.
+Chunk 20 inspection/planning UX is in progress. `presolve inspect` now exposes the nearest Application Contract as a human-readable semantic view without requiring an Environment Specification.
+
+Next is `presolve plan`, which will expose the exact resolved `DeploymentPlan` separately from the compatibility-oriented `presolve check` summary.
 
 ## Planned next
 

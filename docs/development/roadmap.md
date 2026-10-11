@@ -168,6 +168,18 @@ Current subdivision:
 
 Expose the resolver and application/environment models as useful operator/developer inspection tools.
 
+Current subdivision:
+
+```text
+20.1  `presolve inspect` application semantic view (complete)
+20.2  `presolve plan` exact DeploymentPlan view
+20.3  structured `--json` output for check/inspect/plan
+20.4  immutable `.presolved` release inspection
+20.5  UX checkpoint + docs
+```
+
+20.1 adds an environment-independent `presolve inspect` command. It discovers only the nearest Application Contract and renders the normalized application semantics: workloads, capabilities and feature requirements, topology, resources, and network policy. It does not load an Environment Specification or perform provider resolution.
+
 ## Longer-term directions
 
 Possible later work includes:

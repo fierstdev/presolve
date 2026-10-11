@@ -47,6 +47,7 @@ The initial local developer workflow is implemented. See [Getting started](getti
 - [TypeScript authoring](architecture/typescript-authoring.md) — transport-neutral SDK semantics and execution-target adapters.
 - [Provider realization](architecture/provider-realization.md) — node-side adapter configuration, ProviderId joining, and secret-resolution boundary.
 - [Build and package workflow](architecture/build-and-package.md) — environment-independent source/artifact packaging into verified `.presolved` releases.
+- [Inspection and planning UX](architecture/inspection-and-planning.md) — semantic application inspection and the evolving check/plan operator surfaces.
 
 ### Development
 

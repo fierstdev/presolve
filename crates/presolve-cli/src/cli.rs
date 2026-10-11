@@ -21,6 +21,9 @@ pub(crate) enum RootCommand {
     /// Build the nearest application into an immutable `.presolved` release.
     Build(BuildArgs),
 
+    /// Inspect the semantic model of the nearest application.
+    Inspect,
+
     /// Check whether the nearest application can run in the nearest environment.
     Check,
 
@@ -353,6 +356,14 @@ mod tests {
         .expect_err("single Component shorthand should conflict with OCI mappings");
 
         assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
+    }
+
+    #[test]
+    fn inspect_command_parses() {
+        let cli =
+            Cli::try_parse_from(["presolve", "inspect"]).expect("inspect command should parse");
+
+        assert!(matches!(cli.command, RootCommand::Inspect));
     }
 
     #[test]

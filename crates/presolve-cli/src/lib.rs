@@ -8,6 +8,7 @@ mod check;
 mod cli;
 mod dev;
 mod environment;
+mod inspect;
 mod provider;
 mod typescript;
 
@@ -24,6 +25,7 @@ use crate::{
     cli::{Cli, EnvironmentCommand, EnvironmentProviderCommand, RootCommand},
     dev::run_local_dev,
     environment::{create_environment, load_environment},
+    inspect::inspect_application,
     provider::{add_provider, expand_provider_supply, list_providers, remove_provider},
 };
 
@@ -42,6 +44,7 @@ pub fn run() -> Result<()> {
 fn execute(cli: Cli, current_directory: &Path) -> Result<()> {
     match cli.command {
         RootCommand::Build(args) => execute_build(&args, current_directory),
+        RootCommand::Inspect => execute_inspect(current_directory),
         RootCommand::Check => execute_check(current_directory),
         RootCommand::Dev(args) => execute_dev(&args, current_directory),
         RootCommand::Env { command } => execute_environment(command, current_directory),
@@ -81,6 +84,13 @@ fn execute_build(args: &cli::BuildArgs, current_directory: &Path) -> Result<()> 
     println!("  release: {}", output.release.display());
     println!("  digest: {}", output.release_digest);
     println!("  size: {} bytes", output.encoded_size);
+
+    Ok(())
+}
+
+fn execute_inspect(current_directory: &Path) -> Result<()> {
+    let rendered = inspect_application(current_directory)?;
+    print!("{rendered}");
 
     Ok(())
 }
