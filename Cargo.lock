@@ -1179,8 +1179,10 @@ dependencies = [
  "anyhow",
  "clap",
  "presolve-capability",
+ "presolve-contract",
  "presolve-core",
  "presolve-environment",
+ "presolve-resolver",
  "semver",
 ]
 

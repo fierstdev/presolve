@@ -2,11 +2,12 @@
 
 Presolve's portability foundation is implemented, and the local developer workflow is now being built on top of it.
 
-The first implemented CLI surface manages the local Environment Specification:
+The implemented local CLI surface now includes environment management and compatibility checking:
 
 ```text
 presolve env init
 presolve env show
+presolve check
 ```
 
 `presolve environment` is accepted as a visible long-form alias for `presolve env`. Public documentation uses the shorter `env` form.
@@ -127,10 +128,8 @@ Environment Inventory │
 Chunk 15 is continuing with:
 
 - local provider realization
-- Application Contract discovery
-- application/environment compatibility checking
 - local materialization and execution
-- actionable CLI diagnostics
+- broader actionable CLI diagnostics
 
 Commands are documented here only after they are implemented.
 
@@ -221,3 +220,48 @@ presolve env provider remove memory-services
 Removing and later re-adding a provider creates a new `ProviderId`. Renaming provider declarations is not implemented yet.
 
 These commands mutate only `presolve.env.toml`. Concrete local provider realization remains a separate node-side concern and will be added later in Chunk 15.
+
+## Check application compatibility
+
+From an application directory or any descendant, run:
+
+```bash
+presolve check
+```
+
+Presolve independently discovers the nearest:
+
+```text
+presolve.toml
+presolve.env.toml
+```
+
+by walking upward from the current directory.
+
+The Application Contract is parsed and validated. The Environment Specification is parsed, normalized into resolver inventory, and compared against the application through the same resolver used to produce a `DeploymentPlan`.
+
+A successful check reports selected provider bindings:
+
+```text
+Application: orders 1.0.0
+Environment: local
+Status: compatible
+  capability bindings:
+    presolve:kv/store -> memory-services (prv_...) @ 0.1.0
+```
+
+An incompatible application exits unsuccessfully and reports stable resolver diagnostic codes such as:
+
+```text
+PS2001  missing required capability
+PS2002  insufficient memory
+PS2003  insufficient CPU
+PS2004  missing required capability features
+PS2005  unsupported workload execution class
+```
+
+`presolve check` does not materialize providers or execute workloads. It answers one question:
+
+> Can this application be resolved in this environment?
+
+Environment selection is currently discovery-based. Explicit environment selection can be added later without changing this default.

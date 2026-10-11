@@ -16,6 +16,9 @@ pub(crate) struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum RootCommand {
+    /// Check whether the nearest application can run in the nearest environment.
+    Check,
+
     /// Create, inspect, and manage Presolve environments.
     #[command(visible_alias = "environment")]
     Env {
@@ -141,6 +144,13 @@ mod tests {
         assert_eq!(args.name, "local");
         assert_eq!(args.memory_mib, DEFAULT_LOCAL_MEMORY_MIB);
         assert_eq!(args.cpu_millis, DEFAULT_LOCAL_CPU_MILLIS);
+    }
+
+    #[test]
+    fn check_command_parses() {
+        let cli = Cli::try_parse_from(["presolve", "check"]).expect("check command should parse");
+
+        assert!(matches!(cli.command, RootCommand::Check));
     }
 
     #[test]
