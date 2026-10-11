@@ -339,6 +339,7 @@ Implemented foundations include:
 - installed provider-adapter registry with plan-scoped materialization
 - Cloudflare Workers KV adapter
 - live external cloud-provider portability checkpoint
+- environment-independent `presolve build` for verified single-Component `.presolved` releases
 - `presolve dev` local Component execution for the current single-workload Rust path
 
 The project is still pre-stable.
@@ -391,12 +392,20 @@ presolve env provider add memory-services --provides kv,objects
 presolve env check
 ```
 
-From an application directory:
+From an application directory, construct an immutable release independently of any environment:
+
+```bash
+presolve build
+```
+
+For compatibility checking and local execution against the nearest environment:
 
 ```bash
 presolve check
 presolve dev --input "example"
 ```
+
+`presolve build` packages the Application Contract and workload artifact into a verified `.presolved` release without loading `presolve.env.toml`.
 
 `presolve check` answers whether the nearest Application Contract can be resolved against the nearest Environment Specification.
 

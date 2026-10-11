@@ -18,6 +18,9 @@ pub(crate) struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum RootCommand {
+    /// Build the nearest application into an immutable `.presolved` release.
+    Build(BuildArgs),
+
     /// Check whether the nearest application can run in the nearest environment.
     Check,
 
@@ -79,6 +82,17 @@ impl BuiltinCapabilityAlias {
             _ => None,
         }
     }
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct BuildArgs {
+    /// Prebuilt WebAssembly Component to package instead of building source automatically.
+    #[arg(long, value_name = "PATH")]
+    pub(crate) component: Option<PathBuf>,
+
+    /// Output `.presolved` path. Defaults to `dist/<application>.presolved`.
+    #[arg(long, value_name = "PATH")]
+    pub(crate) output: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -163,6 +177,38 @@ mod tests {
         assert_eq!(args.name, "local");
         assert_eq!(args.memory_mib, DEFAULT_LOCAL_MEMORY_MIB);
         assert_eq!(args.cpu_millis, DEFAULT_LOCAL_CPU_MILLIS);
+    }
+
+    #[test]
+    fn build_command_defaults_to_source_build_and_default_output() {
+        let cli = Cli::try_parse_from(["presolve", "build"]).expect("build command should parse");
+
+        let RootCommand::Build(args) = cli.command else {
+            panic!("expected build command");
+        };
+
+        assert!(args.component.is_none());
+        assert!(args.output.is_none());
+    }
+
+    #[test]
+    fn build_command_accepts_component_and_output() {
+        let cli = Cli::try_parse_from([
+            "presolve",
+            "build",
+            "--component",
+            "build/app.wasm",
+            "--output",
+            "release/app.presolved",
+        ])
+        .expect("build command options should parse");
+
+        let RootCommand::Build(args) = cli.command else {
+            panic!("expected build command");
+        };
+
+        assert_eq!(args.component, Some(PathBuf::from("build/app.wasm")));
+        assert_eq!(args.output, Some(PathBuf::from("release/app.presolved")));
     }
 
     #[test]

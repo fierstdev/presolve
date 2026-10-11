@@ -1313,6 +1313,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "clap",
+ "presolve-bundle",
  "presolve-capability",
  "presolve-contract",
  "presolve-core",

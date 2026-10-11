@@ -12,6 +12,21 @@ use crate::check::CompatibilityCheck;
 
 const RUST_COMPONENT_TARGET: &str = "wasm32-wasip2";
 
+#[derive(Debug, Clone, Copy)]
+enum CargoBuildProfile {
+    Debug,
+    Release,
+}
+
+impl CargoBuildProfile {
+    const fn directory(self) -> &'static str {
+        match self {
+            Self::Debug => "debug",
+            Self::Release => "release",
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct DevExecution {
     pub(crate) workload: String,
@@ -97,6 +112,17 @@ fn resolve_component_override(start: &Path, path: &Path) -> Result<PathBuf> {
 }
 
 fn build_rust_component(application_directory: &Path) -> Result<PathBuf> {
+    build_rust_component_with_profile(application_directory, CargoBuildProfile::Debug)
+}
+
+pub(crate) fn build_rust_component_release(application_directory: &Path) -> Result<PathBuf> {
+    build_rust_component_with_profile(application_directory, CargoBuildProfile::Release)
+}
+
+fn build_rust_component_with_profile(
+    application_directory: &Path,
+    profile: CargoBuildProfile,
+) -> Result<PathBuf> {
     let manifest = application_directory.join("Cargo.toml");
 
     if !manifest.is_file() {
@@ -109,14 +135,24 @@ fn build_rust_component(application_directory: &Path) -> Result<PathBuf> {
 
     let project = cargo_project(&manifest)?;
 
-    eprintln!("Building Rust component for {RUST_COMPONENT_TARGET}...");
+    eprintln!(
+        "Building Rust component for {RUST_COMPONENT_TARGET} ({})...",
+        profile.directory()
+    );
 
-    let status = Command::new("cargo")
+    let mut command = Command::new("cargo");
+    command
         .arg("build")
         .arg("--manifest-path")
         .arg(&manifest)
         .arg("--target")
-        .arg(RUST_COMPONENT_TARGET)
+        .arg(RUST_COMPONENT_TARGET);
+
+    if matches!(profile, CargoBuildProfile::Release) {
+        command.arg("--release");
+    }
+
+    let status = command
         .current_dir(application_directory)
         .status()
         .with_context(|| format!("could not run Cargo for `{}`", manifest.display()))?;
@@ -132,7 +168,7 @@ fn build_rust_component(application_directory: &Path) -> Result<PathBuf> {
     let component = project
         .target_directory
         .join(RUST_COMPONENT_TARGET)
-        .join("debug")
+        .join(profile.directory())
         .join(artifact_name);
 
     if !component.is_file() {
@@ -219,11 +255,11 @@ fn cargo_project_from_metadata(metadata: &Value, manifest: &Path) -> Result<Carg
     let target = match cdylib_targets.as_slice() {
         [target] => *target,
         [] => bail!(
-            "`{}` must expose exactly one `cdylib` target for automatic `presolve dev` builds",
+            "`{}` must expose exactly one `cdylib` target for automatic Presolve Rust builds",
             manifest.display()
         ),
         targets => bail!(
-            "`{}` exposes {} `cdylib` targets; use `--component PATH` to choose an artifact explicitly",
+            "`{}` exposes {} `cdylib` targets; supply a prebuilt Component explicitly",
             manifest.display(),
             targets.len()
         ),

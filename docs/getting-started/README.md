@@ -11,6 +11,7 @@ presolve env show
 presolve env provider add
 presolve env provider list
 presolve env provider remove
+presolve build
 presolve check
 presolve dev
 ```
@@ -162,7 +163,7 @@ The initial local developer experience is implemented:
 - single-workload local Component execution through `presolve dev`
 - stable Application Contract and resolution diagnostic codes surfaced through the CLI
 
-The next major implementation area is OCI/container execution. The current local `presolve dev` source-build convenience remains intentionally limited to the implemented Rust Component authoring path; broader build/package orchestration is still planned later.
+That checkpoint established the initial local Component workflow. Subsequent chunks added OCI/container execution, TypeScript authoring, and a real cloud-provider proof. Chunk 19 now adds first-class environment-independent `.presolved` release construction while retaining the current Rust Component source-build convention as one authoring convenience.
 
 Reference documentation:
 
@@ -251,6 +252,40 @@ presolve env provider remove memory-services
 Removing and later re-adding a provider creates a new `ProviderId`. Renaming provider declarations is not implemented yet.
 
 These commands mutate only `presolve.env.toml`. Concrete local provider realization remains a separate node-side concern and occurs only when the local execution path materializes a resolved plan.
+
+## Build an immutable application release
+
+Release construction is independent of environment selection:
+
+```bash
+presolve build
+```
+
+The current automatic source path discovers the nearest `presolve.toml`, builds the colocated Rust `cdylib` for `wasm32-wasip2` in Cargo release mode, packages it into the canonical bundle format, verifies the encoded bundle, and writes:
+
+```text
+dist/<application>.presolved
+```
+
+Use a prebuilt language-neutral Component instead of the automatic Rust source convention with:
+
+```bash
+presolve build --component ./path/to/application.wasm
+```
+
+Override the output path with:
+
+```bash
+presolve build --output ./release/application.presolved
+```
+
+The output must use the `.presolved` extension.
+
+`presolve build` deliberately does **not** discover or require `presolve.env.toml`. It answers:
+
+> What is this immutable application release?
+
+Environment compatibility remains a separate operation handled by `presolve check`.
 
 ## Check application compatibility
 

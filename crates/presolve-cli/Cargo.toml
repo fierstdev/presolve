@@ -14,6 +14,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+presolve-bundle.workspace = true
 presolve-environment.workspace = true
 presolve-contract.workspace = true
 presolve-resolver.workspace = true

@@ -61,6 +61,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Plan-scoped provider adapter materialization | Implemented |
 | Live Cloudflare Workers KV portability proof | Implemented |
 | Cloud-provider portability checkpoint | Implemented |
+| `presolve build` single-Component release workflow | Implemented |
 
 ## Next
 
@@ -72,9 +73,9 @@ TypeScript authoring Chunk 17 is complete. `@presolve/sdk` provides transport-ne
 
 Chunk 18 real cloud-provider portability is complete. Presolve can resolve a provider-neutral KV requirement, preserve the exact selected `ProviderId` through node realization, materialize a Cloudflare Workers KV adapter, resolve secrets only for selected providers, and exercise that provider against real managed infrastructure. No additional required Presolve configuration file was introduced.
 
-The next roadmap chunk is the first-class build/package workflow around the already implemented `.presolved` release format.
+Chunk 19 build/package work is in progress. The first `presolve build` path now constructs verified environment-independent `.presolved` releases for the current single Component workflow, using release-mode Rust compilation or an explicit prebuilt Component.
 
-Automated TypeScript-to-Component compilation remains part of the later build/package workflow.
+Next is explicit artifact mapping for multi-workload releases, followed by OCI inputs and TypeScript source-to-Component integration.
 
 ## Planned next
 

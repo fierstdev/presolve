@@ -3,6 +3,7 @@
 //! Presolve command-line interface.
 
 mod application;
+mod build;
 mod check;
 mod cli;
 mod dev;
@@ -17,6 +18,7 @@ use presolve_environment::inventory_from_specification;
 use presolve_resolver::ResolutionProblem;
 
 use crate::{
+    build::build_release,
     check::{CompatibilityCheck, check_compatibility},
     cli::{Cli, EnvironmentCommand, EnvironmentProviderCommand, RootCommand},
     dev::run_local_dev,
@@ -38,10 +40,29 @@ pub fn run() -> Result<()> {
 
 fn execute(cli: Cli, current_directory: &Path) -> Result<()> {
     match cli.command {
+        RootCommand::Build(args) => execute_build(&args, current_directory),
         RootCommand::Check => execute_check(current_directory),
         RootCommand::Dev(args) => execute_dev(&args, current_directory),
         RootCommand::Env { command } => execute_environment(command, current_directory),
     }
+}
+
+fn execute_build(args: &cli::BuildArgs, current_directory: &Path) -> Result<()> {
+    let output = build_release(
+        current_directory,
+        args.component.as_deref(),
+        args.output.as_deref(),
+    )?;
+
+    println!("Presolve build");
+    println!("  application: {} {}", output.application, output.version);
+    println!("  workload: {}", output.workload);
+    println!("  component: {}", output.component.display());
+    println!("  release: {}", output.release.display());
+    println!("  digest: {}", output.release_digest);
+    println!("  size: {} bytes", output.encoded_size);
+
+    Ok(())
 }
 
 fn execute_check(current_directory: &Path) -> Result<()> {
