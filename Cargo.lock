@@ -1047,6 +1047,7 @@ dependencies = [
  "anyhow",
  "presolve-contract",
  "presolve-core",
+ "semver",
  "serde",
  "serde_json",
  "tar",

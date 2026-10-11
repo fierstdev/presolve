@@ -288,11 +288,18 @@ Implemented foundations include:
 - Wasmtime-based execution
 - fuel, memory, and deadline isolation
 - capability/provider abstraction
+- canonical semantic capability contracts
 - in-memory key-value provider
+- in-memory object-storage provider
+- reusable provider conformance suites
 - environment inventories
 - deterministic capability resolution
+- required and preferred semantic capability-feature negotiation
 - symbolic deployment plans
 - deployment-plan materialization
+- Wasm object-storage bindings with chunked guest/host transfer
+- bounded host-side object transfer state
+- end-to-end object-storage workload validation
 - deterministic `.presolved` bundles
 - SHA-256 application release identity
 - multiple workloads per application
@@ -329,17 +336,21 @@ If the answer is the latter, it generally does not belong in the Application Con
 ```text
 crates/
   presolve-core/          Shared vocabulary and foundational types
+  presolve-capability/    Canonical capability semantic contracts
   presolve-contract/      Application Contract
   presolve-runtime/       WebAssembly Component runtime
   presolve-bundle/        Canonical application release bundles
   presolve-policy/        Deployment and security policy
   presolve-resolver/      Environment compatibility and resolution
-  presolve-provider-sdk/  Provider contracts
+  presolve-provider-sdk/  Provider interfaces
+  presolve-provider-conformance/
+                          Reusable provider semantic conformance suites
   presolve-node/          Deployment-plan materialization
   presolve-cli/           Presolve command-line interface
 
 providers/
   kv-memory/              In-memory key-value provider
+  objects-memory/         In-memory object-storage provider
 
 wit/                      Versioned WebAssembly Component interfaces
 examples/                 Example Presolve applications

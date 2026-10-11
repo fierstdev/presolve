@@ -5,6 +5,7 @@ use std::{
 
 use presolve_contract::ApplicationContract;
 use presolve_core::ArtifactDigest;
+use semver::VersionReq;
 use tar::{Archive, Builder, EntryType, Header};
 use thiserror::Error;
 
@@ -125,11 +126,7 @@ impl PresolveBundle {
             });
         }
 
-        if self.manifest.workloads().is_empty() {
-            return Err(BundleError::InvalidManifest(
-                "bundle must contain at least one workload",
-            ));
-        }
+        verify_manifest_requirements(&self.manifest)?;
 
         let mut workload_names = BTreeSet::new();
         let mut referenced = BTreeSet::new();
@@ -389,6 +386,47 @@ pub enum BundleError {
     #[error("component artifact was supplied for undeclared workload `{0}`")]
     UnexpectedWorkloadArtifact(String),
 
+    /// The manifest declares the same capability interface more than once.
+    #[error("bundle manifest declares capability `{0}` more than once")]
+    DuplicateManifestCapability(String),
+
+    /// A manifest capability interface identifier is malformed.
+    #[error("bundle manifest declares invalid capability interface `{0}`")]
+    InvalidManifestCapabilityInterface(String),
+
+    /// A manifest capability version requirement is malformed.
+    #[error(
+        "bundle manifest capability `{interface}` declares invalid version requirement `{version}`"
+    )]
+    InvalidManifestCapabilityVersion {
+        /// Capability interface containing the invalid version requirement.
+        interface: String,
+
+        /// Invalid semantic version requirement.
+        version: String,
+    },
+
+    /// A manifest capability feature identifier is malformed.
+    #[error("bundle manifest capability `{interface}` declares invalid feature `{feature}`")]
+    InvalidManifestCapabilityFeature {
+        /// Capability interface containing the invalid feature.
+        interface: String,
+
+        /// Invalid feature identifier.
+        feature: String,
+    },
+
+    /// A manifest capability feature occurs more than once across required and
+    /// preferred feature requirements.
+    #[error("bundle manifest capability `{interface}` declares feature `{feature}` more than once")]
+    DuplicateManifestCapabilityFeature {
+        /// Capability interface containing the duplicate feature.
+        interface: String,
+
+        /// Duplicate feature identifier.
+        feature: String,
+    },
+
     /// The manifest declares the same workload name more than once.
     #[error("bundle manifest declares workload `{0}` more than once")]
     DuplicateManifestWorkload(String),
@@ -510,6 +548,109 @@ fn append_entry(
         .map_err(BundleError::Archive)
 }
 
+fn verify_manifest_requirements(manifest: &BundleManifest) -> Result<(), BundleError> {
+    if manifest.workloads().is_empty() {
+        return Err(BundleError::InvalidManifest(
+            "bundle must contain at least one workload",
+        ));
+    }
+
+    verify_capability_requirements(manifest)
+}
+
+fn verify_capability_requirements(manifest: &BundleManifest) -> Result<(), BundleError> {
+    let mut interfaces = BTreeSet::new();
+
+    for capability in manifest.requirements().capabilities() {
+        let interface = capability.interface();
+
+        if !valid_capability_interface(interface) {
+            return Err(BundleError::InvalidManifestCapabilityInterface(
+                interface.to_owned(),
+            ));
+        }
+
+        if !interfaces.insert(interface) {
+            return Err(BundleError::DuplicateManifestCapability(
+                interface.to_owned(),
+            ));
+        }
+
+        if VersionReq::parse(capability.version()).is_err() {
+            return Err(BundleError::InvalidManifestCapabilityVersion {
+                interface: interface.to_owned(),
+                version: capability.version().to_owned(),
+            });
+        }
+
+        let mut features = BTreeSet::new();
+
+        for feature in capability
+            .required_features()
+            .iter()
+            .chain(capability.preferred_features())
+        {
+            if !valid_kebab_segment(feature) {
+                return Err(BundleError::InvalidManifestCapabilityFeature {
+                    interface: interface.to_owned(),
+                    feature: feature.clone(),
+                });
+            }
+
+            if !features.insert(feature.as_str()) {
+                return Err(BundleError::DuplicateManifestCapabilityFeature {
+                    interface: interface.to_owned(),
+                    feature: feature.clone(),
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn valid_capability_interface(interface: &str) -> bool {
+    let Some((namespace, remainder)) = interface.split_once(':') else {
+        return false;
+    };
+
+    if remainder.contains(':') {
+        return false;
+    }
+
+    let Some((package, name)) = remainder.split_once('/') else {
+        return false;
+    };
+
+    if name.contains('/') {
+        return false;
+    }
+
+    valid_kebab_segment(namespace) && valid_kebab_segment(package) && valid_kebab_segment(name)
+}
+
+fn valid_kebab_segment(segment: &str) -> bool {
+    if segment.is_empty() || segment.len() > 63 {
+        return false;
+    }
+
+    let bytes = segment.as_bytes();
+
+    let Some(first) = bytes.first() else {
+        return false;
+    };
+
+    let Some(last) = bytes.last() else {
+        return false;
+    };
+
+    first.is_ascii_lowercase()
+        && last.is_ascii_alphanumeric()
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-')
+}
+
 fn validate_path(path: &str) -> Result<(), BundleError> {
     if path.is_empty()
         || path.starts_with('/')
@@ -592,6 +733,27 @@ mod tests {
     "#,
         )
         .expect("topology contract should parse")
+    }
+
+    fn capability_feature_bundle() -> PresolveBundle {
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "feature-example"
+version = "1.0.0"
+
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+required_features = ["range-read", "conditional-write"]
+preferred_features = ["user-metadata"]
+"#,
+        )
+        .expect("feature contract should parse");
+
+        PresolveBundle::from_component(&contract, COMPONENT).expect("feature bundle should build")
     }
 
     fn topology_bundle() -> PresolveBundle {
@@ -1618,6 +1780,135 @@ version = "1.0.0"
                 to,
                 interface
             } if from == "api" && to == "worker" && interface == "jobs"
+        ));
+    }
+    #[test]
+    fn decode_normalizes_capability_feature_order() {
+        let bundle = capability_feature_bundle();
+
+        let decoded = decode_mutated_manifest(&bundle, |manifest| {
+            let capability = manifest
+                .get_mut("requirements")
+                .and_then(|requirements| requirements.get_mut("capabilities"))
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|capabilities| capabilities.first_mut())
+                .expect("manifest should contain capability");
+
+            capability["required_features"] =
+                serde_json::json!(["range-read", "conditional-write"]);
+        })
+        .expect("feature ordering should normalize");
+
+        assert_eq!(decoded.manifest(), bundle.manifest());
+        assert_eq!(
+            decoded
+                .release_digest()
+                .expect("decoded digest should compute"),
+            bundle
+                .release_digest()
+                .expect("original digest should compute")
+        );
+    }
+
+    #[test]
+    fn decode_rejects_duplicate_manifest_capability() {
+        let bundle = capability_feature_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let capabilities = manifest
+                .get_mut("requirements")
+                .and_then(|requirements| requirements.get_mut("capabilities"))
+                .and_then(serde_json::Value::as_array_mut)
+                .expect("manifest should contain capabilities");
+
+            let duplicate = capabilities
+                .first()
+                .expect("manifest should contain capability")
+                .clone();
+
+            capabilities.push(duplicate);
+        })
+        .expect_err("duplicate capability should fail");
+
+        assert!(matches!(
+            error,
+            BundleError::DuplicateManifestCapability(interface)
+                if interface == "presolve:objects/store"
+        ));
+    }
+
+    #[test]
+    fn decode_rejects_duplicate_capability_feature() {
+        let bundle = capability_feature_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let capability = manifest
+                .get_mut("requirements")
+                .and_then(|requirements| requirements.get_mut("capabilities"))
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|capabilities| capabilities.first_mut())
+                .expect("manifest should contain capability");
+
+            capability["preferred_features"] = serde_json::json!(["range-read", "user-metadata"]);
+        })
+        .expect_err("required/preferred feature overlap should fail");
+
+        assert!(matches!(
+            error,
+            BundleError::DuplicateManifestCapabilityFeature {
+                interface,
+                feature
+            } if interface == "presolve:objects/store" && feature == "range-read"
+        ));
+    }
+
+    #[test]
+    fn decode_rejects_invalid_capability_feature() {
+        let bundle = capability_feature_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let capability = manifest
+                .get_mut("requirements")
+                .and_then(|requirements| requirements.get_mut("capabilities"))
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|capabilities| capabilities.first_mut())
+                .expect("manifest should contain capability");
+
+            capability["preferred_features"] = serde_json::json!(["Range Read"]);
+        })
+        .expect_err("invalid feature identifier should fail");
+
+        assert!(matches!(
+            error,
+            BundleError::InvalidManifestCapabilityFeature {
+                interface,
+                feature
+            } if interface == "presolve:objects/store" && feature == "Range Read"
+        ));
+    }
+
+    #[test]
+    fn decode_rejects_invalid_capability_version_requirement() {
+        let bundle = capability_feature_bundle();
+
+        let error = decode_mutated_manifest(&bundle, |manifest| {
+            let capability = manifest
+                .get_mut("requirements")
+                .and_then(|requirements| requirements.get_mut("capabilities"))
+                .and_then(serde_json::Value::as_array_mut)
+                .and_then(|capabilities| capabilities.first_mut())
+                .expect("manifest should contain capability");
+
+            capability["version"] = serde_json::json!("not-semver");
+        })
+        .expect_err("invalid version requirement should fail");
+
+        assert!(matches!(
+            error,
+            BundleError::InvalidManifestCapabilityVersion {
+                interface,
+                version
+            } if interface == "presolve:objects/store" && version == "not-semver"
         ));
     }
 }

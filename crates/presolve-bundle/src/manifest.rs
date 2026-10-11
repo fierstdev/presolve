@@ -179,11 +179,18 @@ impl BundleManifest {
 
     /// Normalizes collections whose ordering is not application semantics.
     pub(crate) fn normalize(&mut self) {
+        for capability in &mut self.requirements.capabilities {
+            capability.required_features.sort();
+            capability.preferred_features.sort();
+        }
+
         self.requirements.capabilities.sort_by(|left, right| {
             left.interface
                 .cmp(&right.interface)
                 .then_with(|| left.version.cmp(&right.version))
                 .then_with(|| left.optional.cmp(&right.optional))
+                .then_with(|| left.required_features.cmp(&right.required_features))
+                .then_with(|| left.preferred_features.cmp(&right.preferred_features))
         });
 
         self.requirements.network.allow.sort();
