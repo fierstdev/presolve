@@ -15,6 +15,7 @@ path = "src/main.rs"
 anyhow.workspace = true
 clap.workspace = true
 presolve-environment.workspace = true
+semver.workspace = true
 presolve-core.workspace = true
 
 [lints]

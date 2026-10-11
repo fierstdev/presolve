@@ -31,6 +31,24 @@ pub(crate) enum EnvironmentCommand {
 
     /// Show the nearest Environment Specification.
     Show,
+
+    /// Manage providers declared by the nearest Environment Specification.
+    Provider {
+        #[command(subcommand)]
+        command: EnvironmentProviderCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum EnvironmentProviderCommand {
+    /// Add a provider declaration with a generated stable `ProviderId`.
+    Add(ProviderAddArgs),
+
+    /// List provider declarations.
+    List,
+
+    /// Remove a provider declaration by name.
+    Remove(ProviderRemoveArgs),
 }
 
 #[derive(Debug, Args)]
@@ -46,6 +64,28 @@ pub(crate) struct EnvironmentInitArgs {
     /// Allocatable CPU budget in millicores exposed to the resolver.
     #[arg(long, default_value_t = DEFAULT_LOCAL_CPU_MILLIS)]
     pub(crate) cpu_millis: u32,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct ProviderAddArgs {
+    /// Human-readable provider name, unique within the environment.
+    #[arg(value_name = "NAME")]
+    pub(crate) name: String,
+
+    /// Exact supplied capability as INTERFACE@VERSION. Repeat for multiple capabilities.
+    #[arg(long = "capability", value_name = "INTERFACE@VERSION", required = true)]
+    pub(crate) capabilities: Vec<String>,
+
+    /// Optional semantic feature as INTERFACE@VERSION=FEATURE. Repeat as needed.
+    #[arg(long = "feature", value_name = "INTERFACE@VERSION=FEATURE")]
+    pub(crate) features: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct ProviderRemoveArgs {
+    /// Human-readable provider name.
+    #[arg(value_name = "NAME")]
+    pub(crate) name: String,
 }
 
 #[cfg(test)]
@@ -108,5 +148,65 @@ mod tests {
         assert_eq!(args.name, "staging");
         assert_eq!(args.memory_mib, 8_192);
         assert_eq!(args.cpu_millis, 4_000);
+    }
+
+    #[test]
+    fn provider_add_collects_capabilities_and_features() {
+        let cli = Cli::try_parse_from([
+            "presolve",
+            "env",
+            "provider",
+            "add",
+            "memory-services",
+            "--capability",
+            "presolve:kv/store@0.1.0",
+            "--capability",
+            "presolve:objects/store@0.1.0",
+            "--feature",
+            "presolve:objects/store@0.1.0=range-read",
+        ])
+        .expect("provider add command should parse");
+
+        let RootCommand::Env {
+            command:
+                EnvironmentCommand::Provider {
+                    command: EnvironmentProviderCommand::Add(args),
+                },
+        } = cli.command
+        else {
+            panic!("expected env provider add command");
+        };
+
+        assert_eq!(args.name, "memory-services");
+        assert_eq!(
+            args.capabilities,
+            ["presolve:kv/store@0.1.0", "presolve:objects/store@0.1.0"]
+        );
+        assert_eq!(args.features, ["presolve:objects/store@0.1.0=range-read"]);
+    }
+
+    #[test]
+    fn provider_add_requires_at_least_one_capability() {
+        let result = Cli::try_parse_from(["presolve", "env", "provider", "add", "empty-provider"]);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn provider_remove_parses_name() {
+        let cli = Cli::try_parse_from(["presolve", "env", "provider", "remove", "memory-services"])
+            .expect("provider remove command should parse");
+
+        let RootCommand::Env {
+            command:
+                EnvironmentCommand::Provider {
+                    command: EnvironmentProviderCommand::Remove(args),
+                },
+        } = cli.command
+        else {
+            panic!("expected env provider remove command");
+        };
+
+        assert_eq!(args.name, "memory-services");
     }
 }

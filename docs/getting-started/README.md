@@ -141,3 +141,53 @@ Reference documentation:
 - [`.presolved` bundle](../reference/presolved-bundle.md)
 
 For the underlying model, start with [Application portability](../concepts/application-portability.md).
+
+## Declare providers
+
+An Environment Specification describes provider **semantic supply**. It still does not contain concrete runtime implementation configuration.
+
+Add a provider with at least one exact capability:
+
+```bash
+presolve env provider add memory-services \
+  --capability presolve:kv/store@0.1.0 \
+  --capability presolve:objects/store@0.1.0
+```
+
+Presolve generates and persists a stable `ProviderId`.
+
+Advertise supported optional semantic features by targeting the exact supplied capability:
+
+```bash
+presolve env provider add object-services \
+  --capability presolve:objects/store@0.1.0 \
+  --feature presolve:objects/store@0.1.0=range-read \
+  --feature presolve:objects/store@0.1.0=user-metadata
+```
+
+The syntax is intentionally explicit:
+
+```text
+--capability INTERFACE@VERSION
+--feature    INTERFACE@VERSION=FEATURE
+```
+
+Known Presolve capability versions and feature claims are checked against canonical semantic contracts before the Environment Specification is rewritten.
+
+Unknown/custom capability interfaces may be declared without semantic feature claims. Presolve does not accept feature claims for contracts whose semantics it does not know.
+
+List providers:
+
+```bash
+presolve env provider list
+```
+
+Remove a provider by its unique human-facing name:
+
+```bash
+presolve env provider remove memory-services
+```
+
+Removing and later re-adding a provider creates a new `ProviderId`. Renaming provider declarations is not implemented yet.
+
+These commands mutate only `presolve.env.toml`. Concrete local provider realization remains a separate node-side concern and will be added later in Chunk 15.

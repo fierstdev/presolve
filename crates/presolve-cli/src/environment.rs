@@ -2,6 +2,7 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{self, Write},
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::{Context, Result, bail};
@@ -87,6 +88,83 @@ pub(crate) fn load_environment(start: &Path) -> Result<EnvironmentDocument> {
     })
 }
 
+pub(crate) fn replace_environment(
+    path: &Path,
+    specification: &EnvironmentSpecification,
+) -> Result<()> {
+    let encoded =
+        encode_environment(specification).context("could not encode Environment Specification")?;
+
+    let directory = path.parent().ok_or_else(|| {
+        anyhow::anyhow!(
+            "could not determine parent directory for `{}`",
+            path.display()
+        )
+    })?;
+
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Environment Specification path is not valid UTF-8: `{}`",
+                path.display()
+            )
+        })?;
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system clock is before Unix epoch")?
+        .as_nanos();
+
+    let temporary_path = directory.join(format!(
+        ".{file_name}.tmp-{}-{timestamp}",
+        std::process::id()
+    ));
+
+    let write_result = (|| -> Result<()> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary_path)
+            .with_context(|| {
+                format!(
+                    "could not create temporary Environment Specification `{}`",
+                    temporary_path.display()
+                )
+            })?;
+
+        file.write_all(encoded.as_bytes()).with_context(|| {
+            format!(
+                "could not write temporary Environment Specification `{}`",
+                temporary_path.display()
+            )
+        })?;
+
+        file.sync_all().with_context(|| {
+            format!(
+                "could not flush temporary Environment Specification `{}`",
+                temporary_path.display()
+            )
+        })?;
+
+        fs::rename(&temporary_path, path).with_context(|| {
+            format!(
+                "could not replace Environment Specification `{}`",
+                path.display()
+            )
+        })?;
+
+        Ok(())
+    })();
+
+    if write_result.is_err() {
+        let _ = fs::remove_file(&temporary_path);
+    }
+
+    write_result
+}
+
 fn create_new_file(path: &Path) -> Result<File> {
     match OpenOptions::new().write(true).create_new(true).open(path) {
         Ok(file) => Ok(file),
@@ -114,12 +192,12 @@ mod tests {
 
     static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
-    struct TestDirectory {
+    pub(crate) struct TestDirectory {
         path: PathBuf,
     }
 
     impl TestDirectory {
-        fn new() -> Self {
+        pub(crate) fn new() -> Self {
             let sequence = NEXT_TEST_DIRECTORY.fetch_add(1, Ordering::Relaxed);
             let timestamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -136,7 +214,7 @@ mod tests {
             Self { path }
         }
 
-        fn path(&self) -> &Path {
+        pub(crate) fn path(&self) -> &Path {
             &self.path
         }
     }
@@ -244,5 +322,20 @@ mod tests {
             load_environment(directory.path()).expect_err("missing environment should fail");
 
         assert!(error.to_string().contains("run `presolve env init`"));
+    }
+
+    #[test]
+    fn replace_environment_persists_valid_updated_document() {
+        let directory = TestDirectory::new();
+
+        let document = create_environment(directory.path(), "local", 1_024, 1_000)
+            .expect("environment should be created");
+
+        replace_environment(&document.path, &document.specification)
+            .expect("environment should be replaceable");
+
+        let loaded = load_environment(directory.path()).expect("environment should reload");
+
+        assert_eq!(loaded.specification, document.specification);
     }
 }
