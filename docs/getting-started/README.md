@@ -127,7 +127,6 @@ Environment Inventory │
 
 Chunk 15 is continuing with:
 
-- local application execution
 - broader actionable CLI diagnostics
 
 Commands are documented here only after they are implemented.
@@ -295,3 +294,45 @@ The current in-memory object provider implements baseline object-storage semanti
 Custom capabilities and unsupported built-in versions likewise remain resolvable at the semantic layer when an Environment Specification supplies them, but the built-in local profile cannot materialize them until a matching local implementation exists.
 
 `presolve check` remains a semantic compatibility check. The next local workflow step, `presolve dev`, will use this realization path to assemble and execute the resolved application.
+
+
+## Run an application locally
+
+For the currently implemented single-workload Rust authoring path, local development is now one command:
+
+```bash
+presolve dev
+```
+
+Presolve:
+
+1. discovers the nearest `presolve.toml`
+2. discovers the nearest `presolve.env.toml`
+3. resolves application requirements against the environment
+4. stops with the same `PS2xxx` compatibility problems as `presolve check` if resolution fails
+5. builds a colocated Rust `cdylib` for `wasm32-wasip2`
+6. realizes the selected baseline providers with the local provider profile
+7. assembles the runtime
+8. invokes the component's `run(string) -> string` export
+
+Pass input to the current application entry point with:
+
+```bash
+presolve dev --input "Austin"
+```
+
+The automatic Rust build expects `Cargo.toml` beside `presolve.toml` and exactly one `cdylib` target. Cargo metadata is used to discover the target directory and library target rather than assuming a hard-coded package name.
+
+An already-built WebAssembly Component can bypass the Rust build convention:
+
+```bash
+presolve dev --component ./path/to/application.wasm --input "Austin"
+```
+
+Relative component paths are interpreted from the directory where `presolve dev` is invoked.
+
+The explicit component path is the language-neutral escape hatch for the current development runner. Rust build discovery is a convenience for today's implemented authoring path, not part of the Application Contract and not a permanent requirement of Presolve applications.
+
+The initial `presolve dev` runner supports zero or one declared workload. A contract with no explicit workload uses the existing implicit `main` workload. Multi-workload local execution requires workload build/artifact orchestration and is intentionally deferred rather than guessed.
+
+The local providers are process-local. Their state exists for the lifetime of the `presolve dev` process and is not persisted to `presolve.env.toml`.

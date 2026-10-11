@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{ArgGroup, Args, Parser, Subcommand, ValueEnum};
 
 pub(crate) const DEFAULT_LOCAL_MEMORY_MIB: u64 = 1_024;
@@ -18,6 +20,9 @@ pub(crate) struct Cli {
 pub(crate) enum RootCommand {
     /// Check whether the nearest application can run in the nearest environment.
     Check,
+
+    /// Build and run the nearest application in the local environment.
+    Dev(DevArgs),
 
     /// Create, inspect, and manage Presolve environments.
     #[command(visible_alias = "environment")]
@@ -71,6 +76,17 @@ impl BuiltinCapabilityAlias {
             _ => None,
         }
     }
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct DevArgs {
+    /// Prebuilt WebAssembly Component to execute instead of building a Rust application.
+    #[arg(long, value_name = "PATH")]
+    pub(crate) component: Option<PathBuf>,
+
+    /// String passed to the application's current `run` entry point.
+    #[arg(long, value_name = "TEXT", default_value = "")]
+    pub(crate) input: String,
 }
 
 #[derive(Debug, Args)]
@@ -151,6 +167,38 @@ mod tests {
         let cli = Cli::try_parse_from(["presolve", "check"]).expect("check command should parse");
 
         assert!(matches!(cli.command, RootCommand::Check));
+    }
+
+    #[test]
+    fn dev_command_has_empty_input_by_default() {
+        let cli = Cli::try_parse_from(["presolve", "dev"]).expect("dev command should parse");
+
+        let RootCommand::Dev(args) = cli.command else {
+            panic!("expected dev command");
+        };
+
+        assert!(args.component.is_none());
+        assert_eq!(args.input, "");
+    }
+
+    #[test]
+    fn dev_command_accepts_component_and_input() {
+        let cli = Cli::try_parse_from([
+            "presolve",
+            "dev",
+            "--component",
+            "build/app.wasm",
+            "--input",
+            "Austin",
+        ])
+        .expect("dev command options should parse");
+
+        let RootCommand::Dev(args) = cli.command else {
+            panic!("expected dev command");
+        };
+
+        assert_eq!(args.component, Some(PathBuf::from("build/app.wasm")));
+        assert_eq!(args.input, "Austin");
     }
 
     #[test]

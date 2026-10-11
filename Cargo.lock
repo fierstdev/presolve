@@ -1182,8 +1182,10 @@ dependencies = [
  "presolve-contract",
  "presolve-core",
  "presolve-environment",
+ "presolve-node",
  "presolve-resolver",
  "semver",
+ "serde_json",
 ]
 
 [[package]]

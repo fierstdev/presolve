@@ -5,6 +5,7 @@
 mod application;
 mod check;
 mod cli;
+mod dev;
 mod environment;
 mod provider;
 
@@ -17,6 +18,7 @@ use presolve_resolver::ResolutionProblem;
 use crate::{
     check::{CompatibilityCheck, check_compatibility},
     cli::{Cli, EnvironmentCommand, EnvironmentProviderCommand, RootCommand},
+    dev::run_local_dev,
     environment::{create_environment, load_environment},
     provider::{add_provider, expand_provider_supply, list_providers, remove_provider},
 };
@@ -36,6 +38,7 @@ pub fn run() -> Result<()> {
 fn execute(cli: Cli, current_directory: &Path) -> Result<()> {
     match cli.command {
         RootCommand::Check => execute_check(current_directory),
+        RootCommand::Dev(args) => execute_dev(&args, current_directory),
         RootCommand::Env { command } => execute_environment(command, current_directory),
     }
 }
@@ -51,6 +54,45 @@ fn execute_check(current_directory: &Path) -> Result<()> {
             check.environment.specification.environment().name()
         );
     }
+
+    Ok(())
+}
+
+fn execute_dev(args: &cli::DevArgs, current_directory: &Path) -> Result<()> {
+    let check = check_compatibility(current_directory)?;
+
+    if !check.report.is_resolved() {
+        print_compatibility_check(&check);
+
+        bail!(
+            "application `{}` is not compatible with environment `{}`",
+            check.application.contract.application().name(),
+            check.environment.specification.environment().name()
+        );
+    }
+
+    let application = check.application.contract.application();
+    let environment = check.environment.specification.environment();
+
+    println!("Presolve dev");
+    println!(
+        "  application: {} {}",
+        application.name(),
+        application.version()
+    );
+    println!("  environment: {}", environment.name());
+
+    let execution = run_local_dev(
+        &check,
+        current_directory,
+        args.component.as_deref(),
+        &args.input,
+    )?;
+
+    println!("  workload: {}", execution.workload);
+    println!("  component: {}", execution.component.display());
+    println!();
+    println!("{}", execution.output);
 
     Ok(())
 }
