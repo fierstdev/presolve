@@ -1099,6 +1099,7 @@ name = "presolve-node"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "presolve-capability",
  "presolve-contract",
  "presolve-core",
  "presolve-provider-kv-memory",

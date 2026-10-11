@@ -19,6 +19,7 @@ presolve-runtime.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+presolve-capability.workspace = true
 anyhow.workspace = true
 presolve-contract.workspace = true
 presolve-provider-kv-memory.workspace = true

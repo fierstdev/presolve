@@ -18,6 +18,7 @@ exclude = [
     "examples/hello",
     "examples/adversarial",
     "examples/kv-demo",
+    "examples/objects-demo",
     "examples/multi-workload",
 ]
 
