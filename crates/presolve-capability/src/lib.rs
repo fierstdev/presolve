@@ -11,6 +11,7 @@
 mod contract;
 mod kv;
 mod objects;
+mod registry;
 
 pub use contract::{CapabilityContract, CapabilityContractError};
 pub use kv::{
@@ -27,3 +28,5 @@ pub use objects::{
     OBJECT_STORE_OPERATION_HEAD, OBJECT_STORE_OPERATION_LIST, OBJECT_STORE_OPERATION_PUT,
     object_store_contract,
 };
+
+pub use registry::{canonical_contract_for, is_known_capability_interface};

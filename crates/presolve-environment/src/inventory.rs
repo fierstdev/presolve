@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use presolve_capability::CapabilityContract;
-use presolve_core::{EnvironmentId, ProviderId};
+use presolve_core::{EnvironmentId, ProviderId, WorkloadKind};
 use semver::Version;
 
 /// Resolver-facing resources available in a Presolve environment.
@@ -192,13 +192,14 @@ impl ProviderDescriptor {
 pub struct EnvironmentInventory {
     id: EnvironmentId,
     resources: EnvironmentResources,
+    supported_workloads: Vec<WorkloadKind>,
     providers: Vec<ProviderDescriptor>,
 }
 
 impl EnvironmentInventory {
     /// Creates an environment inventory.
     #[must_use]
-    pub const fn new(
+    pub fn new(
         id: EnvironmentId,
         resources: EnvironmentResources,
         providers: Vec<ProviderDescriptor>,
@@ -206,8 +207,26 @@ impl EnvironmentInventory {
         Self {
             id,
             resources,
+            supported_workloads: vec![WorkloadKind::Component],
             providers,
         }
+    }
+
+    /// Overrides workload execution classes supplied by this environment.
+    ///
+    /// Ordering is not semantic and duplicate declarations are removed.
+    #[must_use]
+    pub fn with_supported_workloads(mut self, mut workloads: Vec<WorkloadKind>) -> Self {
+        workloads.sort();
+        workloads.dedup();
+        self.supported_workloads = workloads;
+        self
+    }
+
+    /// Returns workload execution classes supplied by this environment.
+    #[must_use]
+    pub fn supported_workloads(&self) -> &[WorkloadKind] {
+        &self.supported_workloads
     }
 
     /// Returns the environment identifier.

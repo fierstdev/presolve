@@ -10,12 +10,14 @@
 //! provider credentials, SDK configuration, infrastructure secrets, or other
 //! node realization details.
 
+mod enrich;
 mod format;
 mod inventory;
 mod model;
 mod validate;
 mod version;
 
+pub use enrich::{EnvironmentInventoryError, inventory_from_specification};
 pub use format::{
     EnvironmentEncodeError, EnvironmentParseError, encode_environment, parse_environment,
 };
