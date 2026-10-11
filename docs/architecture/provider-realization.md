@@ -119,3 +119,57 @@ Adapters validate selected semantics before constructing a provider. The Cloudfl
 Materialization is strictly plan-scoped. Profiles not selected by a `DeploymentPlan` are not instantiated and their secrets are not resolved.
 
 No new user-authored configuration file is introduced by 18.3. The profile/catalog objects remain node-side runtime state while the shape is exercised by real providers.
+
+## Live Cloudflare KV portability proof
+
+Chunk 18.4 adds an opt-in live checkpoint against a real Cloudflare Workers KV namespace.
+
+The checkpoint does not introduce another Presolve configuration file. Live realization data is supplied only for the proof process:
+
+```text
+PRESOLVE_CLOUDFLARE_ACCOUNT_ID
+PRESOLVE_CLOUDFLARE_KV_NAMESPACE_ID
+PRESOLVE_CLOUDFLARE_API_TOKEN
+```
+
+The API token is represented by a `SecretReference` and resolved by `EnvironmentSecretResolver` only after the resolver selects the provider.
+
+The proof exercises:
+
+```text
+generic Application Contract
+    requires presolve:kv/store ^0.1
+            ↓
+EnvironmentSpecification
+    advertises one provider at 0.1.0
+            ↓
+inventory enrichment
+            ↓
+resolver
+            ↓
+DeploymentPlan
+    exact ProviderId
+            ↓
+ProviderRealizationCatalog
+            ↓
+ProviderAdapterRegistry
+            ↓
+CloudflareKvAdapter
+            ↓
+ProviderRegistry
+    same ProviderId
+            ↓
+real Cloudflare Workers KV
+```
+
+A unique key is generated for each run. The checkpoint performs one write, polls until that value becomes visible within a bounded window, and then deletes the key.
+
+The polling is deliberate. Workers KV is eventually consistent, so the proof validates successful portability without pretending that all conforming providers have identical visibility characteristics.
+
+Run the live proof with:
+
+```bash
+./scripts/smoke-cloudflare-kv.sh
+```
+
+The script never prints the API token.

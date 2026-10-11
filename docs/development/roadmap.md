@@ -126,7 +126,7 @@ Current subdivision:
 18.1  provider realization profile + secret-resolution boundary (complete)
 18.2  first real cloud adapter: Cloudflare Workers KV (complete)
 18.3  adapter registry + plan-scoped cloud materialization (complete)
-18.4  live cloud portability proof
+18.4  live cloud portability proof (complete)
 18.5  cloud-provider checkpoint + docs
 ```
 
@@ -135,6 +135,8 @@ Current subdivision:
 18.2 adds the first real managed-infrastructure adapter, `presolve-provider-kv-cloudflare`, against the Cloudflare Workers KV REST API. The adapter preserves provider-neutral application semantics and keeps account/namespace/token configuration at the realization boundary. It also exposes an important portability question: semantic API compatibility does not imply identical consistency or operational characteristics, so the adapter is not falsely labeled as passing the current immediate-consistency conformance harness.
 
 18.3 adds an installed `ProviderAdapterRegistry` and plan-scoped node materialization. The exact `ProviderId` selected by `DeploymentPlan` is joined to its realization profile, adapter, secret resolver, and finally the concrete `ProviderRegistry` implementation. Unselected provider profiles are never instantiated or secret-resolved.
+
+18.4 adds an opt-in live checkpoint against a real Cloudflare Workers KV namespace. The proof resolves a provider-neutral KV requirement, materializes the exact selected `ProviderId` through the Cloudflare adapter, writes and reads a unique live key with a bounded eventual-consistency poll, and deletes the proof key. Credentials remain process-local realization inputs and are never written to Presolve application/environment files.
 
 ## Chunk 19 — build/package workflow
 
