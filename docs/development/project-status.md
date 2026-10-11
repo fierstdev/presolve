@@ -55,6 +55,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | TypeScript container bridge adapter | Implemented |
 | Real TypeScript OCI workload proof | Implemented |
 | TypeScript Component/WIT adapter boundary | Implemented |
+| TypeScript authoring checkpoint | Implemented |
 
 ## Next
 
@@ -62,15 +63,14 @@ Chunk 15 local developer experience is complete for the current WebAssembly Comp
 
 OCI/container architectural execution work in Chunk 16 is complete. A real OCI workload has an end-to-end local proof through Application Contract resolution, immutable `.presolved` identity, exact provider realization, authenticated capability transport, and Docker execution.
 
-TypeScript authoring is in progress. The SDK kernel, typed KV/object clients, container adapter, and a real TypeScript OCI workload proof are implemented while `presolve.toml` remains the canonical language-independent Application Contract.
+TypeScript authoring Chunk 17 is complete. `@presolve/sdk` provides transport-neutral typed KV/object APIs, with container and Component execution adapters. The OCI TypeScript path has a real end-to-end proof; the Component path is proven at the adapter/WIT boundary. `presolve.toml` remains the canonical language-independent Application Contract.
 
-The later build/package workflow will turn the proven container path into normal developer-facing commands rather than the dedicated checkpoint harness.
+The next roadmap chunk is a real cloud-provider portability proof. Automated TypeScript-to-Component compilation remains part of the later build/package workflow.
 
-## Planned after OCI/container execution
+## Planned next
 
 Current roadmap direction includes:
 
-- TypeScript application authoring
 - a real cloud-provider portability proof
 - higher-level build/package workflow
 - richer `check`/`inspect`/`plan` UX

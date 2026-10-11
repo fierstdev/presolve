@@ -324,6 +324,9 @@ Implemented foundations include:
 - backend-neutral container materialization and local Docker execution
 - authenticated container KV/object capability transport
 - end-to-end OCI/container execution checkpoint
+- TypeScript `@presolve/sdk` with typed KV/object capability APIs
+- TypeScript container and Component execution adapters
+- real TypeScript OCI capability-path checkpoint
 - SHA-256 application release identity
 - multiple workloads per application
 - application-internal interfaces and topology at the contract layer
@@ -337,6 +340,30 @@ Implemented foundations include:
 The project is still pre-stable.
 
 No API, protocol, bundle format, capability interface, or contract schema should be considered stable until explicitly documented as such.
+
+## TypeScript authoring
+
+The experimental TypeScript authoring layer lives in `@presolve/sdk`.
+
+Application code uses provider-neutral capability APIs:
+
+```ts
+import { kv, objects } from "@presolve/sdk";
+
+await kv.set("session", "abc");
+const value = await kv.get("session");
+```
+
+Execution-specific bootstrap is separate:
+
+```text
+@presolve/sdk/container   authenticated HTTP/JSON bridge
+@presolve/sdk/component   normalized direct Component/WIT imports
+```
+
+The OCI TypeScript path has an end-to-end Docker proof. The Component adapter matches the existing Presolve WIT surface, but automated TypeScript-to-Component compilation is not yet part of the developer workflow.
+
+See [TypeScript authoring](docs/architecture/typescript-authoring.md) and the [Chunk 17 checkpoint](docs/development/chunk-17-checkpoint.md).
 
 ## Local development
 
@@ -408,6 +435,9 @@ providers/
   kv-memory/              In-memory key-value provider
   objects-memory/         In-memory object-storage provider
 
+packages/
+  sdk/                    TypeScript authoring SDK and execution adapters
+
 wit/                      Versioned WebAssembly Component interfaces
 examples/                 Example Presolve applications
 docs/                     Design and format references
@@ -424,6 +454,7 @@ Start with:
 - [Application Contract reference](docs/reference/application-contract.md)
 - [Environment Specification reference](docs/reference/environment-specification.md)
 - [Architecture overview](docs/architecture/overview.md)
+- [TypeScript authoring](docs/architecture/typescript-authoring.md)
 - [Project status](docs/development/project-status.md)
 
 ## Project direction

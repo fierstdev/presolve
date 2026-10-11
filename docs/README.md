@@ -44,11 +44,13 @@ The initial local developer workflow is implemented. See [Getting started](getti
 - [Architecture overview](architecture/overview.md) — the complete application-to-runtime model.
 - [Capability contracts](architecture/capability-contracts.md) — canonical semantic capability IR and bindings.
 - [Runtime and materialization](architecture/runtime-and-materialization.md) — symbolic plans, provider IDs, node assembly, and runtime isolation.
+- [TypeScript authoring](architecture/typescript-authoring.md) — transport-neutral SDK semantics and execution-target adapters.
 
 ### Development
 
 - [Project status](development/project-status.md) — implemented, next, and planned surfaces.
 - [Roadmap](development/roadmap.md) — current sequencing of major implementation chunks.
+- [Chunk 17 checkpoint](development/chunk-17-checkpoint.md) — TypeScript authoring proof and explicit non-claims.
 
 ## Status language
 

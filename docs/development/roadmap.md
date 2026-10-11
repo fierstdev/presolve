@@ -88,7 +88,7 @@ Current subdivision:
 
 16.6 closes the architectural proof with a real OCI workload. The checkpoint resolves a container application with KV, packages an immutable OCI descriptor into `.presolved`, realizes the exact selected provider, launches the image through the Docker `ContainerExecutor`, performs a capability call from inside the container, and verifies the resulting provider state on the host. See [Chunk 16 checkpoint](chunk-16-checkpoint.md).
 
-## Chunk 17 — TypeScript authoring
+## Chunk 17 — TypeScript authoring (complete)
 
 Introduce a productive TypeScript-facing application authoring path while preserving the existing semantic boundaries.
 
@@ -101,7 +101,7 @@ Current subdivision:
 17.2  typed KV/object clients + container bridge adapter (complete)
 17.3  real TypeScript OCI workload proof (complete)
 17.4  execution-target adapter boundary / Component projection (complete)
-17.5  TypeScript authoring checkpoint + docs
+17.5  TypeScript authoring checkpoint + docs (complete)
 ```
 
 17.1 establishes `@presolve/sdk` without introducing a second Application Contract. `presolve.toml` remains the canonical application declaration, while the SDK defines a transport-neutral capability call boundary that later execution adapters can project onto HTTP/JSON, WIT, or other compatible bindings.
@@ -111,6 +111,8 @@ Current subdivision:
 17.3 proves those abstractions from a real TypeScript OCI workload. The workload calls `kv.set(...)` through `@presolve/sdk`, the container adapter projects the call onto the bridge, and the existing OCI checkpoint observes the write in the exact KV provider selected by `DeploymentPlan`.
 
 17.4 adds `@presolve/sdk/component`. It projects the same typed KV/object APIs onto normalized direct Component imports matching Presolve's existing WIT semantics, including handle-based object streaming. The adapter boundary intentionally avoids choosing a TypeScript-to-Component compiler; generated binding glue remains a later build/package concern.
+
+17.5 closes the TypeScript authoring chunk with a reproducible SDK checkpoint and explicit status boundaries. The real OCI path is proven end to end; the Component projection is proven at the adapter/WIT boundary; automated TypeScript-to-Component compilation remains part of the later build/package workflow. See [Chunk 17 checkpoint](chunk-17-checkpoint.md).
 
 ## Chunk 18 — real cloud provider proof
 
