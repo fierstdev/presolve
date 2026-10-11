@@ -4,9 +4,9 @@ Presolve development is organized around proving architectural boundaries before
 
 Roadmap order may change as implementation reveals new constraints.
 
-## Completed foundation
+## Completed foundation and local developer workflow
 
-Chunks 1–14 establish the current portability core:
+Chunks 1–15 establish the current portability core and its first usable local developer workflow:
 
 ```text
 1   core domain
@@ -23,6 +23,7 @@ Chunks 1–14 establish the current portability core:
 12  application topology/interfaces
 13  second serious capability + semantic capability contracts
 14  Environment Specification
+15  local developer experience
 ```
 
 Together these prove:
@@ -41,21 +42,22 @@ provider-ID-based materialization
 runtime
 ```
 
-## Chunk 15 — local developer experience
+## Chunk 15 — local developer experience (complete)
 
-Goal: make the implemented architecture usable without manually wiring library objects.
+Implemented:
 
-Expected scope:
+- `presolve env init`, `show`, and `check`
+- generated stable `EnvironmentId` and `ProviderId` values
+- environment-scoped provider add/list/remove commands
+- ergonomic built-in capability shorthand with exact canonical persistence
+- nearest-file discovery for `presolve.toml` and `presolve.env.toml`
+- `presolve check`
+- actionable PS1xxx/PS2xxx CLI diagnostics
+- plan-scoped local in-memory provider realization
+- `presolve dev` for the current single-workload Rust Component path
+- `--component` escape hatch for prebuilt language-neutral Component artifacts
 
-- environment file discovery
-- environment creation
-- generated stable IDs
-- local provider realization
-- local application execution
-- compatibility/check UX
-- actionable diagnostics
-
-The exact CLI contract should be determined by implementation rather than documented prematurely.
+The initial local workflow is intentionally narrow where broader semantics have not yet been designed. Multi-workload build orchestration remains deferred to the later build/package workflow.
 
 ## Chunk 16 — OCI/container execution
 

@@ -30,24 +30,20 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Deterministic `.presolved` bundles | Implemented |
 | Multi-workload bundle topology | Implemented |
 | Adversarial bundle/specification validation | Implemented |
+| CLI Environment Specification discovery/creation | Implemented |
+| CLI provider declaration and generated provider IDs | Implemented |
+| `presolve env check` Environment Specification validation | Implemented |
+| `presolve check` application/environment compatibility | Implemented |
+| Plan-scoped local provider realization | Implemented |
+| `presolve dev` single-workload local Component execution | Implemented |
 
 ## Next
 
-The next major implementation area is local developer experience.
+Chunk 15 local developer experience is complete for the current WebAssembly Component/Rust authoring path.
 
-Expected work includes:
+The next major implementation area is OCI/container workload execution. This will test whether the same Application -> Environment -> Deployment model remains valid when workload portability is provided by a container image rather than the WebAssembly Component Model.
 
-- discovering `presolve.toml`
-- discovering/creating `presolve.env.toml`
-- automatic `EnvironmentId` and `ProviderId` generation
-- local provider configuration
-- compatibility checking UX
-- local execution workflow
-- clearer inspect/diagnostic surfaces
-
-Exact command names are not yet stable.
-
-## Planned after local DX
+## Planned after OCI/container execution
 
 Current roadmap direction includes:
 

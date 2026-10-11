@@ -1,13 +1,18 @@
 # Getting started
 
-Presolve's portability foundation is implemented, and the local developer workflow is now being built on top of it.
+Presolve's portability foundation and initial local developer workflow are implemented.
 
-The implemented local CLI surface now includes environment management and compatibility checking:
+The implemented local CLI surface includes environment management, validation, compatibility checking, and local execution:
 
 ```text
 presolve env init
+presolve env check
 presolve env show
+presolve env provider add
+presolve env provider list
+presolve env provider remove
 presolve check
+presolve dev
 ```
 
 `presolve environment` is accepted as a visible long-form alias for `presolve env`. Public documentation uses the shorter `env` form.
@@ -85,6 +90,26 @@ The discovered file is parsed and validated before its identity, resources, exec
 
 This upward discovery allows commands to work from nested application directories without duplicating the Environment Specification.
 
+## Validate the environment
+
+Run:
+
+```bash
+presolve env check
+```
+
+Presolve discovers the nearest `presolve.env.toml`, parses it, validates its Environment Specification invariants, verifies that its capability declarations can be normalized into resolver inventory, and reports the validated environment identity and provider count.
+
+This command checks the Environment Specification itself. It does not compare the environment with an application.
+
+Use:
+
+```bash
+presolve check
+```
+
+for application/environment compatibility.
+
 ## Current implementation path
 
 The repository currently proves this flow:
@@ -123,13 +148,21 @@ Environment Inventory │
            Runtime
 ```
 
-## What is next
+## Chunk 15 checkpoint
 
-Chunk 15 is continuing with:
+The initial local developer experience is implemented:
 
-- broader actionable CLI diagnostics
+- Environment Specification discovery and creation
+- generated stable environment/provider identities
+- provider declaration UX with built-in capability shorthand
+- Environment Specification validation through `presolve env check`
+- Application Contract discovery
+- application/environment compatibility through `presolve check`
+- plan-scoped local provider realization
+- single-workload local Component execution through `presolve dev`
+- stable Application Contract and resolution diagnostic codes surfaced through the CLI
 
-Commands are documented here only after they are implemented.
+The next major implementation area is OCI/container execution. The current local `presolve dev` source-build convenience remains intentionally limited to the implemented Rust Component authoring path; broader build/package orchestration is still planned later.
 
 Reference documentation:
 
@@ -217,7 +250,7 @@ presolve env provider remove memory-services
 
 Removing and later re-adding a provider creates a new `ProviderId`. Renaming provider declarations is not implemented yet.
 
-These commands mutate only `presolve.env.toml`. Concrete local provider realization remains a separate node-side concern and will be added later in Chunk 15.
+These commands mutate only `presolve.env.toml`. Concrete local provider realization remains a separate node-side concern and occurs only when the local execution path materializes a resolved plan.
 
 ## Check application compatibility
 
@@ -293,7 +326,7 @@ The current in-memory object provider implements baseline object-storage semanti
 
 Custom capabilities and unsupported built-in versions likewise remain resolvable at the semantic layer when an Environment Specification supplies them, but the built-in local profile cannot materialize them until a matching local implementation exists.
 
-`presolve check` remains a semantic compatibility check. The next local workflow step, `presolve dev`, will use this realization path to assemble and execute the resolved application.
+`presolve check` remains a semantic compatibility check. `presolve dev` uses this realization path to assemble and execute the resolved application.
 
 
 ## Run an application locally

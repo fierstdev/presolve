@@ -321,10 +321,42 @@ Implemented foundations include:
 - multiple workloads per application
 - application-internal interfaces and topology at the contract layer
 - deterministic packaging and integrity verification
+- local Environment Specification discovery, creation, and validation
+- environment-scoped provider declaration with generated stable IDs
+- `presolve check` application/environment compatibility workflow
+- plan-scoped local provider realization
+- `presolve dev` local Component execution for the current single-workload Rust path
 
 The project is still pre-stable.
 
 No API, protocol, bundle format, capability interface, or contract schema should be considered stable until explicitly documented as such.
+
+## Local development
+
+The initial local developer workflow is implemented through the `presolve` CLI.
+
+A typical local environment begins with:
+
+```bash
+presolve env init
+presolve env provider add memory-services --provides kv,objects
+presolve env check
+```
+
+From an application directory:
+
+```bash
+presolve check
+presolve dev --input "example"
+```
+
+`presolve check` answers whether the nearest Application Contract can be resolved against the nearest Environment Specification.
+
+`presolve dev` performs that same resolution, realizes supported baseline providers locally, assembles the runtime, and executes the application.
+
+Automatic source builds currently cover the implemented single-workload Rust `cdylib` path targeting `wasm32-wasip2`. A prebuilt WebAssembly Component can be supplied with `--component PATH`, so that Rust build convention is not part of the Application Contract.
+
+The local workflow remains experimental and pre-stable.
 
 ## Design principles
 

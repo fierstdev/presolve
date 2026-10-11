@@ -13,6 +13,7 @@ use std::{env, path::Path};
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
+use presolve_environment::inventory_from_specification;
 use presolve_resolver::ResolutionProblem;
 
 use crate::{
@@ -118,6 +119,28 @@ fn execute_environment(command: EnvironmentCommand, current_directory: &Path) ->
             println!(
                 "  note: capacity values are Presolve allocation defaults, not host detection"
             );
+
+            Ok(())
+        }
+
+        EnvironmentCommand::Check => {
+            let document = load_environment(current_directory)?;
+            inventory_from_specification(&document.specification).with_context(|| {
+                format!(
+                    "Environment Specification `{}` cannot be normalized for resolution",
+                    document.path.display()
+                )
+            })?;
+            let environment = document.specification.environment();
+
+            println!("Environment Specification is valid");
+            println!(
+                "  environment: {} ({})",
+                environment.name(),
+                environment.id()
+            );
+            println!("  file: {}", document.path.display());
+            println!("  providers: {}", document.specification.providers().len());
 
             Ok(())
         }

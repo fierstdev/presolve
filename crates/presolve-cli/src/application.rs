@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::{
     fs, io,
     path::{Path, PathBuf},
@@ -47,7 +48,7 @@ pub(crate) fn load_application(start: &Path) -> Result<ApplicationDocument> {
 
     let contract = parse_contract(&source).map_err(|diagnostics| {
         anyhow::anyhow!(
-            "could not load `{}`: {}",
+            "invalid Application Contract `{}`:\n{}",
             path.display(),
             format_contract_diagnostics(&diagnostics)
         )
@@ -61,18 +62,16 @@ fn format_contract_diagnostics(diagnostics: &ContractDiagnostics) -> String {
         .diagnostics()
         .iter()
         .map(|diagnostic| {
+            let mut rendered = format!("  {}: {}", diagnostic.code(), diagnostic.message());
+
             if let Some(help) = diagnostic.help() {
-                format!(
-                    "{}: {}; help: {help}",
-                    diagnostic.code(),
-                    diagnostic.message()
-                )
-            } else {
-                format!("{}: {}", diagnostic.code(), diagnostic.message())
+                let _ = write!(rendered, "\n    help: {help}");
             }
+
+            rendered
         })
         .collect::<Vec<_>>()
-        .join(" | ")
+        .join("\n")
 }
 
 #[cfg(test)]
@@ -192,7 +191,10 @@ version = "1.0.0"
 
         let error = load_application(directory.path()).expect_err("invalid contract should fail");
 
-        assert!(error.to_string().contains("PS1003"));
+        let rendered = error.to_string();
+
+        assert!(rendered.contains("invalid Application Contract"));
+        assert!(rendered.contains("\n  PS1003:"));
     }
 
     #[test]

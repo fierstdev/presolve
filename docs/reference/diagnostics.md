@@ -44,7 +44,17 @@ Semantic Application Contract validation can return multiple diagnostics in one 
 
 Environment Specification validation currently uses typed Rust errors rather than assigned `PSxxxx` diagnostic codes.
 
-This documentation will be extended when a stable user-facing diagnostic mapping is introduced for that subsystem.
+`presolve env check` exposes those parse and validation failures directly. A successful command means the nearest `presolve.env.toml` parsed, satisfied the Environment Specification invariants, and normalized successfully into resolver inventory.
+
+Environment Specification errors will receive stable diagnostic codes only when that subsystem's user-facing diagnostic taxonomy is designed; this checkpoint does not invent codes merely for CLI symmetry.
+
+## CLI presentation
+
+Application Contract diagnostics retain their stable `PS1xxx` codes when surfaced through discovery-based CLI commands. Multiple diagnostics are rendered one per line with their help text when available.
+
+Resolution failures from `presolve check` and `presolve dev` retain the resolver's `PS2xxx` codes and actionable remediation text.
+
+Errors that do not yet have an assigned stable diagnostic taxonomy—such as missing files, Cargo build failures, local realization failures, and Environment Specification validation failures—remain descriptive errors rather than being assigned ad hoc `PSxxxx` values.
 
 ## Stability
 

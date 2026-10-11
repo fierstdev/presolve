@@ -4,7 +4,7 @@ Presolve is an application portability and distribution layer built around one s
 
 > Applications describe what they are and what they need. Environments describe what they can provide. Presolve resolves the two without making deployment choices part of application identity.
 
-Presolve is pre-stable. These documents distinguish implemented behavior from planned developer experience and longer-term direction.
+Presolve is pre-stable. These documents distinguish implemented behavior from experimental local developer experience and longer-term direction.
 
 ## Start here
 
@@ -16,13 +16,13 @@ If you are new to Presolve:
 4. Read [Resolution and deployment](concepts/resolution-and-deployment.md).
 5. Use the [Application Contract](reference/application-contract.md) and [Environment Specification](reference/environment-specification.md) references when authoring Presolve documents.
 
-The streamlined local developer workflow is the next implementation milestone. See [Getting started](getting-started/README.md) for the current boundary.
+The initial local developer workflow is implemented. See [Getting started](getting-started/README.md) for the current CLI surface and its pre-stable boundaries.
 
 ## Documentation map
 
 ### Getting started
 
-- [Getting started](getting-started/README.md) — current entry point and what is intentionally deferred until the local-development workflow is implemented.
+- [Getting started](getting-started/README.md) — current local CLI workflow, compatibility checking, and local Component execution.
 
 ### Concepts
 

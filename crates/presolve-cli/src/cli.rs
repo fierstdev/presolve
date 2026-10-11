@@ -37,6 +37,9 @@ pub(crate) enum EnvironmentCommand {
     /// Create a new local Environment Specification.
     Init(EnvironmentInitArgs),
 
+    /// Validate the nearest Environment Specification.
+    Check,
+
     /// Show the nearest Environment Specification.
     Show,
 
@@ -199,6 +202,19 @@ mod tests {
 
         assert_eq!(args.component, Some(PathBuf::from("build/app.wasm")));
         assert_eq!(args.input, "Austin");
+    }
+
+    #[test]
+    fn env_check_command_parses() {
+        let cli = Cli::try_parse_from(["presolve", "env", "check"])
+            .expect("env check command should parse");
+
+        assert!(matches!(
+            cli.command,
+            RootCommand::Env {
+                command: EnvironmentCommand::Check
+            }
+        ));
     }
 
     #[test]
