@@ -327,6 +327,7 @@ Implemented foundations include:
 - TypeScript `@presolve/sdk` with typed KV/object capability APIs
 - TypeScript container and Component execution adapters
 - real TypeScript OCI capability-path checkpoint
+- automated TypeScript-to-Component `presolve build` path
 - SHA-256 application release identity
 - multiple workloads per application
 - application-internal interfaces and topology at the contract layer
@@ -359,14 +360,15 @@ await kv.set("session", "abc");
 const value = await kv.get("session");
 ```
 
-Execution-specific bootstrap is separate:
+Execution-specific bootstrap remains separate:
 
 ```text
-@presolve/sdk/container   authenticated HTTP/JSON bridge
-@presolve/sdk/component   normalized direct Component/WIT imports
+@presolve/sdk/container       authenticated HTTP/JSON bridge
+@presolve/sdk/component       normalized direct Component/WIT imports
+@presolve/sdk/component-jco   Jco guest-import normalization
 ```
 
-The OCI TypeScript path has an end-to-end Docker proof. The Component adapter matches the existing Presolve WIT surface, but automated TypeScript-to-Component compilation is not yet part of the developer workflow.
+The OCI TypeScript path has an end-to-end Docker proof. `presolve build` now also automates the TypeScript-to-Component path for the currently supported Component WIT projection, while keeping Jco-specific glue out of application source.
 
 See [TypeScript authoring](docs/architecture/typescript-authoring.md) and the [Chunk 17 checkpoint](docs/development/chunk-17-checkpoint.md).
 

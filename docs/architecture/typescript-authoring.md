@@ -212,3 +212,57 @@ Chunk 17.4 deliberately does not choose a TypeScript→WebAssembly Component com
 Generated bindings from a future build pipeline need only be normalized into `ComponentCapabilityImports`. This prevents Javy, jco, StarlingMonkey, or any other specific compiler/runtime from becoming part of Presolve's application semantics.
 
 The actual automated TypeScript Component build integration belongs to the later build/package workflow.
+
+## Automated TypeScript Component build
+
+Chunk 19.4 selects Jco/ComponentizeJS as the first automated TypeScript-to-Component **build adapter**. This does not make Jco part of Presolve application semantics.
+
+For a single Component workload, a TypeScript application can use the conventional layout:
+
+```text
+presolve.toml
+package.json
+tsconfig.json
+src/main.ts
+```
+
+and run:
+
+```bash
+presolve build
+```
+
+When no explicit artifact input is supplied, Presolve distinguishes the current source conventions:
+
+```text
+Cargo.toml                     → Rust wasm32-wasip2 Component build
+package.json + src/main.ts     → TypeScript Jco Component build
+both                           → ambiguous; require an explicit choice
+```
+
+An alternate TypeScript entry may be selected with:
+
+```bash
+presolve build --typescript-entry src/application.ts
+```
+
+The TypeScript entry must export:
+
+```ts
+export function run(input: string): string | Promise<string>
+```
+
+The build pipeline:
+
+1. validates the Application Contract
+2. type-checks the TypeScript project with its local `tsc`
+3. derives the supported Presolve Component WIT projection from `presolve.toml`
+4. generates build-only bootstrap/WIT material under `.presolve/build/typescript/`
+5. invokes the project-local Jco/ComponentizeJS toolchain with ambient WASI features disabled
+6. packages the resulting Component through the same canonical `.presolved` path as any other Component artifact
+
+For the baseline KV and object-storage capabilities, the generated bootstrap installs `@presolve/sdk/component-jco`. Application source continues to import only `@presolve/sdk`.
+
+The initial automatic projection accepts required baseline `presolve:kv/store@0.1.0` and `presolve:objects/store@0.1.0` capabilities. Optional capabilities, required optional features, and custom capability WIT generation remain explicit prebuilt-Component territory until Presolve has a general binding generator.
+
+Jco is a build tool implementation detail. A future compatible TypeScript Component compiler may replace it without changing `presolve.toml`, `@presolve/sdk`, `.presolved`, or DeploymentPlan semantics.

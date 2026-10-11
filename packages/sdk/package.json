@@ -28,6 +28,10 @@
     "./component": {
       "types": "./dist/component.d.ts",
       "import": "./dist/component.js"
+    },
+    "./component-jco": {
+      "types": "./dist/component-jco.d.ts",
+      "import": "./dist/component-jco.js"
     }
   },
   "scripts": {

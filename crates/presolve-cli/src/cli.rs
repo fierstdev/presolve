@@ -90,15 +90,23 @@ pub(crate) struct BuildArgs {
     #[arg(
         long,
         value_name = "PATH",
-        conflicts_with_all = ["component_for", "oci_image_for"]
+        conflicts_with_all = ["typescript_entry", "component_for", "oci_image_for"]
     )]
     pub(crate) component: Option<PathBuf>,
+
+    /// TypeScript entry to compile into a single Component workload.
+    #[arg(
+        long = "typescript-entry",
+        value_name = "PATH",
+        conflicts_with_all = ["component", "component_for", "oci_image_for"]
+    )]
+    pub(crate) typescript_entry: Option<PathBuf>,
 
     /// Map a declared Component workload to a prebuilt artifact. Repeat per workload.
     #[arg(
         long = "component-for",
         value_name = "WORKLOAD=PATH",
-        conflicts_with = "component"
+        conflicts_with_all = ["component", "typescript_entry"]
     )]
     pub(crate) component_for: Vec<String>,
 
@@ -106,7 +114,7 @@ pub(crate) struct BuildArgs {
     #[arg(
         long = "oci-image-for",
         value_name = "WORKLOAD=TYPE,DIGEST,SIZE",
-        conflicts_with = "component"
+        conflicts_with_all = ["component", "typescript_entry"]
     )]
     pub(crate) oci_image_for: Vec<String>,
 
@@ -208,9 +216,30 @@ mod tests {
         };
 
         assert!(args.component.is_none());
+        assert!(args.typescript_entry.is_none());
         assert_eq!(args.component_for, Vec::<String>::new());
         assert_eq!(args.oci_image_for, Vec::<String>::new());
         assert!(args.output.is_none());
+    }
+
+    #[test]
+    fn build_command_accepts_explicit_typescript_entry() {
+        let cli = Cli::try_parse_from([
+            "presolve",
+            "build",
+            "--typescript-entry",
+            "src/application.ts",
+        ])
+        .expect("TypeScript build option should parse");
+
+        let RootCommand::Build(args) = cli.command else {
+            panic!("expected build command");
+        };
+
+        assert_eq!(
+            args.typescript_entry,
+            Some(PathBuf::from("src/application.ts"))
+        );
     }
 
     #[test]

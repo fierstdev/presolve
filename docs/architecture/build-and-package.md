@@ -137,3 +137,33 @@ The union of explicit artifact mappings must exactly cover the workloads declare
 Container image bytes are not embedded in `.presolved`. The immutable OCI content descriptor is release identity. Registry repositories, tags, registry credentials, pull URLs, and source mirrors remain deployment/transport concerns and are deliberately excluded.
 
 The build path still does not load `presolve.env.toml`.
+
+## Chunk 19.4: TypeScript source-to-Component builds
+
+`presolve build` now has an automated TypeScript Component authoring path.
+
+The default single-workload convention is:
+
+```text
+package.json
+tsconfig.json
+src/main.ts
+```
+
+When that convention is present and `Cargo.toml` is absent, `presolve build` type-checks the project, derives the supported Component WIT world from `presolve.toml`, invokes the project-local Jco/ComponentizeJS toolchain, and packages the generated Component.
+
+Use an explicit entry when needed:
+
+```bash
+presolve build --typescript-entry src/application.ts
+```
+
+Generated bootstrap and WIT files live under `.presolve/build/typescript/`; they are build state, not application configuration.
+
+The generated bootstrap connects Jco guest imports to `@presolve/sdk/component-jco`. Application source remains transport-neutral and continues to use `@presolve/sdk`.
+
+If both the Rust `Cargo.toml` convention and TypeScript `package.json` + `src/main.ts` convention are present, Presolve refuses to guess. Explicit source/artifact selection is required.
+
+The first automatic TypeScript WIT projection covers required baseline KV and object-storage capabilities. Custom capabilities, optional capability imports, and required optional features still require a prebuilt Component.
+
+No TypeScript-specific deployment metadata enters `.presolved`, and `presolve.env.toml` is still absent from the build path.

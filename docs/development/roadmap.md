@@ -150,7 +150,7 @@ Current subdivision:
 19.1  environment-independent `presolve build` + single Component packaging (complete)
 19.2  explicit multi-workload artifact mapping (complete)
 19.3  OCI/container release inputs (complete)
-19.4  TypeScript source-to-Component build integration
+19.4  TypeScript source-to-Component build integration (complete)
 19.5  reproducibility checkpoint + docs
 ```
 
@@ -159,6 +159,8 @@ Current subdivision:
 19.2 adds repeatable explicit Component artifact mapping through `--component-for WORKLOAD=PATH`. Multi-workload builds require exact coverage of declared Component workloads; unknown, duplicate, and missing mappings fail. Mapping order does not affect release identity, and the existing `--component PATH` single-workload shorthand remains compatible.
 
 19.3 adds immutable OCI descriptor inputs through `--oci-image-for WORKLOAD=TYPE,DIGEST,SIZE`. Container-only and mixed Component/container releases now flow through the same canonical `PresolveBundle::from_workload_artifacts` path. Registry names, tags, credentials, and pull endpoints remain outside application release identity.
+
+19.4 adds automatic TypeScript-to-Component builds using a project-local pinned Jco/ComponentizeJS toolchain. Presolve type-checks source, derives the supported WIT imports from the Application Contract, generates build-only bootstrap material under `.presolve/`, and packages the resulting Component through the existing canonical bundle path. Jco is an authoring adapter, not application semantics.
 
 ## Chunk 20 — check/inspect/plan UX
 

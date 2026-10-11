@@ -1,0 +1,9 @@
+contract_version = "0.1"
+
+[application]
+name = "typescript-component-checkpoint"
+version = "0.0.1"
+
+[[capabilities]]
+interface = "presolve:kv/store"
+version = "^0.1"

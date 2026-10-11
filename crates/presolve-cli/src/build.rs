@@ -15,6 +15,7 @@ use presolve_core::ArtifactDigest;
 use crate::{
     application::{ApplicationDocument, load_application},
     dev::build_rust_component_release,
+    typescript::{automatic_typescript_entry, build_typescript_component_release},
 };
 
 const DEFAULT_OUTPUT_DIRECTORY: &str = "dist";
@@ -73,33 +74,53 @@ struct OciImageMapping {
     size: u64,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ArtifactSelection<'a> {
+    component_override: Option<&'a Path>,
+    typescript_entry: Option<&'a Path>,
+    component_mappings: &'a [String],
+    oci_image_mappings: &'a [String],
+}
+
 pub(crate) fn build_release(
     start: &Path,
     component_override: Option<&Path>,
+    typescript_entry: Option<&Path>,
     component_mappings: &[String],
     oci_image_mappings: &[String],
     output_override: Option<&Path>,
 ) -> Result<BuildOutput> {
-    if component_override.is_some()
-        && (!component_mappings.is_empty() || !oci_image_mappings.is_empty())
+    let explicit_single_source = component_override.is_some() || typescript_entry.is_some();
+
+    if explicit_single_source && (!component_mappings.is_empty() || !oci_image_mappings.is_empty())
     {
         bail!(
-            "`--component` is the single-workload shorthand and cannot be combined with \
+            "single-workload source/artifact overrides cannot be combined with \
              `--component-for` or `--oci-image-for`"
         );
+    }
+
+    if component_override.is_some() && typescript_entry.is_some() {
+        bail!("`--component` and `--typescript-entry` cannot be used together");
     }
 
     let document = load_application(start)?;
     let application_directory = application_directory(&document)?;
     let workloads = declared_workloads(&document.contract);
 
+    let selection = ArtifactSelection {
+        component_override,
+        typescript_entry,
+        component_mappings,
+        oci_image_mappings,
+    };
+
     let artifacts = resolve_workload_artifacts(
         start,
         application_directory,
+        &document.contract,
         &workloads,
-        component_override,
-        component_mappings,
-        oci_image_mappings,
+        selection,
     )?;
 
     let bundle = bundle_from_artifacts(&document.contract, &artifacts)?;
@@ -252,20 +273,34 @@ fn declared_workloads(contract: &ApplicationContract) -> Vec<DeclaredWorkload> {
 fn resolve_workload_artifacts(
     start: &Path,
     application_directory: &Path,
+    contract: &ApplicationContract,
     workloads: &[DeclaredWorkload],
-    component_override: Option<&Path>,
-    component_mappings: &[String],
-    oci_image_mappings: &[String],
+    selection: ArtifactSelection<'_>,
 ) -> Result<Vec<ResolvedWorkloadArtifact>> {
-    if let Some(path) = component_override {
+    if let Some(path) = selection.component_override {
         return resolve_single_component_override(start, workloads, path);
     }
 
-    if component_mappings.is_empty() && oci_image_mappings.is_empty() {
-        return resolve_automatic_source_build(application_directory, workloads);
+    if let Some(entry) = selection.typescript_entry {
+        return resolve_single_typescript_source(
+            start,
+            application_directory,
+            contract,
+            workloads,
+            entry,
+        );
     }
 
-    resolve_explicit_workload_mappings(start, workloads, component_mappings, oci_image_mappings)
+    if selection.component_mappings.is_empty() && selection.oci_image_mappings.is_empty() {
+        return resolve_automatic_source_build(start, application_directory, contract, workloads);
+    }
+
+    resolve_explicit_workload_mappings(
+        start,
+        workloads,
+        selection.component_mappings,
+        selection.oci_image_mappings,
+    )
 }
 
 fn resolve_single_component_override(
@@ -296,19 +331,12 @@ fn resolve_single_component_override(
 }
 
 fn resolve_automatic_source_build(
+    start: &Path,
     application_directory: &Path,
+    contract: &ApplicationContract,
     workloads: &[DeclaredWorkload],
 ) -> Result<Vec<ResolvedWorkloadArtifact>> {
-    if workloads.len() != 1 {
-        bail!(
-            "application declares {} workloads; automatic source building currently supports \
-             one Component workload, so provide explicit `--component-for` and/or \
-             `--oci-image-for` mappings",
-            workloads.len()
-        );
-    }
-
-    let workload = &workloads[0];
+    let workload = single_source_workload(workloads)?;
 
     if workload.kind != WorkloadKind::Component {
         bail!(
@@ -319,9 +347,76 @@ fn resolve_automatic_source_build(
         );
     }
 
-    let path = build_rust_component_release(application_directory)?;
+    let rust_source = application_directory.join("Cargo.toml").is_file();
+    let typescript_entry = automatic_typescript_entry(application_directory);
+
+    match (rust_source, typescript_entry) {
+        (true, Some(_)) => bail!(
+            "both Rust and TypeScript automatic source conventions are present; \
+             use `--typescript-entry PATH`, `--component PATH`, or an explicit artifact mapping"
+        ),
+        (true, None) => {
+            let path = build_rust_component_release(application_directory)?;
+            read_component_artifact(application_directory, &workload.name, &path)
+                .map(|artifact| vec![artifact])
+        }
+        (false, Some(entry)) => {
+            resolve_typescript_source(start, application_directory, contract, workload, &entry)
+        }
+        (false, None) => bail!(
+            "no automatic Component source convention was found beside `presolve.toml`; \
+             expected `Cargo.toml` or `package.json` with `src/main.ts`, or supply an explicit artifact"
+        ),
+    }
+}
+
+fn resolve_single_typescript_source(
+    start: &Path,
+    application_directory: &Path,
+    contract: &ApplicationContract,
+    workloads: &[DeclaredWorkload],
+    entry: &Path,
+) -> Result<Vec<ResolvedWorkloadArtifact>> {
+    let workload = single_source_workload(workloads)?;
+
+    if workload.kind != WorkloadKind::Component {
+        bail!(
+            "`--typescript-entry` cannot realize container workload `{}`",
+            workload.name
+        );
+    }
+
+    resolve_typescript_source(start, application_directory, contract, workload, entry)
+}
+
+fn resolve_typescript_source(
+    start: &Path,
+    application_directory: &Path,
+    contract: &ApplicationContract,
+    workload: &DeclaredWorkload,
+    entry: &Path,
+) -> Result<Vec<ResolvedWorkloadArtifact>> {
+    let path = build_typescript_component_release(
+        contract,
+        application_directory,
+        start,
+        &workload.name,
+        entry,
+    )?;
+
     read_component_artifact(application_directory, &workload.name, &path)
         .map(|artifact| vec![artifact])
+}
+
+fn single_source_workload(workloads: &[DeclaredWorkload]) -> Result<&DeclaredWorkload> {
+    match workloads {
+        [workload] => Ok(workload),
+        workloads => bail!(
+            "automatic source building currently supports one workload; application declares {}. \
+             Use explicit `--component-for` and/or `--oci-image-for` mappings.",
+            workloads.len()
+        ),
+    }
 }
 
 fn resolve_explicit_workload_mappings(
@@ -693,7 +788,7 @@ kind = "container"
         let component = directory.path().join("app.wasm");
         fs::write(&component, b"component-bytes").expect("component should be written");
 
-        let output = build_release(directory.path(), Some(&component), &[], &[], None)
+        let output = build_release(directory.path(), Some(&component), None, &[], &[], None)
             .expect("prebuilt component should package");
 
         assert_eq!(output.application, "orders");
@@ -728,6 +823,7 @@ kind = "container"
         build_release(
             directory.path(),
             None,
+            None,
             &[],
             &[manifest_mapping("api", 512)],
             None,
@@ -746,6 +842,7 @@ kind = "container"
         let output = build_release(
             directory.path(),
             Some(&component),
+            None,
             &[],
             &[],
             Some(Path::new("release/orders-custom.presolved")),
@@ -773,7 +870,7 @@ kind = "container"
 
         let mappings = vec!["api=api.wasm".to_owned(), "worker=worker.wasm".to_owned()];
 
-        let output = build_release(directory.path(), None, &mappings, &[], None)
+        let output = build_release(directory.path(), None, None, &mappings, &[], None)
             .expect("multi-workload release should package");
 
         assert_eq!(output.artifacts.len(), 2);
@@ -800,6 +897,7 @@ kind = "container"
 
         let output = build_release(
             directory.path(),
+            None,
             None,
             &[],
             &[manifest_mapping("api", 1_024)],
@@ -831,6 +929,7 @@ kind = "container"
 
         let output = build_release(
             directory.path(),
+            None,
             None,
             &["api=api.wasm".to_owned()],
             &[manifest_mapping("worker", 2_048)],
@@ -890,6 +989,7 @@ kind = "container"
         let first_output = build_release(
             directory.path(),
             None,
+            None,
             &first,
             &[],
             Some(Path::new("dist/first.presolved")),
@@ -898,6 +998,7 @@ kind = "container"
 
         let second_output = build_release(
             directory.path(),
+            None,
             None,
             &second,
             &[],
@@ -923,6 +1024,7 @@ kind = "container"
         let error = build_release(
             directory.path(),
             None,
+            None,
             &["api=api.wasm".to_owned()],
             &[],
             None,
@@ -939,6 +1041,7 @@ kind = "container"
 
         let error = build_release(
             directory.path(),
+            None,
             None,
             &["worker=worker.wasm".to_owned()],
             &[],
@@ -957,6 +1060,7 @@ kind = "container"
         let mapping = manifest_mapping("api", 512);
         let error = build_release(
             directory.path(),
+            None,
             None,
             &[],
             &[mapping.clone(), mapping],
@@ -983,6 +1087,7 @@ kind = "container"
         let error = build_release(
             directory.path(),
             None,
+            None,
             &[],
             &["api=manifest,sha256:bad,512".to_owned()],
             None,
@@ -1000,7 +1105,7 @@ kind = "container"
         let component = directory.path().join("app.wasm");
         fs::write(&component, b"component").expect("component should be written");
 
-        let error = build_release(directory.path(), Some(&component), &[], &[], None)
+        let error = build_release(directory.path(), Some(&component), None, &[], &[], None)
             .expect_err("single shorthand should not guess a workload");
 
         assert!(error.to_string().contains("single-workload shorthand"));

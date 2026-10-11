@@ -261,11 +261,28 @@ Release construction is independent of environment selection:
 presolve build
 ```
 
-The current automatic source path discovers the nearest `presolve.toml`, builds the colocated Rust `cdylib` for `wasm32-wasip2` in Cargo release mode, packages it into the canonical bundle format, verifies the encoded bundle, and writes:
+The automatic single-Component source path discovers the nearest `presolve.toml` and selects a supported authoring convention:
+
+```text
+Cargo.toml                     → Rust `wasm32-wasip2` release build
+package.json + src/main.ts     → TypeScript Jco Component build
+```
+
+If both are present, Presolve refuses to guess.
+
+Both paths package the resulting Component into the canonical bundle format, verify the encoded bundle, and write:
 
 ```text
 dist/<application>.presolved
 ```
+
+For TypeScript, an alternate entry can be selected explicitly:
+
+```bash
+presolve build --typescript-entry src/application.ts
+```
+
+The TypeScript project must provide its compiler and Component toolchain locally. The current checkpoint pins `@bytecodealliance/jco` and `@bytecodealliance/componentize-js`; those are build adapters rather than application semantics.
 
 Use a prebuilt language-neutral Component instead of the automatic Rust source convention with:
 

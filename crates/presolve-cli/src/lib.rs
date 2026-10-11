@@ -9,6 +9,7 @@ mod cli;
 mod dev;
 mod environment;
 mod provider;
+mod typescript;
 
 use std::{env, path::Path};
 
@@ -51,6 +52,7 @@ fn execute_build(args: &cli::BuildArgs, current_directory: &Path) -> Result<()> 
     let output = build_release(
         current_directory,
         args.component.as_deref(),
+        args.typescript_entry.as_deref(),
         &args.component_for,
         &args.oci_image_for,
         args.output.as_deref(),
