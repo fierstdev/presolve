@@ -89,3 +89,33 @@ Chunk 18.2 unit tests use a local HTTP server to verify:
 - availability/error categorization
 
 No live Cloudflare credentials are required until the live portability proof.
+
+## Adapter registry and plan-scoped materialization
+
+Chunk 18.3 connects symbolic resolver output to installed provider adapters without moving implementation configuration into the Environment Specification.
+
+```text
+DeploymentPlan
+    exact ProviderId
+        ↓
+ProviderRealizationCatalog
+    ProviderId → realization profile
+        ↓
+ProviderAdapterRegistry
+    adapter ID → installed adapter
+        ↓
+ProviderAdapter::realize
+        ↓
+RealizedProvider
+        ↓
+ProviderRegistry
+    exact ProviderId → concrete capability implementation
+```
+
+`ProviderCapabilityRequest` carries only the exact capability interface, selected provider version, and negotiated semantic features required by the plan. The realization crate therefore remains independent of the resolver crate.
+
+Adapters validate selected semantics before constructing a provider. The Cloudflare KV adapter accepts only `presolve:kv/store@0.1.0` with no negotiated optional features.
+
+Materialization is strictly plan-scoped. Profiles not selected by a `DeploymentPlan` are not instantiated and their secrets are not resolved.
+
+No new user-authored configuration file is introduced by 18.3. The profile/catalog objects remain node-side runtime state while the shape is exercised by real providers.

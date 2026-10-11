@@ -10,6 +10,7 @@ mod assembly;
 mod capability_bridge;
 mod container;
 mod local;
+mod realization;
 mod registry;
 
 pub use assembly::{AssemblyError, assemble_runtime};
@@ -21,4 +22,5 @@ pub use container::{
     materialize_container_workloads_with_capability_transport,
 };
 pub use local::{LocalRealizationError, realize_local_providers};
+pub use realization::{ProviderMaterializationError, realize_plan_providers};
 pub use registry::{ProviderRegistry, ProviderRegistryError};

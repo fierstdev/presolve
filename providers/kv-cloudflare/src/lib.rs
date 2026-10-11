@@ -544,3 +544,178 @@ mod tests {
         finish(&receiver, handle);
     }
 }
+
+/// Provider-realization adapter for Cloudflare Workers KV.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CloudflareKvAdapter;
+
+impl presolve_provider_realization::ProviderAdapter for CloudflareKvAdapter {
+    fn realize(
+        &self,
+        profile: &presolve_provider_realization::ProviderRealizationProfile,
+        requested: &[presolve_provider_realization::ProviderCapabilityRequest],
+        secrets: &dyn presolve_provider_realization::SecretResolver,
+    ) -> Result<
+        presolve_provider_realization::RealizedProvider,
+        presolve_provider_realization::ProviderAdapterError,
+    > {
+        use std::sync::Arc;
+
+        use presolve_provider_realization::ProviderAdapterError;
+        use presolve_provider_sdk::KEY_VALUE_INTERFACE;
+        use semver::Version;
+
+        let supported_version = Version::new(0, 1, 0);
+
+        for capability in requested {
+            if capability.interface() != KEY_VALUE_INTERFACE {
+                return Err(ProviderAdapterError::UnsupportedCapability {
+                    interface: capability.interface().to_owned(),
+                });
+            }
+
+            if capability.version() != &supported_version {
+                return Err(ProviderAdapterError::UnsupportedVersion {
+                    interface: KEY_VALUE_INTERFACE.to_owned(),
+                    selected_version: capability.version().clone(),
+                    supported_version: supported_version.clone(),
+                });
+            }
+
+            if !capability.negotiated_features().is_empty() {
+                return Err(ProviderAdapterError::UnsupportedFeatures {
+                    interface: KEY_VALUE_INTERFACE.to_owned(),
+                    features: capability.negotiated_features().join(", "),
+                });
+            }
+        }
+
+        let account_id = profile
+            .setting(CLOUDFLARE_ACCOUNT_ID_SETTING)
+            .ok_or_else(|| ProviderAdapterError::MissingSetting {
+                key: CLOUDFLARE_ACCOUNT_ID_SETTING.to_owned(),
+            })?;
+
+        let namespace_id = profile
+            .setting(CLOUDFLARE_NAMESPACE_ID_SETTING)
+            .ok_or_else(|| ProviderAdapterError::MissingSetting {
+                key: CLOUDFLARE_NAMESPACE_ID_SETTING.to_owned(),
+            })?;
+
+        let token_reference = profile.secret(CLOUDFLARE_API_TOKEN_SECRET).ok_or_else(|| {
+            ProviderAdapterError::MissingSecret {
+                name: CLOUDFLARE_API_TOKEN_SECRET.to_owned(),
+            }
+        })?;
+
+        let api_token = secrets.resolve(token_reference).map_err(|error| {
+            ProviderAdapterError::SecretResolution {
+                name: CLOUDFLARE_API_TOKEN_SECRET.to_owned(),
+                message: error.to_string(),
+            }
+        })?;
+
+        let provider =
+            CloudflareKvProvider::new(account_id, namespace_id, api_token).map_err(|error| {
+                ProviderAdapterError::Configuration {
+                    message: error.to_string(),
+                }
+            })?;
+
+        Ok(
+            presolve_provider_realization::RealizedProvider::new(*profile.provider_id())
+                .with_key_value(Arc::new(provider)),
+        )
+    }
+}
+
+#[cfg(test)]
+mod realization_tests {
+    use presolve_core::ProviderId;
+    use presolve_provider_realization::{
+        ProviderAdapter, ProviderAdapterError, ProviderAdapterId, ProviderCapabilityRequest,
+        ProviderRealizationProfile, SecretReference, SecretResolutionError, SecretResolver,
+        SecretValue,
+    };
+    use presolve_provider_sdk::KEY_VALUE_INTERFACE;
+    use semver::Version;
+
+    use super::{
+        CLOUDFLARE_ACCOUNT_ID_SETTING, CLOUDFLARE_API_TOKEN_SECRET, CLOUDFLARE_KV_ADAPTER_ID,
+        CLOUDFLARE_NAMESPACE_ID_SETTING, CloudflareKvAdapter,
+    };
+
+    struct StaticSecrets;
+
+    impl SecretResolver for StaticSecrets {
+        fn resolve(
+            &self,
+            _reference: &SecretReference,
+        ) -> Result<SecretValue, SecretResolutionError> {
+            Ok(SecretValue::new("test-token"))
+        }
+    }
+
+    fn profile() -> ProviderRealizationProfile {
+        ProviderRealizationProfile::new(
+            ProviderId::new(),
+            ProviderAdapterId::new(CLOUDFLARE_KV_ADAPTER_ID).expect("adapter ID should be valid"),
+        )
+        .with_setting(
+            CLOUDFLARE_ACCOUNT_ID_SETTING,
+            "0123456789abcdef0123456789abcdef",
+        )
+        .expect("account setting should work")
+        .with_setting(
+            CLOUDFLARE_NAMESPACE_ID_SETTING,
+            "abcdef0123456789abcdef0123456789",
+        )
+        .expect("namespace setting should work")
+        .with_secret(
+            CLOUDFLARE_API_TOKEN_SECRET,
+            SecretReference::environment_variable("PRESOLVE_TEST_CLOUDFLARE_TOKEN")
+                .expect("secret reference should be valid"),
+        )
+        .expect("secret binding should work")
+    }
+
+    #[test]
+    fn adapter_realizes_selected_baseline_kv() {
+        let profile = profile();
+        let request = ProviderCapabilityRequest::new(
+            KEY_VALUE_INTERFACE,
+            Version::new(0, 1, 0),
+            std::iter::empty::<&str>(),
+        );
+
+        let realized = CloudflareKvAdapter
+            .realize(&profile, &[request], &StaticSecrets)
+            .expect("Cloudflare adapter should realize");
+
+        assert_eq!(realized.provider_id(), profile.provider_id());
+        assert!(realized.key_value().is_some());
+        assert!(realized.object_store().is_none());
+    }
+
+    #[test]
+    fn adapter_rejects_unsupported_version() {
+        let profile = profile();
+        let request = ProviderCapabilityRequest::new(
+            KEY_VALUE_INTERFACE,
+            Version::new(9, 0, 0),
+            std::iter::empty::<&str>(),
+        );
+
+        let error = CloudflareKvAdapter
+            .realize(&profile, &[request], &StaticSecrets)
+            .expect_err("future version should fail");
+
+        assert!(matches!(
+            error,
+            ProviderAdapterError::UnsupportedVersion {
+                selected_version,
+                ..
+            } if selected_version == Version::new(9, 0, 0)
+        ));
+    }
+}

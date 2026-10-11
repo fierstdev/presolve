@@ -9,6 +9,8 @@ rust-version.workspace = true
 
 [dependencies]
 presolve-core.workspace = true
+presolve-provider-sdk.workspace = true
+semver.workspace = true
 thiserror.workspace = true
 
 [lints]

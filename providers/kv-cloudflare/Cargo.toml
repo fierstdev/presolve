@@ -12,7 +12,11 @@ percent-encoding.workspace = true
 presolve-provider-realization.workspace = true
 presolve-provider-sdk.workspace = true
 reqwest.workspace = true
+semver.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+presolve-core.workspace = true
 
 [lints]
 workspace = true

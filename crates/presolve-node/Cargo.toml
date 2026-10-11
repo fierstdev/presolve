@@ -21,6 +21,7 @@ presolve-capability.workspace = true
 presolve-capability-bridge.workspace = true
 presolve-contract.workspace = true
 presolve-provider-sdk.workspace = true
+presolve-provider-realization.workspace = true
 presolve-resolver.workspace = true
 presolve-runtime.workspace = true
 serde.workspace = true
@@ -31,6 +32,7 @@ uuid.workspace = true
 [dev-dependencies]
 presolve-environment.workspace = true
 presolve-executor-docker.workspace = true
+presolve-provider-kv-cloudflare.workspace = true
 anyhow.workspace = true
 semver.workspace = true
 

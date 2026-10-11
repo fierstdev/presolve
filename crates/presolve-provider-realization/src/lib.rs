@@ -16,6 +16,13 @@ use std::{
 use presolve_core::ProviderId;
 use thiserror::Error;
 
+mod adapter;
+
+pub use adapter::{
+    ProviderAdapter, ProviderAdapterError, ProviderAdapterRegistry, ProviderAdapterRegistryError,
+    ProviderCapabilityRequest, RealizedProvider,
+};
+
 const MAX_ADAPTER_ID_LENGTH: usize = 128;
 const MAX_BINDING_KEY_LENGTH: usize = 128;
 
