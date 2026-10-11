@@ -1,18 +1,14 @@
 [package]
-name = "presolve-provider-kv-memory"
+name = "presolve-provider-conformance"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 rust-version.workspace = true
-publish = false
 
 [dependencies]
 presolve-provider-sdk.workspace = true
 
 [lints]
 workspace = true
-
-[dev-dependencies]
-presolve-provider-conformance.workspace = true

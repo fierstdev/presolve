@@ -330,3 +330,15 @@ mod tests {
         assert_eq!(error.code(), ObjectStoreErrorCode::InvalidKey);
     }
 }
+
+#[cfg(test)]
+mod conformance_tests {
+    use presolve_provider_conformance::assert_object_store_conformance;
+
+    use super::InMemoryObjectStoreProvider;
+
+    #[test]
+    fn presolve_baseline_conformance() {
+        assert_object_store_conformance(InMemoryObjectStoreProvider::new);
+    }
+}

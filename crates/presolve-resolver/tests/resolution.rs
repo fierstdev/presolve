@@ -412,7 +412,11 @@ required_features = ["range-read"]
     let environment = EnvironmentInventory::new(
         EnvironmentId::new(),
         EnvironmentResources::new(512, 1_000),
-        vec![object_provider(provider_id, "memory-objects")],
+        vec![object_provider_with_features(
+            provider_id,
+            "range-objects",
+            &["range-read"],
+        )],
     );
 
     let report = resolve(&contract, &environment);
@@ -454,11 +458,7 @@ required_features = ["multipart-upload"]
             ..
         }] if interface == OBJECT_STORE_INTERFACE
             && required_features == &["multipart-upload"]
-            && available_features == &[
-                "conditional-write",
-                "range-read",
-                "user-metadata",
-            ]
+            && available_features.is_empty()
     ));
     assert_eq!(report.problems()[0].code(), "PS2004");
 }
@@ -490,7 +490,11 @@ preferred_features = ["range-read"]
                     Version::new(0, 1, 9),
                 )],
             ),
-            object_provider(preferred_provider_id, "semantic-objects"),
+            object_provider_with_features(
+                preferred_provider_id,
+                "semantic-objects",
+                &["range-read"],
+            ),
         ],
     );
 
@@ -532,4 +536,18 @@ required_features = ["multipart-upload"]
         plan.unbound_optional_capabilities(),
         [OBJECT_STORE_INTERFACE]
     );
+}
+
+fn object_provider_with_features(
+    provider_id: ProviderId,
+    name: &str,
+    features: &[&str],
+) -> ProviderDescriptor {
+    let capability = ProvidedCapability::from_contract(
+        object_store_contract().expect("object-store contract should be valid"),
+    )
+    .with_supported_features(features.iter().copied())
+    .expect("test feature advertisement should be valid");
+
+    ProviderDescriptor::new(provider_id, name, vec![capability])
 }

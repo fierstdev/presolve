@@ -219,7 +219,5 @@ fn select_provider<'a>(
 }
 
 fn supported_features(capability: &ProvidedCapability) -> &[String] {
-    capability
-        .semantic_contract()
-        .map_or(&[] as &[String], |contract| contract.optional_features())
+    capability.supported_features()
 }

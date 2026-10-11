@@ -99,3 +99,15 @@ mod tests {
         assert!(provider.set("", "value").is_err());
     }
 }
+
+#[cfg(test)]
+mod conformance_tests {
+    use presolve_provider_conformance::assert_key_value_conformance;
+
+    use super::InMemoryKeyValueProvider;
+
+    #[test]
+    fn presolve_baseline_conformance() {
+        assert_key_value_conformance(InMemoryKeyValueProvider::new);
+    }
+}

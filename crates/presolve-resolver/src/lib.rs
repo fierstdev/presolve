@@ -13,7 +13,8 @@ mod report;
 mod resolve;
 
 pub use environment::{
-    EnvironmentInventory, EnvironmentResources, ProvidedCapability, ProviderDescriptor,
+    CapabilityFeatureError, EnvironmentInventory, EnvironmentResources, ProvidedCapability,
+    ProviderDescriptor,
 };
 pub use plan::{CapabilityBinding, DeploymentPlan};
 pub use problem::ResolutionProblem;

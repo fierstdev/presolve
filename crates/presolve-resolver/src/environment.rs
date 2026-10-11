@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use presolve_capability::CapabilityContract;
 use presolve_core::{EnvironmentId, ProviderId};
 use semver::Version;
@@ -41,6 +43,7 @@ pub struct ProvidedCapability {
     interface: String,
     version: Version,
     semantic_contract: Option<CapabilityContract>,
+    supported_features: Vec<String>,
 }
 
 impl ProvidedCapability {
@@ -51,6 +54,7 @@ impl ProvidedCapability {
             interface: interface.into(),
             version,
             semantic_contract: None,
+            supported_features: Vec::new(),
         }
     }
 
@@ -62,6 +66,7 @@ impl ProvidedCapability {
             interface: contract.interface().to_owned(),
             version: contract.version().clone(),
             semantic_contract: Some(contract),
+            supported_features: Vec::new(),
         }
     }
 
@@ -82,6 +87,59 @@ impl ProvidedCapability {
     #[must_use]
     pub fn semantic_contract(&self) -> Option<&CapabilityContract> {
         self.semantic_contract.as_ref()
+    }
+
+    /// Returns optional semantic features explicitly advertised by this provider.
+    ///
+    /// The canonical capability contract defines the valid feature vocabulary;
+    /// it does not imply that every provider implements every optional feature.
+    #[must_use]
+    pub fn supported_features(&self) -> &[String] {
+        &self.supported_features
+    }
+
+    /// Advertises optional semantic features implemented by this provider.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no semantic contract is attached, a feature is not
+    /// declared by that contract, or the same feature is advertised twice.
+    pub fn with_supported_features<I, S>(
+        mut self,
+        features: I,
+    ) -> Result<Self, CapabilityFeatureError>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let contract = self
+            .semantic_contract
+            .as_ref()
+            .ok_or(CapabilityFeatureError::MissingSemanticContract)?;
+
+        let mut supported = BTreeSet::new();
+
+        for feature in features {
+            let feature = feature.into();
+
+            if !contract
+                .optional_features()
+                .iter()
+                .any(|declared| declared == &feature)
+            {
+                return Err(CapabilityFeatureError::UnknownFeature {
+                    interface: contract.interface().to_owned(),
+                    feature,
+                });
+            }
+
+            if !supported.insert(feature.clone()) {
+                return Err(CapabilityFeatureError::DuplicateFeature { feature });
+            }
+        }
+
+        self.supported_features = supported.into_iter().collect();
+        Ok(self)
     }
 }
 
@@ -171,6 +229,51 @@ impl EnvironmentInventory {
     }
 }
 
+/// Invalid optional-feature advertisement for an environment capability.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CapabilityFeatureError {
+    /// Optional features require an attached semantic contract.
+    MissingSemanticContract,
+
+    /// The provider advertised a feature outside the canonical contract vocabulary.
+    UnknownFeature {
+        /// Capability interface whose vocabulary was checked.
+        interface: String,
+
+        /// Unknown advertised feature.
+        feature: String,
+    },
+
+    /// The provider advertised the same optional feature more than once.
+    DuplicateFeature {
+        /// Duplicated feature identifier.
+        feature: String,
+    },
+}
+
+impl std::fmt::Display for CapabilityFeatureError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingSemanticContract => write!(
+                formatter,
+                "optional capability features require an attached semantic contract"
+            ),
+            Self::UnknownFeature { interface, feature } => write!(
+                formatter,
+                "feature `{feature}` is not declared by capability contract `{interface}`"
+            ),
+            Self::DuplicateFeature { feature } => {
+                write!(
+                    formatter,
+                    "feature `{feature}` is advertised more than once"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for CapabilityFeatureError {}
+
 #[cfg(test)]
 mod tests {
     use presolve_capability::{OBJECT_STORE_INTERFACE, object_store_contract};
@@ -207,5 +310,53 @@ mod tests {
         assert_eq!(capability.interface(), "example:custom/service");
         assert_eq!(capability.version(), &Version::new(1, 2, 3));
         assert_eq!(capability.semantic_contract(), None);
+    }
+}
+
+#[cfg(test)]
+mod feature_advertisement_tests {
+    use presolve_capability::object_store_contract;
+
+    use super::{CapabilityFeatureError, ProvidedCapability};
+
+    #[test]
+    fn optional_features_are_not_advertised_implicitly() {
+        let capability = ProvidedCapability::from_contract(
+            object_store_contract().expect("object contract should be valid"),
+        );
+
+        let expected: &[String] = &[];
+        assert_eq!(capability.supported_features(), expected);
+    }
+
+    #[test]
+    fn provider_can_explicitly_advertise_declared_optional_features() {
+        let capability = ProvidedCapability::from_contract(
+            object_store_contract().expect("object contract should be valid"),
+        )
+        .with_supported_features(["user-metadata", "range-read"])
+        .expect("declared optional features should be accepted");
+
+        assert_eq!(
+            capability.supported_features(),
+            ["range-read", "user-metadata"]
+        );
+    }
+
+    #[test]
+    fn provider_cannot_advertise_unknown_optional_feature() {
+        let error = ProvidedCapability::from_contract(
+            object_store_contract().expect("object contract should be valid"),
+        )
+        .with_supported_features(["multipart-upload"])
+        .expect_err("unknown optional feature should be rejected");
+
+        assert_eq!(
+            error,
+            CapabilityFeatureError::UnknownFeature {
+                interface: "presolve:objects/store".to_owned(),
+                feature: "multipart-upload".to_owned(),
+            }
+        );
     }
 }

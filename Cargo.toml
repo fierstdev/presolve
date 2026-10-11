@@ -9,6 +9,7 @@ members = [
     "crates/presolve-policy",
     "crates/presolve-resolver",
     "crates/presolve-provider-sdk",
+    "crates/presolve-provider-conformance",
     "crates/presolve-node",
     "crates/presolve-cli",
     "providers/kv-memory",
@@ -58,6 +59,7 @@ presolve-bundle = { path = "crates/presolve-bundle" }
 presolve-policy = { path = "crates/presolve-policy" }
 presolve-resolver = { path = "crates/presolve-resolver" }
 presolve-provider-sdk = { path = "crates/presolve-provider-sdk" }
+presolve-provider-conformance = { path = "crates/presolve-provider-conformance" }
 
 presolve-provider-kv-memory = { path = "providers/kv-memory" }
 presolve-provider-objects-memory = { path = "providers/objects-memory" }

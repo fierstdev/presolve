@@ -13,3 +13,6 @@ presolve-provider-sdk.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+presolve-provider-conformance.workspace = true

@@ -1119,9 +1119,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "presolve-provider-conformance"
+version = "0.0.1"
+dependencies = [
+ "presolve-provider-sdk",
+]
+
+[[package]]
 name = "presolve-provider-kv-memory"
 version = "0.0.1"
 dependencies = [
+ "presolve-provider-conformance",
  "presolve-provider-sdk",
 ]
 
@@ -1129,6 +1137,7 @@ dependencies = [
 name = "presolve-provider-objects-memory"
 version = "0.0.1"
 dependencies = [
+ "presolve-provider-conformance",
  "presolve-provider-sdk",
 ]
 
