@@ -59,7 +59,7 @@ Implemented:
 
 The initial local workflow is intentionally narrow where broader semantics have not yet been designed. Multi-workload build orchestration remains deferred to the later build/package workflow.
 
-## Chunk 16 — OCI/container execution
+## Chunk 16 — OCI/container execution (complete)
 
 Add a second serious workload execution class.
 
@@ -73,7 +73,7 @@ Current subdivision:
 16.3  container executor/materialization boundary (complete)
 16.4  local container runtime adapter (complete)
 16.5  container capability transport (complete)
-16.6  end-to-end portability proof + checkpoint
+16.6  end-to-end portability proof + checkpoint (complete)
 ```
 
 16.1 establishes `container` as Application/Environment semantics and makes resolved workloads explicit in `DeploymentPlan`.
@@ -85,6 +85,8 @@ Current subdivision:
 16.4 adds `presolve-executor-docker`, the first concrete local executor. It resolves only digest-pinned images already present in the active Docker daemon, launches with `--pull=never`, maps current CPU/memory and deny/allow-all network policy, and rejects outbound allow lists rather than weakening them.
 
 16.5 adds an authenticated HTTP/JSON capability bridge as a second transport projection of the existing semantic capability contracts. The node gateway routes exact resolved ProviderId bindings to KV/object provider traits, and container launch requests carry only bridge discovery/authentication data rather than provider credentials.
+
+16.6 closes the architectural proof with a real OCI workload. The checkpoint resolves a container application with KV, packages an immutable OCI descriptor into `.presolved`, realizes the exact selected provider, launches the image through the Docker `ContainerExecutor`, performs a capability call from inside the container, and verifies the resulting provider state on the host. See [Chunk 16 checkpoint](chunk-16-checkpoint.md).
 
 ## Chunk 17 — TypeScript authoring
 

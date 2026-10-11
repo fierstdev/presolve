@@ -30,6 +30,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 presolve-environment.workspace = true
+presolve-executor-docker.workspace = true
 anyhow.workspace = true
 semver.workspace = true
 

@@ -49,18 +49,20 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Container HTTP/JSON capability bridge `0.1` | Implemented |
 | Container KV/object provider routing | Implemented |
 | Authenticated container capability discovery | Implemented |
+| End-to-end OCI/container execution checkpoint | Implemented |
 
 ## Next
 
 Chunk 15 local developer experience is complete for the current WebAssembly Component/Rust authoring path.
 
-OCI/container workload execution is in progress. The Application Contract, Environment Specification, resolver, `DeploymentPlan`, and `.presolved` bundle now preserve container workload identity. The executor/materialization boundary is implemented. The local Docker container adapter and initial container capability transport are implemented. The next step is the end-to-end OCI portability proof and Chunk 16 checkpoint.
+OCI/container architectural execution work in Chunk 16 is complete. A real OCI workload has an end-to-end local proof through Application Contract resolution, immutable `.presolved` identity, exact provider realization, authenticated capability transport, and Docker execution.
+
+The next roadmap chunk is TypeScript authoring. The later build/package workflow will turn the proven container path into normal developer-facing commands rather than the dedicated checkpoint harness.
 
 ## Planned after OCI/container execution
 
 Current roadmap direction includes:
 
-- OCI/container workload execution
 - TypeScript application authoring
 - a real cloud-provider portability proof
 - higher-level build/package workflow
