@@ -1,8 +1,21 @@
+use presolve_core::WorkloadKind;
 use semver::VersionReq;
 
 /// Reason an application cannot be placed into an environment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResolutionProblem {
+    /// The environment cannot execute one declared application workload.
+    UnsupportedWorkload {
+        /// Stable workload name from the Application Contract.
+        workload: String,
+
+        /// Execution class required by the workload.
+        kind: WorkloadKind,
+
+        /// Execution classes supplied by the environment.
+        supported_kinds: Vec<WorkloadKind>,
+    },
+
     /// No environment provider satisfies a required capability.
     MissingCapability {
         /// Required capability interface.
@@ -52,6 +65,7 @@ impl ResolutionProblem {
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::UnsupportedWorkload { .. } => "PS2005",
             Self::MissingCapability { .. } => "PS2001",
             Self::MissingCapabilityFeatures { .. } => "PS2004",
             Self::InsufficientMemory { .. } => "PS2002",

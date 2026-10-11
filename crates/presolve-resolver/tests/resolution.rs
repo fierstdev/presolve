@@ -1,6 +1,6 @@
 use presolve_capability::{OBJECT_STORE_INTERFACE, object_store_contract};
 use presolve_contract::parse_contract;
-use presolve_core::{EnvironmentId, ProviderId};
+use presolve_core::{EnvironmentId, ProviderId, WorkloadKind};
 use presolve_resolver::{
     EnvironmentInventory, EnvironmentResources, ProvidedCapability, ProviderDescriptor,
     ResolutionProblem, resolve,
@@ -27,6 +27,86 @@ outbound = "deny"
     );
 
     parse_contract(&source).expect("test contract should parse")
+}
+
+fn workload_contract(workloads: &str) -> presolve_contract::ApplicationContract {
+    let source = format!(
+        r#"
+contract_version = "0.1"
+
+[application]
+name = "resolver-workload-test"
+version = "0.0.1"
+
+{workloads}
+
+[resources]
+
+[network]
+outbound = "deny"
+"#
+    );
+
+    parse_contract(&source).expect("workload test contract should parse")
+}
+
+#[test]
+fn resolves_supported_component_workload() {
+    let contract = workload_contract(
+        r#"
+[[workloads]]
+name = "api"
+kind = "component"
+"#,
+    );
+
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        Vec::new(),
+    );
+
+    let report = resolve(&contract, &environment);
+
+    assert!(
+        report.is_resolved(),
+        "component workload should resolve in a component-capable environment"
+    );
+}
+
+#[test]
+fn rejects_unsupported_workload_execution_kind() {
+    let contract = workload_contract(
+        r#"
+[[workloads]]
+name = "api"
+kind = "component"
+"#,
+    );
+
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        Vec::new(),
+    )
+    .with_supported_workloads(Vec::new());
+
+    let report = resolve(&contract, &environment);
+
+    assert!(!report.is_resolved());
+
+    assert!(matches!(
+        report.problems(),
+        [
+            ResolutionProblem::UnsupportedWorkload {
+                workload,
+                kind: WorkloadKind::Component,
+                supported_kinds,
+            }
+        ] if workload == "api" && supported_kinds.is_empty()
+    ));
+
+    assert_eq!(report.problems()[0].code(), "PS2005");
 }
 
 fn kv_provider(version: &str) -> ProviderDescriptor {

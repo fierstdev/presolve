@@ -15,6 +15,7 @@ pub fn resolve(
 ) -> ResolutionReport {
     let mut problems = Vec::new();
 
+    resolve_workloads(contract, environment, &mut problems);
     resolve_resources(contract, environment, &mut problems);
 
     let mut bindings = Vec::new();
@@ -68,6 +69,24 @@ pub fn resolve(
         bindings,
         unbound_optional_capabilities,
     ))
+}
+
+fn resolve_workloads(
+    contract: &ApplicationContract,
+    environment: &EnvironmentInventory,
+    problems: &mut Vec<ResolutionProblem>,
+) {
+    for workload in contract.workloads() {
+        if environment.supported_workloads().contains(&workload.kind()) {
+            continue;
+        }
+
+        problems.push(ResolutionProblem::UnsupportedWorkload {
+            workload: workload.name().to_owned(),
+            kind: workload.kind(),
+            supported_kinds: environment.supported_workloads().to_vec(),
+        });
+    }
 }
 
 fn resolve_resources(
