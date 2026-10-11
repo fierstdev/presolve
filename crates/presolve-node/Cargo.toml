@@ -18,11 +18,15 @@ presolve-executor-sdk.workspace = true
 presolve-provider-objects-memory.workspace = true
 presolve-provider-kv-memory.workspace = true
 presolve-capability.workspace = true
+presolve-capability-bridge.workspace = true
 presolve-contract.workspace = true
 presolve-provider-sdk.workspace = true
 presolve-resolver.workspace = true
 presolve-runtime.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 presolve-environment.workspace = true

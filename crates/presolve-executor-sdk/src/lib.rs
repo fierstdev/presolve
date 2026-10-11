@@ -9,6 +9,7 @@
 mod container;
 
 pub use container::{
+    ContainerCapabilityBinding, ContainerCapabilityToken, ContainerCapabilityTransport,
     ContainerExecutor, ContainerExecutorError, ContainerExecutorErrorCode, ContainerHandle,
     ContainerImageDescriptor, ContainerImageResolveError, ContainerImageResolveErrorCode,
     ContainerImageResolver, ContainerImageSource, ContainerLaunchRequest, ContainerNetworkMode,

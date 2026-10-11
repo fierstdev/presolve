@@ -188,7 +188,7 @@ The application model currently recognizes:
 - WebAssembly Component
 - OCI-compatible container
 
-WebAssembly Component execution is implemented end to end. Container workload semantics, resolution, OCI descriptor identity, backend-neutral materialization, and a local Docker CLI executor are implemented; container capability transport is next.
+WebAssembly Component execution is implemented end to end. Container workload semantics, resolution, OCI descriptor identity, backend-neutral materialization, local Docker execution, and authenticated KV/object capability transport are implemented; the end-to-end OCI portability checkpoint is next.
 
 Presolve's application model is designed so additional workload classes can be added without changing application identity semantics. Future execution classes may include native executables, static assets, and other software artifacts.
 

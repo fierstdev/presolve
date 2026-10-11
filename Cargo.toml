@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/presolve-core",
     "crates/presolve-capability",
+    "crates/presolve-capability-bridge",
     "crates/presolve-contract",
     "crates/presolve-environment",
     "crates/presolve-runtime",
@@ -57,6 +58,7 @@ wasmtime-wasi = "=48.0.5"
 
 presolve-core = { path = "crates/presolve-core" }
 presolve-capability = { path = "crates/presolve-capability" }
+presolve-capability-bridge = { path = "crates/presolve-capability-bridge" }
 presolve-contract = { path = "crates/presolve-contract" }
 presolve-environment = { path = "crates/presolve-environment" }
 presolve-runtime = { path = "crates/presolve-runtime" }

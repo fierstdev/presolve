@@ -72,7 +72,7 @@ Current subdivision:
 16.2  OCI artifact identity and `.presolved` representation (complete)
 16.3  container executor/materialization boundary (complete)
 16.4  local container runtime adapter (complete)
-16.5  container capability transport
+16.5  container capability transport (complete)
 16.6  end-to-end portability proof + checkpoint
 ```
 
@@ -83,6 +83,8 @@ Current subdivision:
 16.3 introduces `presolve-executor-sdk`, separating immutable OCI identity, environment-specific image-source resolution, and backend execution. Node materialization now converts a resolved container workload plus `.presolved` release into backend-neutral `ContainerLaunchRequest` values. Capability-bearing container launches remain blocked until 16.5.
 
 16.4 adds `presolve-executor-docker`, the first concrete local executor. It resolves only digest-pinned images already present in the active Docker daemon, launches with `--pull=never`, maps current CPU/memory and deny/allow-all network policy, and rejects outbound allow lists rather than weakening them.
+
+16.5 adds an authenticated HTTP/JSON capability bridge as a second transport projection of the existing semantic capability contracts. The node gateway routes exact resolved ProviderId bindings to KV/object provider traits, and container launch requests carry only bridge discovery/authentication data rather than provider credentials.
 
 ## Chunk 17 — TypeScript authoring
 

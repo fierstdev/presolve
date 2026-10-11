@@ -140,6 +140,121 @@ impl ContainerNetworkPolicy {
     }
 }
 
+/// One capability made available through a container transport.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContainerCapabilityBinding {
+    interface: String,
+    version: String,
+}
+
+impl ContainerCapabilityBinding {
+    /// Creates a transported capability binding.
+    #[must_use]
+    pub fn new(interface: impl Into<String>, version: impl Into<String>) -> Self {
+        Self {
+            interface: interface.into(),
+            version: version.into(),
+        }
+    }
+
+    /// Returns the semantic capability interface.
+    #[must_use]
+    pub fn interface(&self) -> &str {
+        &self.interface
+    }
+
+    /// Returns the exact capability version selected by resolution.
+    #[must_use]
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+}
+
+/// Per-deployment bearer token used to authorize capability bridge calls.
+///
+/// Debug formatting is intentionally redacted so launch-request diagnostics do
+/// not expose the credential accidentally.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ContainerCapabilityToken(String);
+
+impl ContainerCapabilityToken {
+    /// Creates a capability bridge bearer token.
+    #[must_use]
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    /// Exposes the bearer token to an execution adapter that must inject it.
+    #[must_use]
+    pub fn expose_secret(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for ContainerCapabilityToken {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ContainerCapabilityToken([redacted])")
+    }
+}
+
+/// Backend-neutral description of a node-hosted capability bridge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContainerCapabilityTransport {
+    protocol: String,
+    node_port: u16,
+    token: ContainerCapabilityToken,
+    bindings: Vec<ContainerCapabilityBinding>,
+}
+
+impl ContainerCapabilityTransport {
+    /// Creates a capability transport description.
+    #[must_use]
+    pub fn new(
+        protocol: impl Into<String>,
+        node_port: u16,
+        token: ContainerCapabilityToken,
+        mut bindings: Vec<ContainerCapabilityBinding>,
+    ) -> Self {
+        bindings.sort_by(|left, right| {
+            left.interface()
+                .cmp(right.interface())
+                .then_with(|| left.version().cmp(right.version()))
+        });
+        bindings.dedup();
+
+        Self {
+            protocol: protocol.into(),
+            node_port,
+            token,
+            bindings,
+        }
+    }
+
+    /// Returns the transport protocol identifier.
+    #[must_use]
+    pub fn protocol(&self) -> &str {
+        &self.protocol
+    }
+
+    /// Returns the node-side TCP port hosting the bridge.
+    #[must_use]
+    pub const fn node_port(&self) -> u16 {
+        self.node_port
+    }
+
+    /// Returns the per-deployment bearer token.
+    #[must_use]
+    pub const fn token(&self) -> &ContainerCapabilityToken {
+        &self.token
+    }
+
+    /// Returns capabilities exposed through this bridge.
+    #[must_use]
+    pub fn bindings(&self) -> &[ContainerCapabilityBinding] {
+        &self.bindings
+    }
+}
+
 /// Fully materialized request supplied to a container execution backend.
 ///
 /// The immutable descriptor and environment-specific source are both present so
@@ -152,6 +267,7 @@ pub struct ContainerLaunchRequest {
     source: ContainerImageSource,
     resources: ContainerResourceLimits,
     network: ContainerNetworkPolicy,
+    capability_transport: Option<ContainerCapabilityTransport>,
 }
 
 impl ContainerLaunchRequest {
@@ -170,6 +286,7 @@ impl ContainerLaunchRequest {
             source,
             resources,
             network,
+            capability_transport: None,
         }
     }
 
@@ -201,6 +318,19 @@ impl ContainerLaunchRequest {
     #[must_use]
     pub const fn network(&self) -> &ContainerNetworkPolicy {
         &self.network
+    }
+
+    /// Attaches a node-hosted capability transport to this launch request.
+    #[must_use]
+    pub fn with_capability_transport(mut self, transport: ContainerCapabilityTransport) -> Self {
+        self.capability_transport = Some(transport);
+        self
+    }
+
+    /// Returns the capability transport, when this workload has bound capabilities.
+    #[must_use]
+    pub const fn capability_transport(&self) -> Option<&ContainerCapabilityTransport> {
+        self.capability_transport.as_ref()
     }
 }
 

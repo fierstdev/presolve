@@ -8,6 +8,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+presolve-capability-bridge.workspace = true
 presolve-executor-sdk.workspace = true
 
 [lints]

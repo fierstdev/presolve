@@ -4,10 +4,13 @@ use std::{
     process::{Command, Output},
 };
 
+use presolve_capability_bridge::{
+    CAPABILITY_BRIDGE_PATH, CAPABILITY_ENDPOINT_ENV, CAPABILITY_PROTOCOL_ENV, CAPABILITY_TOKEN_ENV,
+};
 use presolve_executor_sdk::{
-    ContainerExecutor, ContainerExecutorError, ContainerHandle, ContainerImageDescriptor,
-    ContainerImageResolveError, ContainerImageResolver, ContainerImageSource,
-    ContainerLaunchRequest, ContainerNetworkMode,
+    ContainerCapabilityTransport, ContainerExecutor, ContainerExecutorError, ContainerHandle,
+    ContainerImageDescriptor, ContainerImageResolveError, ContainerImageResolver,
+    ContainerImageSource, ContainerLaunchRequest, ContainerNetworkMode,
 };
 
 const IMAGE_LIST_FORMAT: &str = "{{.Repository}}\t{{.Digest}}";
@@ -52,6 +55,23 @@ impl DockerCliBackend {
         S: AsRef<OsStr>,
     {
         Command::new(&self.program).args(args).output()
+    }
+
+    fn launch_output(
+        &self,
+        args: &[OsString],
+        transport: Option<&ContainerCapabilityTransport>,
+    ) -> Result<Output, std::io::Error> {
+        let mut command = Command::new(&self.program);
+        command.args(args);
+
+        if let Some(transport) = transport {
+            for (name, value) in capability_environment(transport) {
+                command.env(name, value);
+            }
+        }
+
+        command.output()
     }
 }
 
@@ -124,12 +144,14 @@ impl ContainerExecutor for DockerCliBackend {
         }
 
         let arguments = build_run_arguments(request)?;
-        let output = self.output(&arguments).map_err(|error| {
-            ContainerExecutorError::unavailable(format!(
-                "could not execute Docker CLI `{}`: {error}",
-                self.program.display()
-            ))
-        })?;
+        let output = self
+            .launch_output(&arguments, request.capability_transport())
+            .map_err(|error| {
+                ContainerExecutorError::unavailable(format!(
+                    "could not execute Docker CLI `{}`: {error}",
+                    self.program.display()
+                ))
+            })?;
 
         if !output.status.success() {
             return Err(ContainerExecutorError::internal(format!(
@@ -245,6 +267,12 @@ fn build_run_arguments(
 
     match request.network().outbound() {
         ContainerNetworkMode::Deny => {
+            if request.capability_transport().is_some() {
+                return Err(ContainerExecutorError::invalid_request(
+                    "Docker CLI backend cannot expose the node capability bridge while preserving network deny",
+                ));
+            }
+
             arguments.push(OsString::from("--network"));
             arguments.push(OsString::from("none"));
         }
@@ -258,9 +286,41 @@ fn build_run_arguments(
         }
     }
 
+    if request.capability_transport().is_some() {
+        arguments.push(OsString::from("--add-host"));
+        arguments.push(OsString::from("host.docker.internal:host-gateway"));
+
+        for name in [
+            CAPABILITY_ENDPOINT_ENV,
+            CAPABILITY_TOKEN_ENV,
+            CAPABILITY_PROTOCOL_ENV,
+        ] {
+            arguments.push(OsString::from("--env"));
+            arguments.push(OsString::from(name));
+        }
+    }
+
     arguments.push(OsString::from(request.source().reference()));
 
     Ok(arguments)
+}
+
+fn capability_environment(transport: &ContainerCapabilityTransport) -> [(&'static str, String); 3] {
+    [
+        (
+            CAPABILITY_ENDPOINT_ENV,
+            format!(
+                "http://host.docker.internal:{}{}",
+                transport.node_port(),
+                CAPABILITY_BRIDGE_PATH
+            ),
+        ),
+        (
+            CAPABILITY_TOKEN_ENV,
+            transport.token().expose_secret().to_owned(),
+        ),
+        (CAPABILITY_PROTOCOL_ENV, transport.protocol().to_owned()),
+    ]
 }
 
 fn format_cpu_millis(cpu_millis: u32) -> String {
@@ -358,6 +418,76 @@ mod tests {
             .expect("allow-all request should build");
 
         assert!(!arguments.iter().any(|argument| argument == "--network"));
+    }
+
+    fn capability_request(network: ContainerNetworkMode) -> ContainerLaunchRequest {
+        use presolve_executor_sdk::{
+            ContainerCapabilityBinding, ContainerCapabilityToken, ContainerCapabilityTransport,
+        };
+
+        request(network).with_capability_transport(ContainerCapabilityTransport::new(
+            presolve_capability_bridge::CAPABILITY_BRIDGE_PROTOCOL,
+            41_337,
+            ContainerCapabilityToken::new("secret-token"),
+            vec![ContainerCapabilityBinding::new(
+                "presolve:kv/store",
+                "0.1.0",
+            )],
+        ))
+    }
+
+    #[test]
+    fn capability_transport_is_injected_without_secret_in_argv() {
+        let request = capability_request(ContainerNetworkMode::AllowAll);
+        let arguments = build_run_arguments(&request).expect("request should build");
+
+        assert!(arguments.iter().any(|argument| argument == "--add-host"));
+        assert!(
+            arguments
+                .iter()
+                .any(|argument| argument == "host.docker.internal:host-gateway")
+        );
+        assert!(
+            arguments
+                .iter()
+                .any(|argument| argument == CAPABILITY_ENDPOINT_ENV)
+        );
+        assert!(
+            arguments
+                .iter()
+                .any(|argument| argument == CAPABILITY_TOKEN_ENV)
+        );
+        assert!(!arguments.iter().any(|argument| argument == "secret-token"));
+
+        let transport = request
+            .capability_transport()
+            .expect("transport should be attached");
+        let environment = capability_environment(transport);
+
+        assert_eq!(
+            environment[0],
+            (
+                CAPABILITY_ENDPOINT_ENV,
+                "http://host.docker.internal:41337/v1/call".to_owned(),
+            )
+        );
+        assert_eq!(
+            environment[1],
+            (CAPABILITY_TOKEN_ENV, "secret-token".to_owned())
+        );
+    }
+
+    #[test]
+    fn capability_transport_with_network_deny_is_rejected() {
+        let Err(error) = build_run_arguments(&capability_request(ContainerNetworkMode::Deny))
+        else {
+            panic!("network deny plus TCP capability bridge should fail");
+        };
+
+        assert_eq!(
+            error.code(),
+            presolve_executor_sdk::ContainerExecutorErrorCode::InvalidRequest
+        );
     }
 
     #[test]

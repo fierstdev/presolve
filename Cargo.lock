@@ -1173,6 +1173,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "presolve-capability-bridge"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "presolve-cli"
 version = "0.0.1"
 dependencies = [
@@ -1229,6 +1238,7 @@ dependencies = [
 name = "presolve-executor-docker"
 version = "0.0.1"
 dependencies = [
+ "presolve-capability-bridge",
  "presolve-executor-sdk",
 ]
 
@@ -1246,6 +1256,7 @@ dependencies = [
  "anyhow",
  "presolve-bundle",
  "presolve-capability",
+ "presolve-capability-bridge",
  "presolve-contract",
  "presolve-core",
  "presolve-environment",
@@ -1256,7 +1267,10 @@ dependencies = [
  "presolve-resolver",
  "presolve-runtime",
  "semver",
+ "serde",
+ "serde_json",
  "thiserror 2.0.21",
+ "uuid",
 ]
 
 [[package]]

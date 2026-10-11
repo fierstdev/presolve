@@ -46,12 +46,15 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Container launch-request materialization | Implemented |
 | Docker CLI local container executor | Implemented |
 | Docker local digest-pinned image resolver | Implemented |
+| Container HTTP/JSON capability bridge `0.1` | Implemented |
+| Container KV/object provider routing | Implemented |
+| Authenticated container capability discovery | Implemented |
 
 ## Next
 
 Chunk 15 local developer experience is complete for the current WebAssembly Component/Rust authoring path.
 
-OCI/container workload execution is in progress. The Application Contract, Environment Specification, resolver, `DeploymentPlan`, and `.presolved` bundle now preserve container workload identity. The executor/materialization boundary is implemented. The local Docker container adapter is implemented. The next step is container capability transport.
+OCI/container workload execution is in progress. The Application Contract, Environment Specification, resolver, `DeploymentPlan`, and `.presolved` bundle now preserve container workload identity. The executor/materialization boundary is implemented. The local Docker container adapter and initial container capability transport are implemented. The next step is the end-to-end OCI portability proof and Chunk 16 checkpoint.
 
 ## Planned after OCI/container execution
 

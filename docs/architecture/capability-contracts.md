@@ -119,3 +119,25 @@ Capability Contract
 ```
 
 Not every generation path is implemented yet, but the semantic contract is already separate from its current bindings.
+
+## Container capability bridge
+
+OCI containers cannot receive Wasmtime host imports directly, so Presolve now has a second binding target for baseline built-in capabilities:
+
+```text
+Capability Contract
+      │
+      ├── Rust provider trait
+      ├── WIT / Component Model
+      └── HTTP/JSON capability bridge v0.1
+```
+
+The bridge is a transport projection, not a new semantic contract.
+
+The initial protocol uses an authenticated `POST /v1/call` envelope carrying `interface`, `operation`, and operation-specific JSON input. Responses carry either operation-specific JSON output or a stable error category/message.
+
+The current bridge implements baseline `presolve:kv/store@0.1.0` and `presolve:objects/store@0.1.0`. Negotiated optional object-storage features are rejected until their bridge projection is defined.
+
+Object bodies are represented as byte arrays in bridge v0.1. This first projection prioritizes semantic correctness and language-neutrality; a later protocol version may add streaming without changing the underlying object-storage capability contract.
+
+A per-deployment bearer token authorizes access to the node-hosted bridge. Provider credentials are never injected into the application container.

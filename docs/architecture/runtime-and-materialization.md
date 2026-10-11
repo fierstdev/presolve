@@ -221,3 +221,28 @@ Launch is detached and returns Docker's container ID as the backend-scoped `Cont
 Stop uses forced container removal, making the adapter responsible for cleaning up the instance it launched.
 
 The executor verifies that the resolved source is pinned to the exact digest required by the launch request and confirms that exact source is present in the local Docker daemon before launch.
+
+## Container capability transport
+
+Capability-bearing containers use a node-hosted capability gateway rather than direct provider credentials.
+
+```text
+Container
+  endpoint + bearer token
+        ↓
+Presolve HTTP/JSON bridge
+        ↓
+DeploymentPlan binding
+        ↓
+ProviderRegistry exact ProviderId
+        ↓
+provider implementation
+```
+
+`start_container_capability_gateway` validates the exact capability versions/features selected by the plan and retrieves the exact provider implementations selected by `ProviderId`. It never re-runs provider selection.
+
+`materialize_container_workloads_with_capability_transport` requires the transport's interface/version set to match the plan bindings exactly before attaching it to `ContainerLaunchRequest`.
+
+The local Docker adapter injects bridge discovery through `PRESOLVE_CAPABILITY_ENDPOINT`, `PRESOLVE_CAPABILITY_TOKEN`, and `PRESOLVE_CAPABILITY_PROTOCOL`. The token value is passed to the Docker CLI through its process environment rather than in command arguments.
+
+The current Docker implementation can expose the host bridge only when application outbound networking is `allow_all`. `deny` is rejected for capability-bearing Docker workloads because ordinary TCP access to the host bridge would otherwise require weakening the requested isolation. `allow_list` remains unsupported by the Docker CLI adapter. This is an adapter limitation, not a change to capability or network semantics.

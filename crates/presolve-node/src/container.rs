@@ -2,8 +2,9 @@ use presolve_bundle::{BundleError, PresolveBundle};
 use presolve_contract::OutboundNetworkMode;
 use presolve_core::WorkloadKind;
 use presolve_executor_sdk::{
-    ContainerImageDescriptor, ContainerImageResolveError, ContainerImageResolver,
-    ContainerLaunchRequest, ContainerNetworkMode, ContainerNetworkPolicy, ContainerResourceLimits,
+    ContainerCapabilityTransport, ContainerImageDescriptor, ContainerImageResolveError,
+    ContainerImageResolver, ContainerLaunchRequest, ContainerNetworkMode, ContainerNetworkPolicy,
+    ContainerResourceLimits,
 };
 use presolve_resolver::DeploymentPlan;
 use thiserror::Error;
@@ -64,6 +65,10 @@ pub enum ContainerMaterializationError {
         bindings: usize,
     },
 
+    /// A supplied capability transport does not describe the plan bindings exactly.
+    #[error("container capability transport does not match the resolved capability bindings")]
+    CapabilityTransportMismatch,
+
     /// Immutable OCI identity could not be mapped to an environment-local source.
     #[error("could not resolve OCI source for workload `{workload}`: {source}")]
     ImageResolution {
@@ -99,6 +104,37 @@ pub fn materialize_container_workloads(
     bundle: &PresolveBundle,
     image_resolver: &dyn ContainerImageResolver,
 ) -> Result<Vec<ContainerLaunchRequest>, ContainerMaterializationError> {
+    materialize_container_workloads_internal(plan, bundle, image_resolver, None)
+}
+
+/// Materializes container workloads with an explicit node-hosted capability
+/// transport.
+///
+/// # Errors
+///
+/// Returns the same errors as [`materialize_container_workloads`] and also
+/// rejects a transport whose exposed interface/version set does not exactly
+/// match the resolved capability bindings.
+pub fn materialize_container_workloads_with_capability_transport(
+    plan: &DeploymentPlan,
+    bundle: &PresolveBundle,
+    image_resolver: &dyn ContainerImageResolver,
+    capability_transport: &ContainerCapabilityTransport,
+) -> Result<Vec<ContainerLaunchRequest>, ContainerMaterializationError> {
+    materialize_container_workloads_internal(
+        plan,
+        bundle,
+        image_resolver,
+        Some(capability_transport),
+    )
+}
+
+fn materialize_container_workloads_internal(
+    plan: &DeploymentPlan,
+    bundle: &PresolveBundle,
+    image_resolver: &dyn ContainerImageResolver,
+    capability_transport: Option<&ContainerCapabilityTransport>,
+) -> Result<Vec<ContainerLaunchRequest>, ContainerMaterializationError> {
     bundle.verify()?;
     validate_workload_topology(plan, bundle)?;
 
@@ -113,11 +149,17 @@ pub fn materialize_container_workloads(
     }
 
     if !plan.bindings().is_empty() {
-        return Err(
-            ContainerMaterializationError::CapabilityTransportUnavailable {
-                bindings: plan.bindings().len(),
-            },
-        );
+        let Some(transport) = capability_transport else {
+            return Err(
+                ContainerMaterializationError::CapabilityTransportUnavailable {
+                    bindings: plan.bindings().len(),
+                },
+            );
+        };
+
+        validate_capability_transport(plan, transport)?;
+    } else if capability_transport.is_some_and(|transport| !transport.bindings().is_empty()) {
+        return Err(ContainerMaterializationError::CapabilityTransportMismatch);
     }
 
     let requirements = bundle.manifest().requirements();
@@ -163,16 +205,51 @@ pub fn materialize_container_workloads(
             }
         })?;
 
-        requests.push(ContainerLaunchRequest::new(
+        let mut request = ContainerLaunchRequest::new(
             workload.name(),
             descriptor,
             source,
             resources,
             network.clone(),
-        ));
+        );
+
+        if let Some(transport) = capability_transport {
+            request = request.with_capability_transport(transport.clone());
+        }
+
+        requests.push(request);
     }
 
     Ok(requests)
+}
+
+fn validate_capability_transport(
+    plan: &DeploymentPlan,
+    transport: &ContainerCapabilityTransport,
+) -> Result<(), ContainerMaterializationError> {
+    let mut expected = plan
+        .bindings()
+        .iter()
+        .map(|binding| {
+            (
+                binding.interface().to_owned(),
+                binding.provider_version().to_string(),
+            )
+        })
+        .collect::<Vec<_>>();
+    expected.sort();
+
+    let actual = transport
+        .bindings()
+        .iter()
+        .map(|binding| (binding.interface().to_owned(), binding.version().to_owned()))
+        .collect::<Vec<_>>();
+
+    if actual != expected {
+        return Err(ContainerMaterializationError::CapabilityTransportMismatch);
+    }
+
+    Ok(())
 }
 
 fn validate_workload_topology(
@@ -321,6 +398,79 @@ allow = ["api.example:443"]
             ContainerNetworkMode::AllowList
         );
         assert_eq!(request.network().allow(), ["api.example:443"]);
+    }
+
+    #[test]
+    fn capability_transport_allows_bound_container_materialization() {
+        use presolve_capability_bridge::CAPABILITY_BRIDGE_PROTOCOL;
+        use presolve_executor_sdk::{
+            ContainerCapabilityBinding, ContainerCapabilityToken, ContainerCapabilityTransport,
+        };
+
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "container-with-kv"
+version = "1.0.0"
+
+[[workloads]]
+name = "api"
+kind = "container"
+
+[[capabilities]]
+interface = "presolve:kv/store"
+version = "^0.1"
+
+[network]
+outbound = "allow_all"
+"#,
+        )
+        .expect("contract should parse");
+
+        let provider_id = presolve_core::ProviderId::new();
+        let environment = EnvironmentInventory::new(
+            EnvironmentId::new(),
+            EnvironmentResources::new(1_024, 1_000),
+            vec![presolve_resolver::ProviderDescriptor::new(
+                provider_id,
+                "memory-kv",
+                vec![presolve_resolver::ProvidedCapability::from_contract(
+                    presolve_capability::key_value_contract().expect("KV contract should be valid"),
+                )],
+            )],
+        )
+        .with_supported_workloads(vec![WorkloadKind::Container]);
+        let plan = resolve(&contract, &environment)
+            .plan()
+            .expect("container should resolve")
+            .clone();
+        let bundle = PresolveBundle::from_oci_image(
+            &contract,
+            OciImageArtifactInput::new("api", OCI_IMAGE_MANIFEST_MEDIA_TYPE, IMAGE_DIGEST, 4_096),
+        )
+        .expect("container bundle should build");
+        let transport = ContainerCapabilityTransport::new(
+            CAPABILITY_BRIDGE_PROTOCOL,
+            42_000,
+            ContainerCapabilityToken::new("test-token"),
+            vec![ContainerCapabilityBinding::new(
+                "presolve:kv/store",
+                "0.1.0",
+            )],
+        );
+
+        let requests = materialize_container_workloads_with_capability_transport(
+            &plan,
+            &bundle,
+            &StaticImageResolver,
+            &transport,
+        )
+        .expect("bound container should materialize with transport");
+
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].capability_transport(), Some(&transport));
     }
 
     #[test]
