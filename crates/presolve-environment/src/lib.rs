@@ -19,7 +19,8 @@ mod version;
 
 pub use enrich::{EnvironmentInventoryError, inventory_from_specification};
 pub use format::{
-    EnvironmentEncodeError, EnvironmentParseError, encode_environment, parse_environment,
+    ENVIRONMENT_FILE_NAME, EnvironmentEncodeError, EnvironmentParseError, encode_environment,
+    parse_environment,
 };
 pub use inventory::{
     CapabilityFeatureError, EnvironmentInventory, EnvironmentResources, ProvidedCapability,

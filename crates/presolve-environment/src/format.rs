@@ -2,6 +2,9 @@ use thiserror::Error;
 
 use crate::{EnvironmentSpecification, EnvironmentSpecificationError};
 
+/// Canonical filename for a Presolve Environment Specification.
+pub const ENVIRONMENT_FILE_NAME: &str = "presolve.env.toml";
+
 /// Failure while parsing an Environment Specification document.
 #[derive(Debug, Error)]
 pub enum EnvironmentParseError {

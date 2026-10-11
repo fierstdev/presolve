@@ -36,10 +36,15 @@ Application Contract
     ▼
 Application Release (.presolved)
     │
-    ├───────────────┐
-    ▼               ▼
-Environment     Resolver
-Inventory           │
+    │               Environment Specification
+    │                         │
+    │                         ▼
+    │                  Environment Inventory
+    │                         │
+    └───────────────┬─────────┘
+                    ▼
+                 Resolver
+                    │
                     ▼
               Deployment Plan
                     │
@@ -252,21 +257,29 @@ Deployment
     one realization of an Application Release in an Environment
 ```
 
-The resolver consumes application requirements and an environment inventory and produces a symbolic deployment plan.
+The environment side begins with a versioned declarative Environment Specification. Its canonical filename is `presolve.env.toml`.
+
+The specification describes stable environment/provider identity, resource capacity, supported workload classes, and provider capability supply. Presolve validates and normalizes it into the Environment Inventory consumed by the resolver.
 
 ```text
-Application Contract
-        +
-Environment Inventory
-        │
-        ▼
-     Resolver
-        │
-        ▼
-Deployment Plan
+Application Contract          Environment Specification
+        │                              │
+        │                              ▼
+        │                     Environment Inventory
+        │                              │
+        └──────────────┬───────────────┘
+                       ▼
+                    Resolver
+                       │
+                       ▼
+                 Deployment Plan
 ```
 
-The resolver does not instantiate providers and does not execute workloads.
+Environment and provider IDs are opaque stable identities. Normal user-facing tooling is expected to generate them when environments/providers are created and persist them into the Environment Specification; parsing never silently invents new identities.
+
+The resolver does not instantiate providers and does not execute workloads. A Presolve node later materializes selected provider IDs into concrete implementations.
+
+See [`docs/environment-specification.md`](docs/environment-specification.md) for the Environment Specification contract and identity rules.
 
 A Presolve node later materializes the plan into concrete runtime and provider bindings.
 
@@ -292,6 +305,9 @@ Implemented foundations include:
 - in-memory key-value provider
 - in-memory object-storage provider
 - reusable provider conformance suites
+- versioned Environment Specification parsing, validation, and deterministic normalization
+- specification-to-inventory semantic enrichment
+- explicit workload execution compatibility
 - environment inventories
 - deterministic capability resolution
 - required and preferred semantic capability-feature negotiation
@@ -341,6 +357,7 @@ crates/
   presolve-runtime/       WebAssembly Component runtime
   presolve-bundle/        Canonical application release bundles
   presolve-policy/        Deployment and security policy
+  presolve-environment/   Environment Specification and normalized inventory
   presolve-resolver/      Environment compatibility and resolution
   presolve-provider-sdk/  Provider interfaces
   presolve-provider-conformance/
@@ -354,6 +371,7 @@ providers/
 
 wit/                      Versioned WebAssembly Component interfaces
 examples/                 Example Presolve applications
+docs/                     Design and format references
 scripts/                  Validation and end-to-end checks
 ```
 
