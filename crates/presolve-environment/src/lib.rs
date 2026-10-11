@@ -10,10 +10,14 @@
 //! provider credentials, SDK configuration, infrastructure secrets, or other
 //! node realization details.
 
+mod format;
 mod model;
 mod validate;
 mod version;
 
+pub use format::{
+    EnvironmentEncodeError, EnvironmentParseError, encode_environment, parse_environment,
+};
 pub use model::{
     EnvironmentMetadata, EnvironmentSpecification, ExecutionSupport,
     ProvidedCapabilitySpecification, ProviderSpecification, ResourceCapacity,

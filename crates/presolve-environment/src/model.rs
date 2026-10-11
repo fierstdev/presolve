@@ -38,7 +38,7 @@ impl EnvironmentSpecification {
         execution: ExecutionSupport,
         providers: Vec<ProviderSpecification>,
     ) -> Result<Self, EnvironmentSpecificationError> {
-        let specification = Self {
+        let mut specification = Self {
             specification_version,
             environment,
             resources,
@@ -47,6 +47,7 @@ impl EnvironmentSpecification {
         };
 
         specification.validate()?;
+        specification.normalize();
         Ok(specification)
     }
 
@@ -77,6 +78,41 @@ impl EnvironmentSpecification {
     /// Returns the first violated Environment Specification invariant.
     pub fn validate(&self) -> Result<(), EnvironmentSpecificationError> {
         crate::validate::validate(self)
+    }
+
+    /// Returns a validated copy with all non-semantic collection ordering normalized.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first violated Environment Specification invariant.
+    pub fn normalized(&self) -> Result<Self, EnvironmentSpecificationError> {
+        let mut specification = self.clone();
+        specification.validate()?;
+        specification.normalize();
+        Ok(specification)
+    }
+
+    pub(crate) fn normalize(&mut self) {
+        self.execution.workloads.sort();
+
+        for provider in &mut self.providers {
+            for capability in &mut provider.capabilities {
+                capability.features.sort();
+            }
+
+            provider.capabilities.sort_by(|left, right| {
+                left.interface
+                    .cmp(&right.interface)
+                    .then_with(|| left.version.cmp(&right.version))
+                    .then_with(|| left.features.cmp(&right.features))
+            });
+        }
+
+        self.providers.sort_by(|left, right| {
+            left.name
+                .cmp(&right.name)
+                .then_with(|| left.id.cmp(&right.id))
+        });
     }
 
     /// Returns the Environment Specification schema version.
