@@ -52,6 +52,12 @@ pub mod diagnostic_codes {
 
     /// The same relationship is declared more than once.
     pub const DUPLICATE_RELATIONSHIP: u16 = 1_015;
+
+    /// A requested capability feature identifier is invalid.
+    pub const INVALID_CAPABILITY_FEATURE: u16 = 1_016;
+
+    /// The same capability feature is requested more than once.
+    pub const DUPLICATE_CAPABILITY_FEATURE: u16 = 1_017;
 }
 
 impl ApplicationContract {
@@ -282,6 +288,63 @@ impl ApplicationContract {
                          versions with a single version requirement",
                     ),
                 );
+            }
+            let mut features = HashSet::new();
+
+            for feature in capability.required_features() {
+                if !valid_kebab_segment(feature) {
+                    diagnostics.push(
+                        error(
+                            diagnostic_codes::INVALID_CAPABILITY_FEATURE,
+                            format!(
+                                "invalid required feature `{feature}` for capability `{interface}`"
+                            ),
+                        )
+                        .with_help("use lowercase kebab-case semantic feature identifiers"),
+                    );
+                }
+
+                if !features.insert(feature) {
+                    diagnostics.push(
+                        error(
+                            diagnostic_codes::DUPLICATE_CAPABILITY_FEATURE,
+                            format!(
+                                "capability feature `{feature}` is requested more than once for `{interface}`"
+                            ),
+                        )
+                        .with_help(
+                            "declare each semantic feature once across required and preferred features",
+                        ),
+                    );
+                }
+            }
+
+            for feature in capability.preferred_features() {
+                if !valid_kebab_segment(feature) {
+                    diagnostics.push(
+                        error(
+                            diagnostic_codes::INVALID_CAPABILITY_FEATURE,
+                            format!(
+                                "invalid preferred feature `{feature}` for capability `{interface}`"
+                            ),
+                        )
+                        .with_help("use lowercase kebab-case semantic feature identifiers"),
+                    );
+                }
+
+                if !features.insert(feature) {
+                    diagnostics.push(
+                        error(
+                            diagnostic_codes::DUPLICATE_CAPABILITY_FEATURE,
+                            format!(
+                                "capability feature `{feature}` is requested more than once for `{interface}`"
+                            ),
+                        )
+                        .with_help(
+                            "declare each semantic feature once across required and preferred features",
+                        ),
+                    );
+                }
             }
         }
     }

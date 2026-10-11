@@ -395,3 +395,141 @@ cpu_millis = 500
         ["PS2002", "PS2003", "PS2001",]
     );
 }
+
+#[test]
+fn resolves_provider_with_required_semantic_feature() {
+    let contract = contract(
+        r#"
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+required_features = ["range-read"]
+"#,
+        "",
+    );
+
+    let provider_id = ProviderId::new();
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        vec![object_provider(provider_id, "memory-objects")],
+    );
+
+    let report = resolve(&contract, &environment);
+    let plan = report
+        .plan()
+        .expect("required object semantic feature should resolve");
+
+    assert_eq!(plan.bindings()[0].provider_id(), &provider_id);
+    assert_eq!(plan.bindings()[0].negotiated_features(), ["range-read"]);
+}
+
+#[test]
+fn rejects_provider_missing_required_semantic_feature() {
+    let contract = contract(
+        r#"
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+required_features = ["multipart-upload"]
+"#,
+        "",
+    );
+
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        vec![object_provider(ProviderId::new(), "memory-objects")],
+    );
+
+    let report = resolve(&contract, &environment);
+
+    assert!(!report.is_resolved());
+    assert!(matches!(
+        report.problems(),
+        [ResolutionProblem::MissingCapabilityFeatures {
+            interface,
+            required_features,
+            available_features,
+            ..
+        }] if interface == OBJECT_STORE_INTERFACE
+            && required_features == &["multipart-upload"]
+            && available_features == &[
+                "conditional-write",
+                "range-read",
+                "user-metadata",
+            ]
+    ));
+    assert_eq!(report.problems()[0].code(), "PS2004");
+}
+
+#[test]
+fn preferred_semantic_feature_outranks_higher_provider_version() {
+    let contract = contract(
+        r#"
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+preferred_features = ["range-read"]
+"#,
+        "",
+    );
+
+    let preferred_provider_id = ProviderId::new();
+    let higher_version_provider_id = ProviderId::new();
+
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        vec![
+            ProviderDescriptor::new(
+                higher_version_provider_id,
+                "generic-objects",
+                vec![ProvidedCapability::new(
+                    OBJECT_STORE_INTERFACE,
+                    Version::new(0, 1, 9),
+                )],
+            ),
+            object_provider(preferred_provider_id, "semantic-objects"),
+        ],
+    );
+
+    let report = resolve(&contract, &environment);
+    let plan = report
+        .plan()
+        .expect("preferred semantic feature should rank providers");
+
+    assert_eq!(plan.bindings()[0].provider_id(), &preferred_provider_id);
+    assert_eq!(plan.bindings()[0].negotiated_features(), ["range-read"]);
+}
+
+#[test]
+fn optional_capability_with_unsatisfied_required_feature_remains_unbound() {
+    let contract = contract(
+        r#"
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+optional = true
+required_features = ["multipart-upload"]
+"#,
+        "",
+    );
+
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        vec![object_provider(ProviderId::new(), "memory-objects")],
+    );
+
+    let report = resolve(&contract, &environment);
+    let plan = report
+        .plan()
+        .expect("optional semantic mismatch should not reject deployment");
+
+    assert_eq!(plan.bindings(), []);
+    assert_eq!(
+        plan.unbound_optional_capabilities(),
+        [OBJECT_STORE_INTERFACE]
+    );
+}

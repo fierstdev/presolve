@@ -250,10 +250,22 @@ fn canonical_requirements(contract: &ApplicationContract) -> RequirementsManifes
     let mut capabilities = contract
         .capabilities()
         .iter()
-        .map(|capability| CapabilityManifest {
-            interface: capability.interface().to_owned(),
-            version: capability.version().to_string(),
-            optional: capability.optional(),
+        .map(|capability| {
+            let mut required_features = capability.required_features().to_vec();
+            required_features.sort();
+            required_features.dedup();
+
+            let mut preferred_features = capability.preferred_features().to_vec();
+            preferred_features.sort();
+            preferred_features.dedup();
+
+            CapabilityManifest {
+                interface: capability.interface().to_owned(),
+                version: capability.version().to_string(),
+                optional: capability.optional(),
+                required_features,
+                preferred_features,
+            }
         })
         .collect::<Vec<_>>();
 
@@ -262,6 +274,8 @@ fn canonical_requirements(contract: &ApplicationContract) -> RequirementsManifes
             .cmp(&right.interface)
             .then_with(|| left.version.cmp(&right.version))
             .then_with(|| left.optional.cmp(&right.optional))
+            .then_with(|| left.required_features.cmp(&right.required_features))
+            .then_with(|| left.preferred_features.cmp(&right.preferred_features))
     });
 
     let mut allow = contract.network().allow().to_vec();
@@ -396,6 +410,12 @@ pub struct CapabilityManifest {
 
     #[serde(default, skip_serializing_if = "is_false")]
     optional: bool,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    required_features: Vec<String>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    preferred_features: Vec<String>,
 }
 
 impl CapabilityManifest {
@@ -415,6 +435,18 @@ impl CapabilityManifest {
     #[must_use]
     pub const fn optional(&self) -> bool {
         self.optional
+    }
+
+    /// Returns required semantic features in canonical order.
+    #[must_use]
+    pub fn required_features(&self) -> &[String] {
+        &self.required_features
+    }
+
+    /// Returns preferred semantic features in canonical order.
+    #[must_use]
+    pub fn preferred_features(&self) -> &[String] {
+        &self.preferred_features
     }
 }
 

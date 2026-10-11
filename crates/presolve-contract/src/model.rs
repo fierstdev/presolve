@@ -220,6 +220,12 @@ pub struct CapabilityRequirement {
 
     #[serde(default, skip_serializing_if = "is_false")]
     optional: bool,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    required_features: Vec<String>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    preferred_features: Vec<String>,
 }
 
 impl CapabilityRequirement {
@@ -239,6 +245,18 @@ impl CapabilityRequirement {
     #[must_use]
     pub const fn optional(&self) -> bool {
         self.optional
+    }
+
+    /// Returns semantic features that every selected provider must support.
+    #[must_use]
+    pub fn required_features(&self) -> &[String] {
+        &self.required_features
+    }
+
+    /// Returns semantic features used to rank otherwise-compatible providers.
+    #[must_use]
+    pub fn preferred_features(&self) -> &[String] {
+        &self.preferred_features
     }
 }
 

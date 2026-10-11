@@ -12,6 +12,22 @@ pub enum ResolutionProblem {
         version: VersionReq,
     },
 
+    /// Providers match the interface and version but cannot prove all
+    /// required semantic features.
+    MissingCapabilityFeatures {
+        /// Required capability interface.
+        interface: String,
+
+        /// Required compatible version range.
+        version: VersionReq,
+
+        /// Semantic features the application requires.
+        required_features: Vec<String>,
+
+        /// Semantic features advertised by otherwise-compatible providers.
+        available_features: Vec<String>,
+    },
+
     /// The environment has less memory than the application requires.
     InsufficientMemory {
         /// Application memory requirement.
@@ -37,6 +53,7 @@ impl ResolutionProblem {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::MissingCapability { .. } => "PS2001",
+            Self::MissingCapabilityFeatures { .. } => "PS2004",
             Self::InsufficientMemory { .. } => "PS2002",
             Self::InsufficientCpu { .. } => "PS2003",
         }

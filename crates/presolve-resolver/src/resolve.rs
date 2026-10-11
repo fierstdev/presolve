@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use presolve_contract::{ApplicationContract, CapabilityRequirement};
 
 use crate::{
@@ -20,22 +22,38 @@ pub fn resolve(
 
     for requirement in contract.capabilities() {
         match select_provider(requirement, environment) {
-            Some((provider, capability)) => {
+            ProviderSelection::Selected {
+                provider,
+                capability,
+                negotiated_features,
+            } => {
                 bindings.push(CapabilityBinding::new(
                     requirement.interface().to_owned(),
                     *provider.id(),
                     provider.name().to_owned(),
                     capability.version().clone(),
                     capability.semantic_contract().cloned(),
+                    negotiated_features,
                 ));
             }
-            None if requirement.optional() => {
+            ProviderSelection::MissingCapability
+            | ProviderSelection::MissingRequiredFeatures { .. }
+                if requirement.optional() =>
+            {
                 unbound_optional_capabilities.push(requirement.interface().to_owned());
             }
-            None => {
+            ProviderSelection::MissingCapability => {
                 problems.push(ResolutionProblem::MissingCapability {
                     interface: requirement.interface().to_owned(),
                     version: requirement.version().clone(),
+                });
+            }
+            ProviderSelection::MissingRequiredFeatures { available_features } => {
+                problems.push(ResolutionProblem::MissingCapabilityFeatures {
+                    interface: requirement.interface().to_owned(),
+                    version: requirement.version().clone(),
+                    required_features: requirement.required_features().to_vec(),
+                    available_features,
                 });
             }
         }
@@ -79,11 +97,29 @@ fn resolve_resources(
     }
 }
 
+enum ProviderSelection<'a> {
+    Selected {
+        provider: &'a ProviderDescriptor,
+        capability: &'a ProvidedCapability,
+        negotiated_features: Vec<String>,
+    },
+    MissingCapability,
+    MissingRequiredFeatures {
+        available_features: Vec<String>,
+    },
+}
+
+struct Candidate<'a> {
+    provider: &'a ProviderDescriptor,
+    capability: &'a ProvidedCapability,
+    preferred_matches: usize,
+}
+
 fn select_provider<'a>(
     requirement: &CapabilityRequirement,
     environment: &'a EnvironmentInventory,
-) -> Option<(&'a ProviderDescriptor, &'a ProvidedCapability)> {
-    let mut candidates: Vec<_> = environment
+) -> ProviderSelection<'a> {
+    let version_candidates = environment
         .providers()
         .iter()
         .flat_map(|provider| {
@@ -96,19 +132,94 @@ fn select_provider<'a>(
             capability.interface() == requirement.interface()
                 && requirement.version().matches(capability.version())
         })
-        .collect();
+        .collect::<Vec<_>>();
 
-    candidates.sort_by(|(provider_a, capability_a), (provider_b, capability_b)| {
-        capability_b
-            .version()
-            .cmp(capability_a.version())
+    if version_candidates.is_empty() {
+        return ProviderSelection::MissingCapability;
+    }
+
+    let mut available_features = BTreeSet::new();
+    let mut candidates = Vec::new();
+
+    for (provider, capability) in version_candidates {
+        let supported = supported_features(capability);
+
+        available_features.extend(supported.iter().cloned());
+
+        if !requirement
+            .required_features()
+            .iter()
+            .all(|required| supported.iter().any(|feature| feature == required))
+        {
+            continue;
+        }
+
+        let preferred_matches = requirement
+            .preferred_features()
+            .iter()
+            .filter(|preferred| supported.iter().any(|feature| feature == *preferred))
+            .count();
+
+        candidates.push(Candidate {
+            provider,
+            capability,
+            preferred_matches,
+        });
+    }
+
+    if candidates.is_empty() {
+        return ProviderSelection::MissingRequiredFeatures {
+            available_features: available_features.into_iter().collect(),
+        };
+    }
+
+    candidates.sort_by(|candidate_a, candidate_b| {
+        candidate_b
+            .preferred_matches
+            .cmp(&candidate_a.preferred_matches)
             .then_with(|| {
-                provider_a
+                candidate_b
+                    .capability
+                    .version()
+                    .cmp(candidate_a.capability.version())
+            })
+            .then_with(|| {
+                candidate_a
+                    .provider
                     .id()
                     .to_string()
-                    .cmp(&provider_b.id().to_string())
+                    .cmp(&candidate_b.provider.id().to_string())
             })
     });
 
-    candidates.into_iter().next()
+    let selected = candidates
+        .into_iter()
+        .next()
+        .expect("non-empty candidate list should select a provider");
+
+    let supported = supported_features(selected.capability);
+    let mut negotiated_features = requirement.required_features().to_vec();
+
+    negotiated_features.extend(
+        requirement
+            .preferred_features()
+            .iter()
+            .filter(|preferred| supported.iter().any(|feature| feature == *preferred))
+            .cloned(),
+    );
+
+    negotiated_features.sort();
+    negotiated_features.dedup();
+
+    ProviderSelection::Selected {
+        provider: selected.provider,
+        capability: selected.capability,
+        negotiated_features,
+    }
+}
+
+fn supported_features(capability: &ProvidedCapability) -> &[String] {
+    capability
+        .semantic_contract()
+        .map_or(&[] as &[String], |contract| contract.optional_features())
 }

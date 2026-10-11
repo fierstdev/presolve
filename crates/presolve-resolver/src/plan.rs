@@ -10,6 +10,7 @@ pub struct CapabilityBinding {
     provider_name: String,
     provider_version: Version,
     semantic_contract: Option<CapabilityContract>,
+    negotiated_features: Vec<String>,
 }
 
 impl CapabilityBinding {
@@ -19,6 +20,7 @@ impl CapabilityBinding {
         provider_name: String,
         provider_version: Version,
         semantic_contract: Option<CapabilityContract>,
+        negotiated_features: Vec<String>,
     ) -> Self {
         Self {
             interface,
@@ -26,6 +28,7 @@ impl CapabilityBinding {
             provider_name,
             provider_version,
             semantic_contract,
+            negotiated_features,
         }
     }
 
@@ -58,6 +61,12 @@ impl CapabilityBinding {
     #[must_use]
     pub fn semantic_contract(&self) -> Option<&CapabilityContract> {
         self.semantic_contract.as_ref()
+    }
+
+    /// Returns semantic features selected for this binding.
+    #[must_use]
+    pub fn negotiated_features(&self) -> &[String] {
+        &self.negotiated_features
     }
 }
 
