@@ -111,3 +111,49 @@ It implements `CapabilityTransport` using the existing `presolve-http-json/0.1` 
 The adapter is separate from the main package surface, so normal TypeScript application code remains transport-neutral.
 
 Chunk 17.3 uses this adapter from a real TypeScript OCI workload.
+
+## Real TypeScript OCI workload proof
+
+Chunk 17.3 validates the TypeScript authoring path against the real OCI/container execution architecture proven in Chunk 16.
+
+The proof workload is ordinary TypeScript:
+
+```ts
+import { kv } from "@presolve/sdk";
+import { installContainerBridge } from "@presolve/sdk/container";
+
+installContainerBridge();
+await kv.set(
+  "presolve.chunk16.checkpoint",
+  "container-capability-ok",
+);
+```
+
+The image is built from the pnpm workspace, exported with OCI media types, and identified by its immutable OCI descriptor. That descriptor is then passed through the existing Presolve container checkpoint.
+
+The host-side checkpoint:
+
+1. resolves the container application and KV requirement,
+2. constructs `.presolved` identity from the OCI descriptor,
+3. realizes the exact selected KV provider,
+4. starts the authenticated capability gateway,
+5. materializes and launches the image through `ContainerExecutor`,
+6. observes the value written by the TypeScript workload in the selected provider.
+
+This proves the path:
+
+```text
+TypeScript source
+    ↓
+@presolve/sdk
+    ↓
+@presolve/sdk/container
+    ↓
+presolve-http-json/0.1
+    ↓
+exact DeploymentPlan ProviderId
+    ↓
+KeyValueProvider
+```
+
+The proof does not introduce a TypeScript-specific deployment model. `presolve.toml`, Environment resolution, `.presolved`, and `DeploymentPlan` remain unchanged.

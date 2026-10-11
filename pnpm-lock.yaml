@@ -191,6 +191,16 @@ importers:
 
   .: {}
 
+  examples/typescript-container-capability-checkpoint:
+    dependencies:
+      '@presolve/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+    devDependencies:
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   packages/sdk:
     devDependencies:
       typescript:

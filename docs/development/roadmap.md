@@ -99,12 +99,16 @@ Current subdivision:
 ```text
 17.1  TypeScript workspace + transport-neutral SDK kernel (complete)
 17.2  typed KV/object clients + container bridge adapter (complete)
-17.3  real TypeScript OCI workload proof
+17.3  real TypeScript OCI workload proof (complete)
 17.4  execution-target adapter boundary / Component projection
 17.5  TypeScript authoring checkpoint + docs
 ```
 
 17.1 establishes `@presolve/sdk` without introducing a second Application Contract. `presolve.toml` remains the canonical application declaration, while the SDK defines a transport-neutral capability call boundary that later execution adapters can project onto HTTP/JSON, WIT, or other compatible bindings.
+
+17.2 adds typed functional KV/object clients and the `@presolve/sdk/container` adapter for the authenticated HTTP/JSON capability bridge.
+
+17.3 proves those abstractions from a real TypeScript OCI workload. The workload calls `kv.set(...)` through `@presolve/sdk`, the container adapter projects the call onto the bridge, and the existing OCI checkpoint observes the write in the exact KV provider selected by `DeploymentPlan`.
 
 ## Chunk 18 — real cloud provider proof
 

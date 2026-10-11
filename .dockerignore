@@ -1,0 +1,9 @@
+.git
+.gitignore
+target
+node_modules
+**/node_modules
+**/dist
+.presolve
+*.presolved
+.DS_Store

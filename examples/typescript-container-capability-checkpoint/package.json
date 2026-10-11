@@ -1,0 +1,17 @@
+{
+  "name": "@presolve/example-typescript-container-checkpoint",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "pnpm run typecheck && pnpm run build"
+  },
+  "dependencies": {
+    "@presolve/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

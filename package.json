@@ -14,6 +14,7 @@
     "build:ts": "pnpm --filter @presolve/sdk build",
     "typecheck:ts": "pnpm --filter @presolve/sdk typecheck",
     "test:ts": "pnpm --filter @presolve/sdk test",
-    "check:ts": "pnpm --filter @presolve/sdk check"
+    "check:ts": "pnpm --filter @presolve/sdk check",
+    "smoke:ts-oci": "./scripts/smoke-typescript-container-oci.sh"
   }
 }
