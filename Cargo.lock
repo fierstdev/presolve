@@ -1096,6 +1096,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "presolve-environment"
+version = "0.0.1"
+dependencies = [
+ "presolve-core",
+ "semver",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "presolve-node"
 version = "0.0.1"
 dependencies = [
