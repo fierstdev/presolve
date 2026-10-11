@@ -113,3 +113,63 @@ selection
 ```
 
 That separation is required for future local, cloud, cluster, or other node realizations.
+
+## Container materialization
+
+Container execution uses a separate materialization path rather than extending the Component runtime with backend-specific behavior.
+
+```text
+DeploymentPlan
+    workload: api/container
+        +
+.presolved 0.2
+    OCI digest + media type + size
+        ↓
+ContainerImageResolver
+        ↓
+environment-specific image source
+        ↓
+ContainerLaunchRequest
+        ↓
+ContainerExecutor
+        ↓
+backend instance
+```
+
+`presolve-executor-sdk` owns the backend-neutral container execution interface.
+
+### Immutable identity vs source
+
+`ContainerImageDescriptor` is application release identity:
+
+```text
+media type
+sha256 digest
+size
+```
+
+`ContainerImageSource` is environment-specific realization data. It may identify a registry path, local image-store reference, cloud artifact locator, or another backend-specific source.
+
+A source may change without changing the application release as long as it still resolves to the same immutable descriptor.
+
+The executor contract requires a backend to verify that located content matches the immutable descriptor before launch.
+
+### Launch request
+
+A materialized `ContainerLaunchRequest` carries:
+
+- workload name
+- immutable OCI descriptor
+- environment-specific image source
+- application resource requirements
+- application outbound-network policy
+
+It does not contain provider credentials or registry credentials.
+
+### Capability transport boundary
+
+Container capability transport is intentionally not guessed in 16.3.
+
+If a resolved plan contains capability bindings and also requires container materialization, the current node fails explicitly. Chunk 16.5 will define how capability bindings cross the container boundary.
+
+This prevents a container from being launched successfully while silently lacking capabilities the resolver promised to the application.

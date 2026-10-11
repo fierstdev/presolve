@@ -41,12 +41,15 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | `.presolved` bundle format `0.2` | Implemented |
 | OCI image descriptor workload identity | Implemented |
 | Bundle `0.1` decode compatibility | Implemented |
+| Backend-neutral container executor SDK | Implemented |
+| OCI image source-resolution boundary | Implemented |
+| Container launch-request materialization | Implemented |
 
 ## Next
 
 Chunk 15 local developer experience is complete for the current WebAssembly Component/Rust authoring path.
 
-OCI/container workload execution is in progress. The Application Contract, Environment Specification, resolver, `DeploymentPlan`, and `.presolved` bundle now preserve container workload identity. The next step is the container executor/materialization boundary.
+OCI/container workload execution is in progress. The Application Contract, Environment Specification, resolver, `DeploymentPlan`, and `.presolved` bundle now preserve container workload identity. The executor/materialization boundary is implemented. The next step is the local container runtime adapter.
 
 ## Planned after OCI/container execution
 

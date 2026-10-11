@@ -13,9 +13,12 @@ path = "src/main.rs"
 
 [dependencies]
 presolve-core.workspace = true
+presolve-bundle.workspace = true
+presolve-executor-sdk.workspace = true
 presolve-provider-objects-memory.workspace = true
 presolve-provider-kv-memory.workspace = true
 presolve-capability.workspace = true
+presolve-contract.workspace = true
 presolve-provider-sdk.workspace = true
 presolve-resolver.workspace = true
 presolve-runtime.workspace = true
@@ -24,7 +27,6 @@ thiserror.workspace = true
 [dev-dependencies]
 presolve-environment.workspace = true
 anyhow.workspace = true
-presolve-contract.workspace = true
 semver.workspace = true
 
 [lints]

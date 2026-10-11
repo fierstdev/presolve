@@ -7,9 +7,11 @@
 //! environment.
 
 mod assembly;
+mod container;
 mod local;
 mod registry;
 
 pub use assembly::{AssemblyError, assemble_runtime};
+pub use container::{ContainerMaterializationError, materialize_container_workloads};
 pub use local::{LocalRealizationError, realize_local_providers};
 pub use registry::{ProviderRegistry, ProviderRegistryError};

@@ -1226,14 +1226,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "presolve-executor-sdk"
+version = "0.0.1"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "presolve-node"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "presolve-bundle",
  "presolve-capability",
  "presolve-contract",
  "presolve-core",
  "presolve-environment",
+ "presolve-executor-sdk",
  "presolve-provider-kv-memory",
  "presolve-provider-objects-memory",
  "presolve-provider-sdk",
