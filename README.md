@@ -340,7 +340,7 @@ Implemented foundations include:
 - installed provider-adapter registry with plan-scoped materialization
 - Cloudflare Workers KV adapter
 - live external cloud-provider portability checkpoint
-- environment-independent `presolve build` for verified single-Component `.presolved` releases
+- environment-independent `presolve build` for Component, OCI, mixed, Rust-source, and TypeScript-source `.presolved` releases
 - `presolve dev` local Component execution for the current single-workload Rust path
 
 The project is still pre-stable.

@@ -140,7 +140,7 @@ Current subdivision:
 
 18.5 closes the cloud-provider proof with a reproducible non-live checkpoint and explicit architectural conclusions. Chunk 18 does not add another required Presolve configuration file and does not prematurely standardize provider consistency/latency/quota vocabulary after observing only one external provider. See [Chunk 18 checkpoint](chunk-18-checkpoint.md).
 
-## Chunk 19 — build/package workflow
+## Chunk 19 — build/package workflow (complete)
 
 Make creation of `.presolved` releases a first-class developer workflow around the already implemented canonical bundle format.
 
@@ -151,7 +151,7 @@ Current subdivision:
 19.2  explicit multi-workload artifact mapping (complete)
 19.3  OCI/container release inputs (complete)
 19.4  TypeScript source-to-Component build integration (complete)
-19.5  reproducibility checkpoint + docs
+19.5  reproducibility checkpoint + docs (complete)
 ```
 
 19.1 adds the first public release-construction command. `presolve build` discovers only the Application Contract, builds the current Rust Component authoring path in release mode (or accepts `--component PATH`), verifies canonical bundle round-trip identity, and writes `dist/<application>.presolved` by default. Environment discovery is deliberately absent from the build path.
@@ -161,6 +161,8 @@ Current subdivision:
 19.3 adds immutable OCI descriptor inputs through `--oci-image-for WORKLOAD=TYPE,DIGEST,SIZE`. Container-only and mixed Component/container releases now flow through the same canonical `PresolveBundle::from_workload_artifacts` path. Registry names, tags, credentials, and pull endpoints remain outside application release identity.
 
 19.4 adds automatic TypeScript-to-Component builds using a project-local pinned Jco/ComponentizeJS toolchain. Presolve type-checks source, derives the supported WIT imports from the Application Contract, generates build-only bootstrap material under `.presolve/`, and packages the resulting Component through the existing canonical bundle path. Jco is an authoring adapter, not application semantics.
+
+19.5 closes the build/package chunk with CLI-level byte reproducibility checks across Component, multi-Component, OCI, mixed, and pinned TypeScript source builds. The checkpoint distinguishes Presolve packaging determinism from the broader reproducibility properties of external source compilers. See [Chunk 19 checkpoint](chunk-19-checkpoint.md).
 
 ## Chunk 20 — check/inspect/plan UX
 

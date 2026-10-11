@@ -167,3 +167,22 @@ If both the Rust `Cargo.toml` convention and TypeScript `package.json` + `src/ma
 The first automatic TypeScript WIT projection covers required baseline KV and object-storage capabilities. Custom capabilities, optional capability imports, and required optional features still require a prebuilt Component.
 
 No TypeScript-specific deployment metadata enters `.presolved`, and `presolve.env.toml` is still absent from the build path.
+
+## Chunk 19.5: reproducibility checkpoint
+
+Chunk 19 closes with a CLI-level reproducibility checkpoint:
+
+```bash
+./scripts/check-build-package.sh
+```
+
+The checkpoint verifies byte-identical `.presolved` output when equivalent release inputs are supplied through:
+
+- single prebuilt Component packaging
+- multi-Component mappings in different CLI orders
+- immutable OCI descriptors
+- mixed Component/OCI mappings in different CLI orders
+
+It also runs the pinned TypeScript Component source build twice from clean generated state and compares both the generated Component and final `.presolved` archive.
+
+The distinction is deliberate: deterministic Presolve packaging is a Presolve invariant, while reproducibility of source compiler output is a property of the selected toolchain. The current TypeScript checkpoint proves the pinned toolchain under the tested conditions; it does not turn all language compilers or cross-platform source builds into byte-reproducible guarantees.

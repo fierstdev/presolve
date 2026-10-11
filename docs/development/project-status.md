@@ -65,6 +65,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Multi-workload Component artifact mapping | Implemented |
 | OCI/container and mixed-workload release packaging | Implemented |
 | Automated TypeScript-to-Component release build | Implemented |
+| Build/package reproducibility checkpoint | Implemented |
 
 ## Next
 
@@ -76,15 +77,14 @@ TypeScript authoring Chunk 17 is complete. `@presolve/sdk` provides transport-ne
 
 Chunk 18 real cloud-provider portability is complete. Presolve can resolve a provider-neutral KV requirement, preserve the exact selected `ProviderId` through node realization, materialize a Cloudflare Workers KV adapter, resolve secrets only for selected providers, and exercise that provider against real managed infrastructure. No additional required Presolve configuration file was introduced.
 
-Chunk 19 build/package work is in progress. `presolve build` now supports verified environment-independent Component-only, container-only, mixed Component/container, Rust-source Component, and TypeScript-source Component releases. The TypeScript path type-checks locally, derives the supported WIT projection from `presolve.toml`, and uses Jco/ComponentizeJS only as a build adapter.
+Chunk 19 build/package workflow is complete. `presolve build` constructs verified environment-independent releases from Rust Component source, TypeScript Component source, prebuilt Components, immutable OCI descriptors, and mixed workload inputs. CLI-level checkpoint coverage proves deterministic `.presolved` packaging for equal artifact identity and exercises repeated clean TypeScript Component builds with the pinned checkpoint toolchain.
 
-Next is the Chunk 19 reproducibility checkpoint and documentation closure.
+The next roadmap chunk is richer `check`/`inspect`/`plan` UX over the application, environment, resolver, and release models.
 
 ## Planned next
 
 Current roadmap direction includes:
 
-- higher-level build/package workflow
 - richer `check`/`inspect`/`plan` UX
 
 ## Not yet a product guarantee
