@@ -44,12 +44,14 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Backend-neutral container executor SDK | Implemented |
 | OCI image source-resolution boundary | Implemented |
 | Container launch-request materialization | Implemented |
+| Docker CLI local container executor | Implemented |
+| Docker local digest-pinned image resolver | Implemented |
 
 ## Next
 
 Chunk 15 local developer experience is complete for the current WebAssembly Component/Rust authoring path.
 
-OCI/container workload execution is in progress. The Application Contract, Environment Specification, resolver, `DeploymentPlan`, and `.presolved` bundle now preserve container workload identity. The executor/materialization boundary is implemented. The next step is the local container runtime adapter.
+OCI/container workload execution is in progress. The Application Contract, Environment Specification, resolver, `DeploymentPlan`, and `.presolved` bundle now preserve container workload identity. The executor/materialization boundary is implemented. The local Docker container adapter is implemented. The next step is container capability transport.
 
 ## Planned after OCI/container execution
 

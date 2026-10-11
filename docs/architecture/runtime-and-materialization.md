@@ -173,3 +173,51 @@ Container capability transport is intentionally not guessed in 16.3.
 If a resolved plan contains capability bindings and also requires container materialization, the current node fails explicitly. Chunk 16.5 will define how capability bindings cross the container boundary.
 
 This prevents a container from being launched successfully while silently lacking capabilities the resolver promised to the application.
+
+## Docker CLI adapter
+
+The first concrete `ContainerExecutor` implementation is `presolve-executor-docker`.
+
+It is deliberately a local environment adapter rather than part of Presolve's canonical application model.
+
+The adapter currently uses the installed `docker` CLI and active Docker daemon.
+
+### Local image resolution
+
+`DockerCliBackend` implements both:
+
+- `ContainerImageResolver`
+- `ContainerExecutor`
+
+Image-source resolution scans the active Docker daemon's local image inventory for the immutable OCI digest. It returns a digest-pinned source such as:
+
+```text
+docker.io/library/nginx@sha256:...
+```
+
+The adapter does not pull by tag and does not infer mutable image identity. An image must already be pulled or loaded into the active Docker daemon.
+
+Container launch uses `--pull=never`, so execution cannot silently replace the release artifact with newly fetched content.
+
+### Current policy mapping
+
+The adapter maps current Presolve requirements as follows:
+
+```text
+memory_mib   -> docker run --memory
+cpu_millis   -> docker run --cpus
+network deny -> docker run --network none
+network allow_all -> Docker environment/default networking
+```
+
+`allow_list` is rejected. The Docker CLI alone cannot faithfully implement Presolve's target allow-list semantics, so weakening `allow_list` to ordinary bridge networking would violate the Application Contract.
+
+No ports are published automatically. Port/interface realization remains separate from this initial executor proof.
+
+### Lifecycle
+
+Launch is detached and returns Docker's container ID as the backend-scoped `ContainerHandle`.
+
+Stop uses forced container removal, making the adapter responsible for cleaning up the instance it launched.
+
+The executor verifies that the resolved source is pinned to the exact digest required by the launch request and confirms that exact source is present in the local Docker daemon before launch.

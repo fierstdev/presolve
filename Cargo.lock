@@ -1226,6 +1226,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "presolve-executor-docker"
+version = "0.0.1"
+dependencies = [
+ "presolve-executor-sdk",
+]
+
+[[package]]
 name = "presolve-executor-sdk"
 version = "0.0.1"
 dependencies = [

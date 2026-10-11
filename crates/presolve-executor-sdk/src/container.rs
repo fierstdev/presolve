@@ -227,6 +227,9 @@ impl ContainerHandle {
 /// Stable categories for image-source resolution failures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContainerImageResolveErrorCode {
+    /// The image-source backend is not currently available.
+    Unavailable,
+
     /// No source for the immutable image descriptor is available.
     NotFound,
 
@@ -249,6 +252,15 @@ pub struct ContainerImageResolveError {
 }
 
 impl ContainerImageResolveError {
+    /// Creates an unavailable-image-source-backend error.
+    #[must_use]
+    pub fn unavailable(message: impl Into<String>) -> Self {
+        Self {
+            code: ContainerImageResolveErrorCode::Unavailable,
+            message: message.into(),
+        }
+    }
+
     /// Creates a missing-image-source error.
     #[must_use]
     pub fn not_found(message: impl Into<String>) -> Self {

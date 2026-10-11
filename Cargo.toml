@@ -16,6 +16,7 @@ members = [
     "crates/presolve-cli",
     "providers/kv-memory",
     "providers/objects-memory",
+    "executors/docker",
 ]
 exclude = [
     "examples/hello",
@@ -66,6 +67,7 @@ presolve-provider-sdk = { path = "crates/presolve-provider-sdk" }
 presolve-provider-conformance = { path = "crates/presolve-provider-conformance" }
 presolve-executor-sdk = { path = "crates/presolve-executor-sdk" }
 presolve-node = { path = "crates/presolve-node" }
+presolve-executor-docker = { path = "executors/docker" }
 
 presolve-provider-kv-memory = { path = "providers/kv-memory" }
 presolve-provider-objects-memory = { path = "providers/objects-memory" }
