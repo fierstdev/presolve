@@ -1,0 +1,18 @@
+[package]
+name = "presolve-provider-kv-cloudflare"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+percent-encoding.workspace = true
+presolve-provider-realization.workspace = true
+presolve-provider-sdk.workspace = true
+reqwest.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

@@ -124,13 +124,15 @@ Current subdivision:
 
 ```text
 18.1  provider realization profile + secret-resolution boundary (complete)
-18.2  first real cloud adapter: Cloudflare Workers KV
+18.2  first real cloud adapter: Cloudflare Workers KV (complete)
 18.3  adapter registry + plan-scoped cloud materialization
 18.4  live cloud portability proof
 18.5  cloud-provider checkpoint + docs
 ```
 
 18.1 preserves the existing Environment Specification boundary: provider credentials, endpoints, SDK configuration, and adapter identity remain outside resolver-facing environment supply. A separate node-side `ProviderRealizationProfile` maps stable `ProviderId` values to adapter identity, non-secret settings, and secret references. No persisted node configuration format is locked yet.
+
+18.2 adds the first real managed-infrastructure adapter, `presolve-provider-kv-cloudflare`, against the Cloudflare Workers KV REST API. The adapter preserves provider-neutral application semantics and keeps account/namespace/token configuration at the realization boundary. It also exposes an important portability question: semantic API compatibility does not imply identical consistency or operational characteristics, so the adapter is not falsely labeled as passing the current immediate-consistency conformance harness.
 
 ## Chunk 19 — build/package workflow
 
