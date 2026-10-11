@@ -94,6 +94,18 @@ Introduce a productive TypeScript-facing application authoring path while preser
 
 This should fit under existing TypeScript tooling rather than requiring Presolve to replace the ecosystem.
 
+Current subdivision:
+
+```text
+17.1  TypeScript workspace + transport-neutral SDK kernel
+17.2  typed KV/object clients + container bridge adapter
+17.3  real TypeScript OCI workload proof
+17.4  execution-target adapter boundary / Component projection
+17.5  TypeScript authoring checkpoint + docs
+```
+
+17.1 establishes `@presolve/sdk` without introducing a second Application Contract. `presolve.toml` remains the canonical application declaration, while the SDK defines a transport-neutral capability call boundary that later execution adapters can project onto HTTP/JSON, WIT, or other compatible bindings.
+
 ## Chunk 18 — real cloud provider proof
 
 Implement at least one real provider/environment path outside the in-memory/local proof.

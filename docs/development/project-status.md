@@ -50,6 +50,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Container KV/object provider routing | Implemented |
 | Authenticated container capability discovery | Implemented |
 | End-to-end OCI/container execution checkpoint | Implemented |
+| TypeScript SDK workspace/kernel | In progress |
 
 ## Next
 
@@ -57,7 +58,9 @@ Chunk 15 local developer experience is complete for the current WebAssembly Comp
 
 OCI/container architectural execution work in Chunk 16 is complete. A real OCI workload has an end-to-end local proof through Application Contract resolution, immutable `.presolved` identity, exact provider realization, authenticated capability transport, and Docker execution.
 
-The next roadmap chunk is TypeScript authoring. The later build/package workflow will turn the proven container path into normal developer-facing commands rather than the dedicated checkpoint harness.
+TypeScript authoring is now in progress. Chunk 17 begins with a transport-neutral `@presolve/sdk` kernel while keeping `presolve.toml` as the canonical language-independent Application Contract.
+
+The later build/package workflow will turn the proven container path into normal developer-facing commands rather than the dedicated checkpoint harness.
 
 ## Planned after OCI/container execution
 
