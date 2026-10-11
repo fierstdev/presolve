@@ -31,3 +31,22 @@ That adapter discovers `PRESOLVE_CAPABILITY_ENDPOINT`, `PRESOLVE_CAPABILITY_TOKE
 Ordinary application imports do not expose Docker, HTTP, WIT, provider identity, registry location, or provider credentials.
 
 The low-level `@presolve/sdk/runtime` export remains available for execution adapters and deterministic tests.
+
+### Component execution adapter
+
+The Component projection is available separately:
+
+```ts
+import { installComponentBindings } from "@presolve/sdk/component";
+
+installComponentBindings({
+  kv: generatedKvImports,
+  objects: generatedObjectImports,
+});
+```
+
+The binding facade mirrors the existing Presolve WIT semantics. KV calls map directly; object bodies use the existing handle/read/write streaming model.
+
+Application code still imports `kv` and `objects` from `@presolve/sdk`. Only execution bootstrap code imports `@presolve/sdk/component`.
+
+The SDK deliberately does not choose a TypeScript→WebAssembly Component compiler. Later build tooling may use any compatible toolchain as long as its generated WIT bindings are normalized to the `ComponentCapabilityImports` facade.

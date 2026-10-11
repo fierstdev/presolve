@@ -157,3 +157,58 @@ KeyValueProvider
 ```
 
 The proof does not introduce a TypeScript-specific deployment model. `presolve.toml`, Environment resolution, `.presolved`, and `DeploymentPlan` remain unchanged.
+
+## Component/WIT adapter
+
+Chunk 17.4 adds `@presolve/sdk/component` as the second concrete execution-target adapter.
+
+The public application API remains unchanged:
+
+```ts
+import { kv, objects } from "@presolve/sdk";
+```
+
+Only execution bootstrap selects the projection:
+
+```text
+OCI container
+    @presolve/sdk/container
+        ↓
+    HTTP/JSON bridge
+
+WebAssembly Component
+    @presolve/sdk/component
+        ↓
+    normalized direct Component imports
+        ↓
+    Presolve WIT
+```
+
+The normalized Component facade matches the existing semantic WIT operations rather than defining another protocol.
+
+For `presolve:kv/store@0.1.0`, `get`, `set`, and `delete` map directly.
+
+For `presolve:objects/store@0.1.0`, the adapter translates the public `Uint8Array` API onto the existing streaming handle model:
+
+```text
+get
+  → read-session
+  → read(handle, max-bytes)*
+  → close-read
+
+put
+  → put(key, size)
+  → write(handle, chunk)*
+  → finish-put
+  → abort-put on failure
+```
+
+This means the HTTP/JSON and Component projections may use different transport mechanics without changing TypeScript application code.
+
+### Toolchain boundary
+
+Chunk 17.4 deliberately does not choose a TypeScript→WebAssembly Component compiler or JavaScript Component toolchain.
+
+Generated bindings from a future build pipeline need only be normalized into `ComponentCapabilityImports`. This prevents Javy, jco, StarlingMonkey, or any other specific compiler/runtime from becoming part of Presolve's application semantics.
+
+The actual automated TypeScript Component build integration belongs to the later build/package workflow.

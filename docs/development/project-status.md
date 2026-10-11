@@ -54,6 +54,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | TypeScript KV/object capability APIs | Implemented |
 | TypeScript container bridge adapter | Implemented |
 | Real TypeScript OCI workload proof | Implemented |
+| TypeScript Component/WIT adapter boundary | Implemented |
 
 ## Next
 

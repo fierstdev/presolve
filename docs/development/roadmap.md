@@ -100,7 +100,7 @@ Current subdivision:
 17.1  TypeScript workspace + transport-neutral SDK kernel (complete)
 17.2  typed KV/object clients + container bridge adapter (complete)
 17.3  real TypeScript OCI workload proof (complete)
-17.4  execution-target adapter boundary / Component projection
+17.4  execution-target adapter boundary / Component projection (complete)
 17.5  TypeScript authoring checkpoint + docs
 ```
 
@@ -109,6 +109,8 @@ Current subdivision:
 17.2 adds typed functional KV/object clients and the `@presolve/sdk/container` adapter for the authenticated HTTP/JSON capability bridge.
 
 17.3 proves those abstractions from a real TypeScript OCI workload. The workload calls `kv.set(...)` through `@presolve/sdk`, the container adapter projects the call onto the bridge, and the existing OCI checkpoint observes the write in the exact KV provider selected by `DeploymentPlan`.
+
+17.4 adds `@presolve/sdk/component`. It projects the same typed KV/object APIs onto normalized direct Component imports matching Presolve's existing WIT semantics, including handle-based object streaming. The adapter boundary intentionally avoids choosing a TypeScript-to-Component compiler; generated binding glue remains a later build/package concern.
 
 ## Chunk 18 — real cloud provider proof
 

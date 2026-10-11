@@ -24,6 +24,10 @@
     "./container": {
       "types": "./dist/container.d.ts",
       "import": "./dist/container.js"
+    },
+    "./component": {
+      "types": "./dist/component.d.ts",
+      "import": "./dist/component.js"
     }
   },
   "scripts": {
