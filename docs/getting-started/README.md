@@ -127,8 +127,7 @@ Environment Inventory │
 
 Chunk 15 is continuing with:
 
-- local provider realization
-- local materialization and execution
+- local application execution
 - broader actionable CLI diagnostics
 
 Commands are documented here only after they are implemented.
@@ -265,3 +264,34 @@ PS2005  unsupported workload execution class
 > Can this application be resolved in this environment?
 
 Environment selection is currently discovery-based. Explicit environment selection can be added later without changing this default.
+
+## Local provider realization
+
+Presolve now has a node-side local realization profile for resolved plans.
+
+The resolver still selects symbolic provider identities from the Environment Specification:
+
+```text
+Application Contract
+        +
+Environment Specification
+        ↓
+DeploymentPlan
+        ↓
+provider id + capability binding
+```
+
+For local development, Presolve can then realize the selected baseline bindings with built-in process-local implementations:
+
+```text
+presolve:kv/store       → in-memory key/value provider
+presolve:objects/store  → in-memory object provider
+```
+
+This does **not** change `presolve.env.toml` and does not infer an implementation from a provider's name. The realization is an execution-time local policy applied only after resolution.
+
+The current in-memory object provider implements baseline object-storage semantics only. If a resolved application negotiates optional features such as `range-read`, `conditional-write`, or `user-metadata`, local realization fails rather than silently weakening the capability contract.
+
+Custom capabilities and unsupported built-in versions likewise remain resolvable at the semantic layer when an Environment Specification supplies them, but the built-in local profile cannot materialize them until a matching local implementation exists.
+
+`presolve check` remains a semantic compatibility check. The next local workflow step, `presolve dev`, will use this realization path to assemble and execute the resolved application.

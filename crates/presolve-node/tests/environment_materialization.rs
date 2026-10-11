@@ -3,7 +3,7 @@ use std::sync::Arc;
 use presolve_contract::parse_contract;
 use presolve_core::ProviderId;
 use presolve_environment::{inventory_from_specification, parse_environment};
-use presolve_node::{AssemblyError, ProviderRegistry, assemble_runtime};
+use presolve_node::{AssemblyError, ProviderRegistry, assemble_runtime, realize_local_providers};
 use presolve_provider_kv_memory::InMemoryKeyValueProvider;
 use presolve_provider_objects_memory::InMemoryObjectStoreProvider;
 use presolve_provider_sdk::{KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE};
@@ -80,14 +80,11 @@ fn environment_file_drives_resolution_and_node_materialization() {
     assert_eq!(plan.bindings()[0].interface(), KEY_VALUE_INTERFACE);
     assert_eq!(plan.bindings()[1].interface(), OBJECT_STORE_INTERFACE);
 
-    let mut registry = ProviderRegistry::new();
+    let registry =
+        realize_local_providers(&plan).expect("selected providers should realize locally");
 
-    registry
-        .register_key_value(provider_id, Arc::new(InMemoryKeyValueProvider::new()))
-        .expect("KV implementation should register");
-    registry
-        .register_object_store(provider_id, Arc::new(InMemoryObjectStoreProvider::new()))
-        .expect("object implementation should register");
+    assert!(registry.key_value(provider_id).is_some());
+    assert!(registry.object_store(provider_id).is_some());
 
     assemble_runtime(&plan, &registry)
         .expect("resolved environment plan should materialize into a runtime");
