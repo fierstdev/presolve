@@ -51,13 +51,22 @@ fn execute_build(args: &cli::BuildArgs, current_directory: &Path) -> Result<()> 
     let output = build_release(
         current_directory,
         args.component.as_deref(),
+        &args.component_for,
         args.output.as_deref(),
     )?;
 
     println!("Presolve build");
     println!("  application: {} {}", output.application, output.version);
-    println!("  workload: {}", output.workload);
-    println!("  component: {}", output.component.display());
+    println!("  components:");
+
+    for component in &output.components {
+        println!(
+            "    {} -> {}",
+            component.workload,
+            component.component.display()
+        );
+    }
+
     println!("  release: {}", output.release.display());
     println!("  digest: {}", output.release_digest);
     println!("  size: {} bytes", output.encoded_size);

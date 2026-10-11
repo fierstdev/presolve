@@ -62,6 +62,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Live Cloudflare Workers KV portability proof | Implemented |
 | Cloud-provider portability checkpoint | Implemented |
 | `presolve build` single-Component release workflow | Implemented |
+| Multi-workload Component artifact mapping | Implemented |
 
 ## Next
 
@@ -73,9 +74,9 @@ TypeScript authoring Chunk 17 is complete. `@presolve/sdk` provides transport-ne
 
 Chunk 18 real cloud-provider portability is complete. Presolve can resolve a provider-neutral KV requirement, preserve the exact selected `ProviderId` through node realization, materialize a Cloudflare Workers KV adapter, resolve secrets only for selected providers, and exercise that provider against real managed infrastructure. No additional required Presolve configuration file was introduced.
 
-Chunk 19 build/package work is in progress. The first `presolve build` path now constructs verified environment-independent `.presolved` releases for the current single Component workflow, using release-mode Rust compilation or an explicit prebuilt Component.
+Chunk 19 build/package work is in progress. `presolve build` now supports verified environment-independent single- and multi-workload Component releases. Multi-workload inputs are explicit `WORKLOAD=PATH` mappings, while the existing automatic Rust source build remains a single-workload convenience.
 
-Next is explicit artifact mapping for multi-workload releases, followed by OCI inputs and TypeScript source-to-Component integration.
+Next is immutable OCI/container release input support, followed by TypeScript source-to-Component integration.
 
 ## Planned next
 

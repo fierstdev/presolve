@@ -78,3 +78,27 @@ No new configuration file is introduced by the build workflow.
 Chunk 19.1 deliberately does not yet define the full artifact-input UX for multiple Component workloads, OCI container descriptors, mixed Component/container releases, or automatic TypeScript-to-Component compilation.
 
 The canonical bundle already supports those release representations. Later Chunk 19 work makes them first-class CLI build inputs without changing the bundle identity model.
+
+## Chunk 19.2: explicit multi-workload Component mapping
+
+Multi-workload Component applications use explicit workload-to-artifact mappings:
+
+```bash
+presolve build   --component-for api=./build/api.wasm   --component-for worker=./build/worker.wasm
+```
+
+`--component-for` is repeatable. The supplied workload names must exactly cover the Component workloads declared by the Application Contract.
+
+Presolve rejects:
+
+- unknown workload names
+- duplicate mappings
+- missing mappings
+- mixing `--component PATH` with `--component-for`
+- using the single-workload `--component PATH` shorthand for a multi-workload application
+
+The ordering of `--component-for` arguments is not release identity. Presolve restores Application Contract workload order before constructing the canonical bundle, and the underlying bundle representation is itself order-independent.
+
+Automatic source building remains intentionally narrow. When exactly one Component workload exists and no explicit artifact input is supplied, the existing Rust `cdylib` release build convenience is used. Multi-workload source orchestration is not guessed; callers provide explicit artifacts.
+
+Container workloads remain deferred to Chunk 19.3 rather than being coerced into the Component artifact path.

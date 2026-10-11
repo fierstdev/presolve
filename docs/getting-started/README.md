@@ -273,6 +273,14 @@ Use a prebuilt language-neutral Component instead of the automatic Rust source c
 presolve build --component ./path/to/application.wasm
 ```
 
+For an application with multiple declared Component workloads, map each workload explicitly:
+
+```bash
+presolve build   --component-for api=./build/api.wasm   --component-for worker=./build/worker.wasm
+```
+
+The mappings must exactly cover the declared Component workloads. `--component PATH` remains the single-workload shorthand and cannot be combined with `--component-for`.
+
 Override the output path with:
 
 ```bash

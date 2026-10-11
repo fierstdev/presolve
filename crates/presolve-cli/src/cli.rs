@@ -86,9 +86,17 @@ impl BuiltinCapabilityAlias {
 
 #[derive(Debug, Args)]
 pub(crate) struct BuildArgs {
-    /// Prebuilt WebAssembly Component to package instead of building source automatically.
-    #[arg(long, value_name = "PATH")]
+    /// Prebuilt Component for a single-workload application.
+    #[arg(long, value_name = "PATH", conflicts_with = "component_for")]
     pub(crate) component: Option<PathBuf>,
+
+    /// Map a declared Component workload to a prebuilt artifact. Repeat per workload.
+    #[arg(
+        long = "component-for",
+        value_name = "WORKLOAD=PATH",
+        conflicts_with = "component"
+    )]
+    pub(crate) component_for: Vec<String>,
 
     /// Output `.presolved` path. Defaults to `dist/<application>.presolved`.
     #[arg(long, value_name = "PATH")]
@@ -188,6 +196,7 @@ mod tests {
         };
 
         assert!(args.component.is_none());
+        assert_eq!(args.component_for, Vec::<String>::new());
         assert!(args.output.is_none());
     }
 
@@ -209,6 +218,44 @@ mod tests {
 
         assert_eq!(args.component, Some(PathBuf::from("build/app.wasm")));
         assert_eq!(args.output, Some(PathBuf::from("release/app.presolved")));
+    }
+
+    #[test]
+    fn build_command_accepts_explicit_workload_component_mappings() {
+        let cli = Cli::try_parse_from([
+            "presolve",
+            "build",
+            "--component-for",
+            "api=build/api.wasm",
+            "--component-for",
+            "worker=build/worker.wasm",
+        ])
+        .expect("multi-workload build command should parse");
+
+        let RootCommand::Build(args) = cli.command else {
+            panic!("expected build command");
+        };
+
+        assert!(args.component.is_none());
+        assert_eq!(
+            args.component_for,
+            ["api=build/api.wasm", "worker=build/worker.wasm"]
+        );
+    }
+
+    #[test]
+    fn build_command_rejects_component_and_component_for_together() {
+        let error = Cli::try_parse_from([
+            "presolve",
+            "build",
+            "--component",
+            "build/app.wasm",
+            "--component-for",
+            "api=build/api.wasm",
+        ])
+        .expect_err("component input forms should conflict");
+
+        assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
     }
 
     #[test]

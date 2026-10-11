@@ -148,13 +148,15 @@ Current subdivision:
 
 ```text
 19.1  environment-independent `presolve build` + single Component packaging (complete)
-19.2  explicit multi-workload artifact mapping
+19.2  explicit multi-workload artifact mapping (complete)
 19.3  OCI/container release inputs
 19.4  TypeScript source-to-Component build integration
 19.5  reproducibility checkpoint + docs
 ```
 
 19.1 adds the first public release-construction command. `presolve build` discovers only the Application Contract, builds the current Rust Component authoring path in release mode (or accepts `--component PATH`), verifies canonical bundle round-trip identity, and writes `dist/<application>.presolved` by default. Environment discovery is deliberately absent from the build path.
+
+19.2 adds repeatable explicit Component artifact mapping through `--component-for WORKLOAD=PATH`. Multi-workload builds require exact coverage of declared Component workloads; unknown, duplicate, and missing mappings fail. Mapping order does not affect release identity, and the existing `--component PATH` single-workload shorthand remains compatible.
 
 ## Chunk 20 — check/inspect/plan UX
 
