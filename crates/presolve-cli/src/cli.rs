@@ -87,7 +87,11 @@ impl BuiltinCapabilityAlias {
 #[derive(Debug, Args)]
 pub(crate) struct BuildArgs {
     /// Prebuilt Component for a single-workload application.
-    #[arg(long, value_name = "PATH", conflicts_with = "component_for")]
+    #[arg(
+        long,
+        value_name = "PATH",
+        conflicts_with_all = ["component_for", "oci_image_for"]
+    )]
     pub(crate) component: Option<PathBuf>,
 
     /// Map a declared Component workload to a prebuilt artifact. Repeat per workload.
@@ -97,6 +101,14 @@ pub(crate) struct BuildArgs {
         conflicts_with = "component"
     )]
     pub(crate) component_for: Vec<String>,
+
+    /// Map a container workload to immutable OCI descriptor identity. Repeat per workload.
+    #[arg(
+        long = "oci-image-for",
+        value_name = "WORKLOAD=TYPE,DIGEST,SIZE",
+        conflicts_with = "component"
+    )]
+    pub(crate) oci_image_for: Vec<String>,
 
     /// Output `.presolved` path. Defaults to `dist/<application>.presolved`.
     #[arg(long, value_name = "PATH")]
@@ -197,6 +209,7 @@ mod tests {
 
         assert!(args.component.is_none());
         assert_eq!(args.component_for, Vec::<String>::new());
+        assert_eq!(args.oci_image_for, Vec::<String>::new());
         assert!(args.output.is_none());
     }
 
@@ -244,6 +257,49 @@ mod tests {
     }
 
     #[test]
+    fn build_command_accepts_oci_image_mapping() {
+        let cli = Cli::try_parse_from([
+            "presolve",
+            "build",
+            "--oci-image-for",
+            "worker=manifest,sha256:0123456789abcdef,1024",
+        ])
+        .expect("OCI workload mapping should parse");
+
+        let RootCommand::Build(args) = cli.command else {
+            panic!("expected build command");
+        };
+
+        assert_eq!(
+            args.oci_image_for,
+            ["worker=manifest,sha256:0123456789abcdef,1024"]
+        );
+    }
+
+    #[test]
+    fn build_command_accepts_mixed_artifact_mappings() {
+        let cli = Cli::try_parse_from([
+            "presolve",
+            "build",
+            "--component-for",
+            "api=build/api.wasm",
+            "--oci-image-for",
+            "worker=index,sha256:0123456789abcdef,2048",
+        ])
+        .expect("mixed workload mappings should parse");
+
+        let RootCommand::Build(args) = cli.command else {
+            panic!("expected build command");
+        };
+
+        assert_eq!(args.component_for, ["api=build/api.wasm"]);
+        assert_eq!(
+            args.oci_image_for,
+            ["worker=index,sha256:0123456789abcdef,2048"]
+        );
+    }
+
+    #[test]
     fn build_command_rejects_component_and_component_for_together() {
         let error = Cli::try_parse_from([
             "presolve",
@@ -254,6 +310,18 @@ mod tests {
             "api=build/api.wasm",
         ])
         .expect_err("component input forms should conflict");
+
+        assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
+
+        let error = Cli::try_parse_from([
+            "presolve",
+            "build",
+            "--component",
+            "build/app.wasm",
+            "--oci-image-for",
+            "worker=manifest,sha256:0123456789abcdef,1024",
+        ])
+        .expect_err("single Component shorthand should conflict with OCI mappings");
 
         assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
     }

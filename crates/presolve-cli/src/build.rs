@@ -5,7 +5,10 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use presolve_bundle::{ComponentArtifactInput, PresolveBundle};
+use presolve_bundle::{
+    ComponentArtifactInput, OCI_IMAGE_INDEX_MEDIA_TYPE, OCI_IMAGE_MANIFEST_MEDIA_TYPE,
+    OciImageArtifactInput, PresolveBundle, WorkloadArtifactInput,
+};
 use presolve_contract::{ApplicationContract, WorkloadKind};
 use presolve_core::ArtifactDigest;
 
@@ -18,58 +21,136 @@ const DEFAULT_OUTPUT_DIRECTORY: &str = "dist";
 const PRESOLVED_EXTENSION: &str = "presolved";
 
 #[derive(Debug)]
-pub(crate) struct BuildComponentOutput {
-    pub(crate) workload: String,
-    pub(crate) component: PathBuf,
+pub(crate) enum BuildArtifactOutput {
+    Component {
+        workload: String,
+        path: PathBuf,
+    },
+    OciImage {
+        workload: String,
+        media_type: String,
+        digest: String,
+        size: u64,
+    },
 }
 
 #[derive(Debug)]
 pub(crate) struct BuildOutput {
     pub(crate) application: String,
     pub(crate) version: String,
-    pub(crate) components: Vec<BuildComponentOutput>,
+    pub(crate) artifacts: Vec<BuildArtifactOutput>,
     pub(crate) release: PathBuf,
     pub(crate) release_digest: ArtifactDigest,
     pub(crate) encoded_size: u64,
 }
 
+#[derive(Debug, Clone)]
+struct DeclaredWorkload {
+    name: String,
+    kind: WorkloadKind,
+}
+
 #[derive(Debug)]
-struct ResolvedComponentArtifact {
+enum ResolvedWorkloadArtifact {
+    Component {
+        workload: String,
+        path: PathBuf,
+        bytes: Vec<u8>,
+    },
+    OciImage {
+        workload: String,
+        media_type: &'static str,
+        digest: String,
+        size: u64,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct OciImageMapping {
     workload: String,
-    path: PathBuf,
-    bytes: Vec<u8>,
+    media_type: &'static str,
+    digest: String,
+    size: u64,
 }
 
 pub(crate) fn build_release(
     start: &Path,
     component_override: Option<&Path>,
     component_mappings: &[String],
+    oci_image_mappings: &[String],
     output_override: Option<&Path>,
 ) -> Result<BuildOutput> {
-    if component_override.is_some() && !component_mappings.is_empty() {
-        bail!("`--component` and `--component-for` cannot be used together");
+    if component_override.is_some()
+        && (!component_mappings.is_empty() || !oci_image_mappings.is_empty())
+    {
+        bail!(
+            "`--component` is the single-workload shorthand and cannot be combined with \
+             `--component-for` or `--oci-image-for`"
+        );
     }
 
     let document = load_application(start)?;
     let application_directory = application_directory(&document)?;
-    let workloads = component_workload_names(&document.contract)?;
+    let workloads = declared_workloads(&document.contract);
 
-    let components = resolve_component_artifacts(
+    let artifacts = resolve_workload_artifacts(
         start,
         application_directory,
         &workloads,
         component_override,
         component_mappings,
+        oci_image_mappings,
     )?;
 
-    let inputs = components
+    let bundle = bundle_from_artifacts(&document.contract, &artifacts)?;
+    let (release_digest, encoded) = verify_encoded_bundle(&bundle)?;
+
+    let release = release_output_path(
+        start,
+        application_directory,
+        document.contract.application().name(),
+        output_override,
+    )?;
+
+    reject_component_output_collision(&artifacts, &release)?;
+    let encoded_size = write_release(&release, &encoded)?;
+
+    Ok(BuildOutput {
+        application: document.contract.application().name().to_owned(),
+        version: document.contract.application().version().to_string(),
+        artifacts: build_artifact_outputs(artifacts),
+        release,
+        release_digest,
+        encoded_size,
+    })
+}
+
+fn bundle_from_artifacts(
+    contract: &ApplicationContract,
+    artifacts: &[ResolvedWorkloadArtifact],
+) -> Result<PresolveBundle> {
+    let inputs = artifacts
         .iter()
-        .map(|artifact| ComponentArtifactInput::new(&artifact.workload, &artifact.bytes))
+        .map(|artifact| match artifact {
+            ResolvedWorkloadArtifact::Component {
+                workload, bytes, ..
+            } => WorkloadArtifactInput::Component(ComponentArtifactInput::new(workload, bytes)),
+            ResolvedWorkloadArtifact::OciImage {
+                workload,
+                media_type,
+                digest,
+                size,
+            } => WorkloadArtifactInput::OciImage(OciImageArtifactInput::new(
+                workload, media_type, digest, *size,
+            )),
+        })
         .collect::<Vec<_>>();
 
-    let bundle = PresolveBundle::from_components(&document.contract, &inputs)
-        .context("could not construct `.presolved` application release")?;
+    PresolveBundle::from_workload_artifacts(contract, &inputs)
+        .context("could not construct `.presolved` application release")
+}
 
+fn verify_encoded_bundle(bundle: &PresolveBundle) -> Result<(ArtifactDigest, Vec<u8>)> {
     let release_digest = bundle
         .release_digest()
         .context("could not compute application release digest")?;
@@ -92,49 +173,55 @@ pub(crate) fn build_release(
         );
     }
 
-    let release = release_output_path(
-        start,
-        application_directory,
-        document.contract.application().name(),
-        output_override,
-    )?;
+    Ok((release_digest, encoded))
+}
 
-    if let Some(component) = components
-        .iter()
-        .find(|component| component.path == release)
-    {
+fn reject_component_output_collision(
+    artifacts: &[ResolvedWorkloadArtifact],
+    release: &Path,
+) -> Result<()> {
+    if let Some(workload) = component_input_at_path(artifacts, release) {
         bail!(
-            "release output `{}` would overwrite component input for workload `{}`",
-            release.display(),
-            component.workload
+            "release output `{}` would overwrite component input for workload `{workload}`",
+            release.display()
         );
     }
 
+    Ok(())
+}
+
+fn write_release(release: &Path, encoded: &[u8]) -> Result<u64> {
     if let Some(parent) = release.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("could not create output directory `{}`", parent.display()))?;
     }
 
-    fs::write(&release, &encoded)
+    fs::write(release, encoded)
         .with_context(|| format!("could not write release `{}`", release.display()))?;
 
-    let encoded_size = u64::try_from(encoded.len())
-        .context("encoded `.presolved` release is too large to represent")?;
+    u64::try_from(encoded.len()).context("encoded `.presolved` release is too large to represent")
+}
 
-    Ok(BuildOutput {
-        application: document.contract.application().name().to_owned(),
-        version: document.contract.application().version().to_string(),
-        components: components
-            .into_iter()
-            .map(|component| BuildComponentOutput {
-                workload: component.workload,
-                component: component.path,
-            })
-            .collect(),
-        release,
-        release_digest,
-        encoded_size,
-    })
+fn build_artifact_outputs(artifacts: Vec<ResolvedWorkloadArtifact>) -> Vec<BuildArtifactOutput> {
+    artifacts
+        .into_iter()
+        .map(|artifact| match artifact {
+            ResolvedWorkloadArtifact::Component { workload, path, .. } => {
+                BuildArtifactOutput::Component { workload, path }
+            }
+            ResolvedWorkloadArtifact::OciImage {
+                workload,
+                media_type,
+                digest,
+                size,
+            } => BuildArtifactOutput::OciImage {
+                workload,
+                media_type: media_type.to_owned(),
+                digest,
+                size,
+            },
+        })
+        .collect()
 }
 
 fn application_directory(document: &ApplicationDocument) -> Result<&Path> {
@@ -144,92 +231,122 @@ fn application_directory(document: &ApplicationDocument) -> Result<&Path> {
         .context("Application Contract path has no parent directory")
 }
 
-fn component_workload_names(contract: &ApplicationContract) -> Result<Vec<String>> {
+fn declared_workloads(contract: &ApplicationContract) -> Vec<DeclaredWorkload> {
     if contract.workloads().is_empty() {
-        return Ok(vec!["main".to_owned()]);
+        return vec![DeclaredWorkload {
+            name: "main".to_owned(),
+            kind: WorkloadKind::Component,
+        }];
     }
 
-    let unsupported = contract
+    contract
         .workloads()
         .iter()
-        .filter(|workload| workload.kind() != WorkloadKind::Component)
-        .map(|workload| format!("{} ({})", workload.name(), workload.kind()))
-        .collect::<Vec<_>>();
-
-    if !unsupported.is_empty() {
-        bail!(
-            "`presolve build` Chunk 19.2 accepts Component artifacts only; \
-             unsupported workloads: {}",
-            unsupported.join(", ")
-        );
-    }
-
-    Ok(contract
-        .workloads()
-        .iter()
-        .map(|workload| workload.name().to_owned())
-        .collect())
+        .map(|workload| DeclaredWorkload {
+            name: workload.name().to_owned(),
+            kind: workload.kind(),
+        })
+        .collect()
 }
 
-fn resolve_component_artifacts(
+fn resolve_workload_artifacts(
     start: &Path,
     application_directory: &Path,
-    workloads: &[String],
+    workloads: &[DeclaredWorkload],
     component_override: Option<&Path>,
     component_mappings: &[String],
-) -> Result<Vec<ResolvedComponentArtifact>> {
+    oci_image_mappings: &[String],
+) -> Result<Vec<ResolvedWorkloadArtifact>> {
     if let Some(path) = component_override {
-        if workloads.len() != 1 {
-            bail!(
-                "`--component PATH` is the single-workload shorthand; \
-                 application declares {} workloads, so use one \
-                 `--component-for WORKLOAD=PATH` per workload",
-                workloads.len()
-            );
-        }
-
-        return Ok(vec![read_component_artifact(start, &workloads[0], path)?]);
+        return resolve_single_component_override(start, workloads, path);
     }
 
-    if !component_mappings.is_empty() {
-        return resolve_explicit_component_mappings(start, workloads, component_mappings);
+    if component_mappings.is_empty() && oci_image_mappings.is_empty() {
+        return resolve_automatic_source_build(application_directory, workloads);
     }
 
+    resolve_explicit_workload_mappings(start, workloads, component_mappings, oci_image_mappings)
+}
+
+fn resolve_single_component_override(
+    start: &Path,
+    workloads: &[DeclaredWorkload],
+    path: &Path,
+) -> Result<Vec<ResolvedWorkloadArtifact>> {
     if workloads.len() != 1 {
         bail!(
-            "application declares {} Component workloads; automatic source building currently \
-             supports one workload, so provide one `--component-for WORKLOAD=PATH` per workload",
+            "`--component PATH` is the single-workload shorthand; application declares {} \
+             workloads, so use explicit workload mappings",
             workloads.len()
         );
     }
 
+    let workload = &workloads[0];
+
+    if workload.kind != WorkloadKind::Component {
+        bail!(
+            "`--component PATH` cannot realize container workload `{}`; \
+             use `--oci-image-for {}=TYPE,DIGEST,SIZE`",
+            workload.name,
+            workload.name
+        );
+    }
+
+    read_component_artifact(start, &workload.name, path).map(|artifact| vec![artifact])
+}
+
+fn resolve_automatic_source_build(
+    application_directory: &Path,
+    workloads: &[DeclaredWorkload],
+) -> Result<Vec<ResolvedWorkloadArtifact>> {
+    if workloads.len() != 1 {
+        bail!(
+            "application declares {} workloads; automatic source building currently supports \
+             one Component workload, so provide explicit `--component-for` and/or \
+             `--oci-image-for` mappings",
+            workloads.len()
+        );
+    }
+
+    let workload = &workloads[0];
+
+    if workload.kind != WorkloadKind::Component {
+        bail!(
+            "container workload `{}` requires an immutable OCI descriptor through \
+             `--oci-image-for {}=TYPE,DIGEST,SIZE`",
+            workload.name,
+            workload.name
+        );
+    }
+
     let path = build_rust_component_release(application_directory)?;
-    read_component_artifact(application_directory, &workloads[0], &path)
+    read_component_artifact(application_directory, &workload.name, &path)
         .map(|artifact| vec![artifact])
 }
 
-fn resolve_explicit_component_mappings(
+fn resolve_explicit_workload_mappings(
     start: &Path,
-    workloads: &[String],
-    mappings: &[String],
-) -> Result<Vec<ResolvedComponentArtifact>> {
+    workloads: &[DeclaredWorkload],
+    component_mappings: &[String],
+    oci_image_mappings: &[String],
+) -> Result<Vec<ResolvedWorkloadArtifact>> {
     let expected = workloads
         .iter()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-    let mut supplied = BTreeMap::<String, PathBuf>::new();
+        .map(|workload| (workload.name.as_str(), workload.kind))
+        .collect::<BTreeMap<_, _>>();
 
-    for mapping in mappings {
+    let mut components = BTreeMap::<String, PathBuf>::new();
+
+    for mapping in component_mappings {
         let (workload, path) = parse_component_mapping(mapping)?;
+        validate_mapping_target(
+            &expected,
+            workload,
+            WorkloadKind::Component,
+            "--component-for",
+        )?;
 
-        if !expected.contains(workload) {
-            bail!(
-                "`--component-for` names unknown workload `{workload}`; expected one of: {}",
-                workloads.join(", ")
-            );
-        }
-
-        if supplied
+        if components
             .insert(workload.to_owned(), PathBuf::from(path))
             .is_some()
         {
@@ -237,28 +354,95 @@ fn resolve_explicit_component_mappings(
         }
     }
 
+    let mut images = BTreeMap::<String, OciImageMapping>::new();
+
+    for mapping in oci_image_mappings {
+        let image = parse_oci_image_mapping(mapping)?;
+        validate_mapping_target(
+            &expected,
+            &image.workload,
+            WorkloadKind::Container,
+            "--oci-image-for",
+        )?;
+
+        let workload = image.workload.clone();
+
+        if images.insert(workload.clone(), image).is_some() {
+            bail!("duplicate `--oci-image-for` mapping for workload `{workload}`");
+        }
+    }
+
+    let component_names = components.keys().map(String::as_str);
+    let image_names = images.keys().map(String::as_str);
+    let supplied = component_names.chain(image_names).collect::<BTreeSet<_>>();
+
     let missing = workloads
         .iter()
-        .filter(|workload| !supplied.contains_key(workload.as_str()))
-        .cloned()
+        .filter(|workload| !supplied.contains(workload.name.as_str()))
+        .map(|workload| workload.name.clone())
         .collect::<Vec<_>>();
 
     if !missing.is_empty() {
         bail!(
-            "missing `--component-for` mapping for workload(s): {}",
+            "missing artifact mapping for workload(s): {}",
             missing.join(", ")
         );
     }
 
     workloads
         .iter()
-        .map(|workload| {
-            let path = supplied
-                .get(workload)
-                .expect("validated component mapping should exist");
-            read_component_artifact(start, workload, path)
+        .map(|workload| match workload.kind {
+            WorkloadKind::Component => {
+                let Some(path) = components.get(&workload.name) else {
+                    bail!(
+                        "Component workload `{}` requires `--component-for {}=PATH`",
+                        workload.name,
+                        workload.name
+                    );
+                };
+
+                read_component_artifact(start, &workload.name, path)
+            }
+            WorkloadKind::Container => {
+                let Some(image) = images.get(&workload.name) else {
+                    bail!(
+                        "container workload `{}` requires \
+                         `--oci-image-for {}=TYPE,DIGEST,SIZE`",
+                        workload.name,
+                        workload.name
+                    );
+                };
+
+                Ok(ResolvedWorkloadArtifact::OciImage {
+                    workload: workload.name.clone(),
+                    media_type: image.media_type,
+                    digest: image.digest.clone(),
+                    size: image.size,
+                })
+            }
         })
         .collect()
+}
+
+fn validate_mapping_target(
+    expected: &BTreeMap<&str, WorkloadKind>,
+    workload: &str,
+    supplied_kind: WorkloadKind,
+    flag: &str,
+) -> Result<()> {
+    let Some(expected_kind) = expected.get(workload) else {
+        let names = expected.keys().copied().collect::<Vec<_>>().join(", ");
+        bail!("`{flag}` names unknown workload `{workload}`; expected one of: {names}");
+    };
+
+    if *expected_kind != supplied_kind {
+        bail!(
+            "`{flag}` supplies a `{supplied_kind}` artifact for workload `{workload}`, \
+             but the Application Contract declares `{expected_kind}`"
+        );
+    }
+
+    Ok(())
 }
 
 fn parse_component_mapping(mapping: &str) -> Result<(&str, &str)> {
@@ -277,16 +461,61 @@ fn parse_component_mapping(mapping: &str) -> Result<(&str, &str)> {
     Ok((workload, path))
 }
 
+fn parse_oci_image_mapping(mapping: &str) -> Result<OciImageMapping> {
+    let (workload, descriptor) = mapping.split_once('=').ok_or_else(|| {
+        anyhow::anyhow!(
+            "invalid `--oci-image-for` value `{mapping}`; expected \
+             WORKLOAD=TYPE,DIGEST,SIZE"
+        )
+    })?;
+
+    if workload.is_empty() {
+        bail!("invalid `--oci-image-for` value `{mapping}`; workload name cannot be empty");
+    }
+
+    let mut fields = descriptor.split(',');
+    let image_type = fields.next().unwrap_or_default();
+    let digest = fields.next().unwrap_or_default();
+    let size = fields.next().unwrap_or_default();
+
+    if fields.next().is_some() || image_type.is_empty() || digest.is_empty() || size.is_empty() {
+        bail!(
+            "invalid `--oci-image-for` value `{mapping}`; expected \
+             WORKLOAD=TYPE,DIGEST,SIZE"
+        );
+    }
+
+    let media_type = match image_type {
+        "manifest" => OCI_IMAGE_MANIFEST_MEDIA_TYPE,
+        "index" => OCI_IMAGE_INDEX_MEDIA_TYPE,
+        other => bail!(
+            "unsupported OCI descriptor type `{other}` in `{mapping}`; \
+             expected `manifest` or `index`"
+        ),
+    };
+
+    let size = size.parse::<u64>().with_context(|| {
+        format!("invalid OCI descriptor size `{size}` in `--oci-image-for {mapping}`")
+    })?;
+
+    Ok(OciImageMapping {
+        workload: workload.to_owned(),
+        media_type,
+        digest: digest.to_owned(),
+        size,
+    })
+}
+
 fn read_component_artifact(
     start: &Path,
     workload: &str,
     path: &Path,
-) -> Result<ResolvedComponentArtifact> {
+) -> Result<ResolvedWorkloadArtifact> {
     let path = resolve_input_path(start, path)?;
     let bytes = fs::read(&path)
         .with_context(|| format!("could not read component `{}`", path.display()))?;
 
-    Ok(ResolvedComponentArtifact {
+    Ok(ResolvedWorkloadArtifact::Component {
         workload: workload.to_owned(),
         path,
         bytes,
@@ -308,6 +537,18 @@ fn resolve_input_path(start: &Path, path: &Path) -> Result<PathBuf> {
     }
 
     Ok(resolved)
+}
+
+fn component_input_at_path<'a>(
+    artifacts: &'a [ResolvedWorkloadArtifact],
+    release: &Path,
+) -> Option<&'a str> {
+    artifacts.iter().find_map(|artifact| match artifact {
+        ResolvedWorkloadArtifact::Component { workload, path, .. } if path == release => {
+            Some(workload.as_str())
+        }
+        _ => None,
+    })
 }
 
 fn release_output_path(
@@ -342,9 +583,13 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
+    use presolve_bundle::WorkloadManifest;
+
     use super::*;
 
     static NEXT_TEST_DIRECTORY: AtomicU64 = AtomicU64::new(0);
+    const OCI_DIGEST: &str =
+        "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     struct TestDirectory {
         path: PathBuf,
@@ -409,6 +654,37 @@ kind = "component"
 "#
     }
 
+    fn mixed_contract() -> &'static str {
+        r#"
+[[workloads]]
+name = "api"
+kind = "component"
+
+[[workloads]]
+name = "worker"
+kind = "container"
+"#
+    }
+
+    fn container_contract() -> &'static str {
+        r#"
+[[workloads]]
+name = "api"
+kind = "container"
+"#
+    }
+
+    fn manifest_mapping(workload: &str, size: u64) -> String {
+        format!("{workload}=manifest,{OCI_DIGEST},{size}")
+    }
+
+    fn output_workload(artifact: &BuildArtifactOutput) -> &str {
+        match artifact {
+            BuildArtifactOutput::Component { workload, .. }
+            | BuildArtifactOutput::OciImage { workload, .. } => workload,
+        }
+    }
+
     #[test]
     fn implicit_component_build_writes_default_dist_release() {
         let directory = TestDirectory::new();
@@ -417,13 +693,13 @@ kind = "component"
         let component = directory.path().join("app.wasm");
         fs::write(&component, b"component-bytes").expect("component should be written");
 
-        let output = build_release(directory.path(), Some(&component), &[], None)
+        let output = build_release(directory.path(), Some(&component), &[], &[], None)
             .expect("prebuilt component should package");
 
         assert_eq!(output.application, "orders");
         assert_eq!(output.version, "1.2.3");
-        assert_eq!(output.components.len(), 1);
-        assert_eq!(output.components[0].workload, "main");
+        assert_eq!(output.artifacts.len(), 1);
+        assert_eq!(output_workload(&output.artifacts[0]), "main");
         assert_eq!(
             output.release,
             directory.path().join("dist").join("orders.presolved")
@@ -445,15 +721,18 @@ kind = "component"
     #[test]
     fn build_does_not_require_environment_specification() {
         let directory = TestDirectory::new();
-        write_contract(directory.path(), "");
-
-        let component = directory.path().join("app.wasm");
-        fs::write(&component, b"environment-independent").expect("component should be written");
+        write_contract(directory.path(), container_contract());
 
         assert!(!directory.path().join("presolve.env.toml").exists());
 
-        build_release(directory.path(), Some(&component), &[], None)
-            .expect("release construction must not require an environment");
+        build_release(
+            directory.path(),
+            None,
+            &[],
+            &[manifest_mapping("api", 512)],
+            None,
+        )
+        .expect("container release construction must not require an environment");
     }
 
     #[test]
@@ -467,6 +746,7 @@ kind = "component"
         let output = build_release(
             directory.path(),
             Some(&component),
+            &[],
             &[],
             Some(Path::new("release/orders-custom.presolved")),
         )
@@ -493,12 +773,12 @@ kind = "component"
 
         let mappings = vec!["api=api.wasm".to_owned(), "worker=worker.wasm".to_owned()];
 
-        let output = build_release(directory.path(), None, &mappings, None)
+        let output = build_release(directory.path(), None, &mappings, &[], None)
             .expect("multi-workload release should package");
 
-        assert_eq!(output.components.len(), 2);
-        assert_eq!(output.components[0].workload, "api");
-        assert_eq!(output.components[1].workload, "worker");
+        assert_eq!(output.artifacts.len(), 2);
+        assert_eq!(output_workload(&output.artifacts[0]), "api");
+        assert_eq!(output_workload(&output.artifacts[1]), "worker");
 
         let encoded = fs::read(&output.release).expect("release should be readable");
         let decoded = PresolveBundle::decode(&encoded).expect("release should verify");
@@ -507,10 +787,91 @@ kind = "component"
             .manifest()
             .workloads()
             .iter()
-            .map(presolve_bundle::WorkloadManifest::name)
+            .map(WorkloadManifest::name)
             .collect::<Vec<_>>();
 
         assert_eq!(workloads, ["api", "worker"]);
+    }
+
+    #[test]
+    fn container_workload_packages_immutable_oci_descriptor() {
+        let directory = TestDirectory::new();
+        write_contract(directory.path(), container_contract());
+
+        let output = build_release(
+            directory.path(),
+            None,
+            &[],
+            &[manifest_mapping("api", 1_024)],
+            None,
+        )
+        .expect("container release should package");
+
+        let encoded = fs::read(&output.release).expect("release should be readable");
+        let decoded = PresolveBundle::decode(&encoded).expect("release should verify");
+        let workload = &decoded.manifest().workloads()[0];
+        let image = workload
+            .oci_image()
+            .expect("container should have OCI image");
+
+        assert_eq!(workload.kind(), WorkloadKind::Container);
+        assert_eq!(image.media_type(), OCI_IMAGE_MANIFEST_MEDIA_TYPE);
+        assert_eq!(image.digest(), OCI_DIGEST);
+        assert_eq!(image.size(), 1_024);
+        assert_eq!(workload.artifacts(), []);
+    }
+
+    #[test]
+    fn mixed_component_and_container_release_packages() {
+        let directory = TestDirectory::new();
+        write_contract(directory.path(), mixed_contract());
+
+        fs::write(directory.path().join("api.wasm"), b"api-component")
+            .expect("api component should be written");
+
+        let output = build_release(
+            directory.path(),
+            None,
+            &["api=api.wasm".to_owned()],
+            &[manifest_mapping("worker", 2_048)],
+            None,
+        )
+        .expect("mixed release should package");
+
+        assert_eq!(output.artifacts.len(), 2);
+        assert_eq!(output_workload(&output.artifacts[0]), "api");
+        assert_eq!(output_workload(&output.artifacts[1]), "worker");
+
+        let encoded = fs::read(output.release).expect("release should be readable");
+        let decoded = PresolveBundle::decode(&encoded).expect("release should verify");
+
+        let api = decoded
+            .manifest()
+            .workloads()
+            .iter()
+            .find(|workload| workload.name() == "api")
+            .expect("api workload should exist");
+        let worker = decoded
+            .manifest()
+            .workloads()
+            .iter()
+            .find(|workload| workload.name() == "worker")
+            .expect("worker workload should exist");
+
+        assert_eq!(api.kind(), WorkloadKind::Component);
+        assert_eq!(worker.kind(), WorkloadKind::Container);
+        assert!(worker.oci_image().is_some());
+    }
+
+    #[test]
+    fn index_alias_maps_to_canonical_oci_media_type() {
+        let mapping = format!("api=index,{OCI_DIGEST},4096");
+        let parsed = parse_oci_image_mapping(&mapping).expect("index mapping should parse");
+
+        assert_eq!(parsed.workload, "api");
+        assert_eq!(parsed.media_type, OCI_IMAGE_INDEX_MEDIA_TYPE);
+        assert_eq!(parsed.digest, OCI_DIGEST);
+        assert_eq!(parsed.size, 4_096);
     }
 
     #[test]
@@ -530,6 +891,7 @@ kind = "component"
             directory.path(),
             None,
             &first,
+            &[],
             Some(Path::new("dist/first.presolved")),
         )
         .expect("first release should package");
@@ -538,6 +900,7 @@ kind = "component"
             directory.path(),
             None,
             &second,
+            &[],
             Some(Path::new("dist/second.presolved")),
         )
         .expect("second release should package");
@@ -550,92 +913,96 @@ kind = "component"
     }
 
     #[test]
-    fn missing_component_mapping_is_rejected() {
+    fn missing_mixed_artifact_mapping_is_rejected() {
         let directory = TestDirectory::new();
-        write_contract(directory.path(), multi_component_contract());
+        write_contract(directory.path(), mixed_contract());
 
         fs::write(directory.path().join("api.wasm"), b"api-component")
             .expect("api component should be written");
 
-        let error = build_release(directory.path(), None, &["api=api.wasm".to_owned()], None)
-            .expect_err("missing worker mapping should fail");
+        let error = build_release(
+            directory.path(),
+            None,
+            &["api=api.wasm".to_owned()],
+            &[],
+            None,
+        )
+        .expect_err("missing container mapping should fail");
 
         assert!(error.to_string().contains("worker"));
     }
 
     #[test]
-    fn unknown_component_mapping_is_rejected() {
+    fn wrong_kind_mapping_is_rejected() {
         let directory = TestDirectory::new();
-        write_contract(directory.path(), multi_component_contract());
+        write_contract(directory.path(), mixed_contract());
 
         let error = build_release(
             directory.path(),
             None,
-            &["frontend=frontend.wasm".to_owned()],
+            &["worker=worker.wasm".to_owned()],
+            &[],
             None,
         )
-        .expect_err("unknown workload mapping should fail");
+        .expect_err("Component mapping for container workload should fail");
 
-        assert!(error.to_string().contains("unknown workload `frontend`"));
+        assert!(error.to_string().contains("container"));
     }
 
     #[test]
-    fn duplicate_component_mapping_is_rejected() {
+    fn duplicate_oci_mapping_is_rejected() {
         let directory = TestDirectory::new();
-        write_contract(directory.path(), multi_component_contract());
+        write_contract(directory.path(), container_contract());
 
+        let mapping = manifest_mapping("api", 512);
         let error = build_release(
             directory.path(),
             None,
-            &["api=first.wasm".to_owned(), "api=second.wasm".to_owned()],
+            &[],
+            &[mapping.clone(), mapping],
             None,
         )
-        .expect_err("duplicate workload mapping should fail");
+        .expect_err("duplicate OCI mapping should fail");
 
         assert!(error.to_string().contains("duplicate"));
     }
 
     #[test]
+    fn invalid_oci_mapping_shape_is_rejected() {
+        let error = parse_oci_image_mapping("api=manifest,sha256:abc")
+            .expect_err("incomplete OCI mapping should fail");
+
+        assert!(error.to_string().contains("WORKLOAD=TYPE,DIGEST,SIZE"));
+    }
+
+    #[test]
+    fn invalid_oci_descriptor_is_rejected_by_bundle_validation() {
+        let directory = TestDirectory::new();
+        write_contract(directory.path(), container_contract());
+
+        let error = build_release(
+            directory.path(),
+            None,
+            &[],
+            &["api=manifest,sha256:bad,512".to_owned()],
+            None,
+        )
+        .expect_err("invalid digest should fail");
+
+        assert!(error.to_string().contains("could not construct"));
+    }
+
+    #[test]
     fn single_component_shorthand_is_rejected_for_multiple_workloads() {
         let directory = TestDirectory::new();
-        write_contract(directory.path(), multi_component_contract());
+        write_contract(directory.path(), mixed_contract());
 
         let component = directory.path().join("app.wasm");
         fs::write(&component, b"component").expect("component should be written");
 
-        let error = build_release(directory.path(), Some(&component), &[], None)
+        let error = build_release(directory.path(), Some(&component), &[], &[], None)
             .expect_err("single shorthand should not guess a workload");
 
         assert!(error.to_string().contains("single-workload shorthand"));
-    }
-
-    #[test]
-    fn container_workload_remains_deferred_to_19_3() {
-        let contract = presolve_contract::parse_contract(
-            r#"
-contract_version = "0.1"
-
-[application]
-name = "container-app"
-version = "1.0.0"
-
-[[workloads]]
-name = "api"
-kind = "container"
-"#,
-        )
-        .expect("contract should parse");
-
-        let error = component_workload_names(&contract).expect_err("container build should fail");
-
-        assert!(error.to_string().contains("Chunk 19.2"));
-    }
-
-    #[test]
-    fn component_mapping_parser_preserves_equals_in_path() {
-        assert_eq!(
-            parse_component_mapping("api=build/name=value.wasm").expect("mapping should parse"),
-            ("api", "build/name=value.wasm")
-        );
     }
 }

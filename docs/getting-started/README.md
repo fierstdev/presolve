@@ -279,7 +279,23 @@ For an application with multiple declared Component workloads, map each workload
 presolve build   --component-for api=./build/api.wasm   --component-for worker=./build/worker.wasm
 ```
 
-The mappings must exactly cover the declared Component workloads. `--component PATH` remains the single-workload shorthand and cannot be combined with `--component-for`.
+For a container workload, supply immutable OCI descriptor identity:
+
+```bash
+presolve build   --oci-image-for api=manifest,sha256:<digest>,<size>
+```
+
+`manifest` and `index` are accepted descriptor-type aliases.
+
+Component and container mappings may be combined:
+
+```bash
+presolve build   --component-for api=./build/api.wasm   --oci-image-for worker=manifest,sha256:<digest>,<size>
+```
+
+The explicit mappings must exactly cover the declared workloads and match each workload's declared kind. `--component PATH` remains the single-Component-workload shorthand.
+
+OCI image bytes, registry names, tags, credentials, and pull URLs are not stored in `.presolved`; the immutable OCI descriptor is the container workload's release identity.
 
 Override the output path with:
 

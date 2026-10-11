@@ -18,7 +18,7 @@ use presolve_environment::inventory_from_specification;
 use presolve_resolver::ResolutionProblem;
 
 use crate::{
-    build::build_release,
+    build::{BuildArtifactOutput, build_release},
     check::{CompatibilityCheck, check_compatibility},
     cli::{Cli, EnvironmentCommand, EnvironmentProviderCommand, RootCommand},
     dev::run_local_dev,
@@ -52,19 +52,28 @@ fn execute_build(args: &cli::BuildArgs, current_directory: &Path) -> Result<()> 
         current_directory,
         args.component.as_deref(),
         &args.component_for,
+        &args.oci_image_for,
         args.output.as_deref(),
     )?;
 
     println!("Presolve build");
     println!("  application: {} {}", output.application, output.version);
-    println!("  components:");
+    println!("  artifacts:");
 
-    for component in &output.components {
-        println!(
-            "    {} -> {}",
-            component.workload,
-            component.component.display()
-        );
+    for artifact in &output.artifacts {
+        match artifact {
+            BuildArtifactOutput::Component { workload, path } => {
+                println!("    {workload} -> component {}", path.display());
+            }
+            BuildArtifactOutput::OciImage {
+                workload,
+                media_type,
+                digest,
+                size,
+            } => {
+                println!("    {workload} -> OCI {media_type} {digest} ({size} bytes)");
+            }
+        }
     }
 
     println!("  release: {}", output.release.display());

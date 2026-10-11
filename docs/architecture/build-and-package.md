@@ -102,3 +102,38 @@ The ordering of `--component-for` arguments is not release identity. Presolve re
 Automatic source building remains intentionally narrow. When exactly one Component workload exists and no explicit artifact input is supplied, the existing Rust `cdylib` release build convenience is used. Multi-workload source orchestration is not guessed; callers provide explicit artifacts.
 
 Container workloads remain deferred to Chunk 19.3 rather than being coerced into the Component artifact path.
+
+## Chunk 19.3: OCI/container release inputs
+
+`presolve build` can now package immutable OCI image descriptors for container workloads.
+
+The CLI form is:
+
+```bash
+presolve build   --oci-image-for api=manifest,sha256:<digest>,<size>
+```
+
+or, for a multi-platform OCI image index:
+
+```bash
+presolve build   --oci-image-for api=index,sha256:<digest>,<size>
+```
+
+The `manifest` and `index` tokens are CLI aliases. The canonical `.presolved` manifest stores the full OCI media type:
+
+```text
+manifest → application/vnd.oci.image.manifest.v1+json
+index    → application/vnd.oci.image.index.v1+json
+```
+
+Component and container mappings compose for mixed applications:
+
+```bash
+presolve build   --component-for api=./build/api.wasm   --oci-image-for worker=manifest,sha256:<digest>,<size>
+```
+
+The union of explicit artifact mappings must exactly cover the workloads declared by `presolve.toml`, and each mapping must match the declared workload kind.
+
+Container image bytes are not embedded in `.presolved`. The immutable OCI content descriptor is release identity. Registry repositories, tags, registry credentials, pull URLs, and source mirrors remain deployment/transport concerns and are deliberately excluded.
+
+The build path still does not load `presolve.env.toml`.
