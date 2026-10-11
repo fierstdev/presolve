@@ -9,6 +9,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+presolve-capability.workspace = true
 presolve-core.workspace = true
 semver.workspace = true
 serde.workspace = true

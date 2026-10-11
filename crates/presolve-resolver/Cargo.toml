@@ -11,6 +11,7 @@ rust-version.workspace = true
 presolve-capability.workspace = true
 presolve-contract.workspace = true
 presolve-core.workspace = true
+presolve-environment.workspace = true
 semver.workspace = true
 
 [lints]

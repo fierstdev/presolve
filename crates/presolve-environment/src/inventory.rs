@@ -4,7 +4,7 @@ use presolve_capability::CapabilityContract;
 use presolve_core::{EnvironmentId, ProviderId};
 use semver::Version;
 
-/// Resources available to an application in an `Presolve` environment.
+/// Resolver-facing resources available in a Presolve environment.
 ///
 /// This represents allocatable capacity visible to the resolver. It does not
 /// yet model multi-application scheduling or resource reservations.
@@ -37,7 +37,7 @@ impl EnvironmentResources {
     }
 }
 
-/// One capability exposed by an environment provider.
+/// One normalized capability exposed by an environment provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProvidedCapability {
     interface: String,
@@ -187,7 +187,7 @@ impl ProviderDescriptor {
     }
 }
 
-/// Capabilities and resources available in one execution environment.
+/// Normalized capabilities and resources available in one execution environment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnvironmentInventory {
     id: EnvironmentId,
@@ -389,6 +389,39 @@ mod adversarial_feature_advertisement_tests {
             CapabilityFeatureError::DuplicateFeature {
                 feature: "range-read".to_owned(),
             }
+        );
+    }
+}
+
+#[cfg(test)]
+mod ownership_tests {
+    use presolve_core::{EnvironmentId, ProviderId};
+    use semver::Version;
+
+    use super::{
+        EnvironmentInventory, EnvironmentResources, ProvidedCapability, ProviderDescriptor,
+    };
+
+    #[test]
+    fn normalized_inventory_is_owned_by_environment_crate() {
+        let provider_id = ProviderId::new();
+        let environment = EnvironmentInventory::new(
+            EnvironmentId::new(),
+            EnvironmentResources::new(512, 1_000),
+            vec![ProviderDescriptor::new(
+                provider_id,
+                "memory-kv",
+                vec![ProvidedCapability::new(
+                    "presolve:kv/store",
+                    Version::new(0, 1, 0),
+                )],
+            )],
+        );
+
+        assert_eq!(environment.providers()[0].id(), &provider_id);
+        assert_eq!(
+            environment.providers()[0].capabilities()[0].interface(),
+            "presolve:kv/store"
         );
     }
 }

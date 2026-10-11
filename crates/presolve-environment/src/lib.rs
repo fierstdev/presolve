@@ -11,12 +11,17 @@
 //! node realization details.
 
 mod format;
+mod inventory;
 mod model;
 mod validate;
 mod version;
 
 pub use format::{
     EnvironmentEncodeError, EnvironmentParseError, encode_environment, parse_environment,
+};
+pub use inventory::{
+    CapabilityFeatureError, EnvironmentInventory, EnvironmentResources, ProvidedCapability,
+    ProviderDescriptor,
 };
 pub use model::{
     EnvironmentMetadata, EnvironmentSpecification, ExecutionSupport,

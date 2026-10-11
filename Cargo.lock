@@ -1099,6 +1099,7 @@ dependencies = [
 name = "presolve-environment"
 version = "0.0.1"
 dependencies = [
+ "presolve-capability",
  "presolve-core",
  "semver",
  "serde",
@@ -1169,6 +1170,7 @@ dependencies = [
  "presolve-capability",
  "presolve-contract",
  "presolve-core",
+ "presolve-environment",
  "semver",
 ]
 
