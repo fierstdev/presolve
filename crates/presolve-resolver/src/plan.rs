@@ -1,6 +1,31 @@
 use presolve_capability::CapabilityContract;
-use presolve_core::{EnvironmentId, ProviderId};
+use presolve_core::{EnvironmentId, ProviderId, WorkloadKind};
 use semver::Version;
+
+/// One application workload accepted by the selected environment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedWorkload {
+    name: String,
+    kind: WorkloadKind,
+}
+
+impl ResolvedWorkload {
+    pub(crate) fn new(name: String, kind: WorkloadKind) -> Self {
+        Self { name, kind }
+    }
+
+    /// Returns the workload name from the Application Contract.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the workload execution class accepted by the environment.
+    #[must_use]
+    pub const fn kind(&self) -> WorkloadKind {
+        self.kind
+    }
+}
 
 /// Binding between an application capability and an environment provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,6 +99,7 @@ impl CapabilityBinding {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeploymentPlan {
     environment_id: EnvironmentId,
+    workloads: Vec<ResolvedWorkload>,
     bindings: Vec<CapabilityBinding>,
     unbound_optional_capabilities: Vec<String>,
 }
@@ -81,11 +107,13 @@ pub struct DeploymentPlan {
 impl DeploymentPlan {
     pub(crate) fn new(
         environment_id: EnvironmentId,
+        workloads: Vec<ResolvedWorkload>,
         bindings: Vec<CapabilityBinding>,
         unbound_optional_capabilities: Vec<String>,
     ) -> Self {
         Self {
             environment_id,
+            workloads,
             bindings,
             unbound_optional_capabilities,
         }
@@ -95,6 +123,12 @@ impl DeploymentPlan {
     #[must_use]
     pub const fn environment_id(&self) -> &EnvironmentId {
         &self.environment_id
+    }
+
+    /// Returns workloads accepted for execution by the selected environment.
+    #[must_use]
+    pub fn workloads(&self) -> &[ResolvedWorkload] {
+        &self.workloads
     }
 
     /// Returns resolved capability bindings.

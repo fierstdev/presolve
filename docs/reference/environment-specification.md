@@ -94,7 +94,7 @@ features = ["range-read", "user-metadata"]
 
 The current schema version is `0.1`.
 
-The currently implemented workload execution class is `component`.
+Recognized workload execution classes are `component` and `container`. The built-in local node currently executes Components; container execution is being added during Chunk 16. An Environment Specification should advertise `container` only when that environment actually has a compatible container executor.
 
 ## Identity
 
@@ -138,7 +138,7 @@ They are persisted into `presolve.env.toml` so parsing the same document is dete
 
 The parser does not silently generate missing IDs.
 
-Until the local-development CLI workflow is implemented, manually authored fixtures and Environment Specifications must contain valid IDs explicitly. Chunk 15 is responsible for the user-facing creation and editing workflow around these generated identities.
+`presolve env init` and `presolve env provider add` generate these identities for the local authoring workflow. Manually authored fixtures and Environment Specifications must still contain valid IDs explicitly.
 
 ## Resources
 
@@ -173,7 +173,7 @@ The corresponding resolver problem is:
 PS2005 UnsupportedWorkload
 ```
 
-Additional workload classes such as OCI containers or native executables should be added only when their actual execution model is implemented.
+The schema/resolver vocabulary may recognize a workload class before every Presolve node can materialize it. Environment declarations remain statements of actual environment supply: advertising `container` means that environment is asserting container execution is available.
 
 ## Providers
 

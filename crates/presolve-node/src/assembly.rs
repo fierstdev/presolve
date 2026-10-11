@@ -1,4 +1,4 @@
-use presolve_core::ProviderId;
+use presolve_core::{ProviderId, WorkloadKind};
 use presolve_provider_sdk::{KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE};
 use presolve_resolver::DeploymentPlan;
 use presolve_runtime::{Runtime, RuntimeError};
@@ -9,6 +9,16 @@ use crate::ProviderRegistry;
 /// Failure while materializing a symbolic deployment plan.
 #[derive(Debug, Error)]
 pub enum AssemblyError {
+    /// This runtime assembler only materializes WebAssembly Component workloads.
+    #[error("component runtime cannot materialize workload `{workload}` of kind `{kind}`")]
+    UnsupportedWorkload {
+        /// Workload that cannot be materialized by this runtime.
+        workload: String,
+
+        /// Workload execution class selected by the resolver.
+        kind: WorkloadKind,
+    },
+
     /// The deployment plan references a capability this node cannot yet bind.
     #[error("node cannot materialize capability `{interface}`")]
     UnsupportedCapability {
@@ -43,15 +53,25 @@ pub enum AssemblyError {
 ///
 /// # Errors
 ///
-/// Returns [`AssemblyError::UnsupportedCapability`] when the deployment plan
-/// contains a capability this node cannot materialize,
-/// [`AssemblyError::MissingProvider`] when a selected provider implementation
-/// is absent from the registry, or [`AssemblyError::Runtime`] when runtime
-/// construction fails.
+/// Returns [`AssemblyError::UnsupportedWorkload`] when the plan contains a
+/// workload that cannot execute in the Component runtime,
+/// [`AssemblyError::UnsupportedCapability`] when the deployment plan contains a
+/// capability this node cannot materialize, [`AssemblyError::MissingProvider`]
+/// when a selected provider implementation is absent from the registry, or
+/// [`AssemblyError::Runtime`] when runtime construction fails.
 pub fn assemble_runtime(
     plan: &DeploymentPlan,
     registry: &ProviderRegistry,
 ) -> Result<Runtime, AssemblyError> {
+    for workload in plan.workloads() {
+        if workload.kind() != WorkloadKind::Component {
+            return Err(AssemblyError::UnsupportedWorkload {
+                workload: workload.name().to_owned(),
+                kind: workload.kind(),
+            });
+        }
+    }
+
     let mut builder = Runtime::builder();
 
     for binding in plan.bindings() {
@@ -145,6 +165,49 @@ outbound = "deny"
             .plan()
             .expect("object-storage requirement should resolve")
             .clone()
+    }
+
+    #[test]
+    fn component_runtime_rejects_container_workload() {
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "container-node-test"
+version = "0.0.1"
+
+[[workloads]]
+name = "api"
+kind = "container"
+"#,
+        )
+        .expect("container contract should parse");
+
+        let environment = EnvironmentInventory::new(
+            EnvironmentId::new(),
+            EnvironmentResources::new(512, 1_000),
+            Vec::new(),
+        )
+        .with_supported_workloads(vec![WorkloadKind::Container]);
+
+        let plan = resolve(&contract, &environment)
+            .plan()
+            .expect("container workload should resolve semantically")
+            .clone();
+        let registry = ProviderRegistry::new();
+
+        let Err(error) = assemble_runtime(&plan, &registry) else {
+            panic!("component runtime should reject container workload");
+        };
+
+        assert!(matches!(
+            error,
+            AssemblyError::UnsupportedWorkload {
+                workload,
+                kind: WorkloadKind::Container,
+            } if workload == "api"
+        ));
     }
 
     #[test]

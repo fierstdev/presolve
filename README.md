@@ -183,11 +183,14 @@ Presolve deliberately separates three concepts.
 
 A workload is one executable constituent of an application.
 
-The currently implemented execution class is:
+The application model currently recognizes:
 
 - WebAssembly Component
+- OCI-compatible container
 
-Presolve's application model is designed so additional workload classes can be added without changing application identity semantics. Future execution classes may include OCI containers, native executables, static assets, and other software artifacts.
+WebAssembly Component execution is implemented end to end. Container workload semantics and resolution are implemented, while OCI artifact packaging and execution are being added incrementally.
+
+Presolve's application model is designed so additional workload classes can be added without changing application identity semantics. Future execution classes may include native executables, static assets, and other software artifacts.
 
 ### Capabilities
 

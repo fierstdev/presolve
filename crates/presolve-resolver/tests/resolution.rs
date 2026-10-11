@@ -72,6 +72,72 @@ kind = "component"
         report.is_resolved(),
         "component workload should resolve in a component-capable environment"
     );
+
+    let plan = report
+        .plan()
+        .expect("resolved report should contain a plan");
+    assert_eq!(plan.workloads().len(), 1);
+    assert_eq!(plan.workloads()[0].name(), "api");
+    assert_eq!(plan.workloads()[0].kind(), WorkloadKind::Component);
+}
+
+#[test]
+fn resolves_supported_container_workload_and_records_it_in_plan() {
+    let contract = workload_contract(
+        r#"
+[[workloads]]
+name = "api"
+kind = "container"
+"#,
+    );
+
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        Vec::new(),
+    )
+    .with_supported_workloads(vec![WorkloadKind::Container]);
+
+    let report = resolve(&contract, &environment);
+
+    assert!(
+        report.is_resolved(),
+        "container-capable environment should resolve"
+    );
+
+    let plan = report
+        .plan()
+        .expect("resolved report should contain a plan");
+    assert_eq!(plan.workloads().len(), 1);
+    assert_eq!(plan.workloads()[0].name(), "api");
+    assert_eq!(plan.workloads()[0].kind(), WorkloadKind::Container);
+}
+
+#[test]
+fn implicit_main_component_requires_component_execution_support() {
+    let contract = workload_contract("");
+
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        Vec::new(),
+    )
+    .with_supported_workloads(vec![WorkloadKind::Container]);
+
+    let report = resolve(&contract, &environment);
+
+    assert!(!report.is_resolved());
+    assert!(matches!(
+        report.problems(),
+        [
+            ResolutionProblem::UnsupportedWorkload {
+                workload,
+                kind: WorkloadKind::Component,
+                supported_kinds,
+            }
+        ] if workload == "main"
+            && supported_kinds.as_slice() == [WorkloadKind::Container]
+    ));
 }
 
 #[test]

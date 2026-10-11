@@ -4,7 +4,7 @@ use std::{
 };
 
 use presolve_contract::ApplicationContract;
-use presolve_core::ArtifactDigest;
+use presolve_core::{ArtifactDigest, WorkloadKind};
 use semver::VersionReq;
 use tar::{Archive, Builder, EntryType, Header};
 use thiserror::Error;
@@ -374,6 +374,16 @@ pub enum BundleError {
         count: usize,
     },
 
+    /// The current bundle artifact model cannot package this workload kind.
+    #[error("bundle format v0.1 does not yet support workload `{workload}` of kind `{kind}`")]
+    UnsupportedWorkloadKind {
+        /// Workload whose artifact model is not implemented.
+        workload: String,
+
+        /// Unsupported workload execution class.
+        kind: WorkloadKind,
+    },
+
     /// More than one artifact was supplied for the same workload.
     #[error("component artifact for workload `{0}` was supplied more than once")]
     DuplicateWorkloadArtifact(String),
@@ -553,6 +563,15 @@ fn verify_manifest_requirements(manifest: &BundleManifest) -> Result<(), BundleE
         return Err(BundleError::InvalidManifest(
             "bundle must contain at least one workload",
         ));
+    }
+
+    for workload in manifest.workloads() {
+        if workload.kind() != WorkloadKind::Component {
+            return Err(BundleError::UnsupportedWorkloadKind {
+                workload: workload.name().to_owned(),
+                kind: workload.kind(),
+            });
+        }
     }
 
     verify_capability_requirements(manifest)
@@ -803,6 +822,36 @@ preferred_features = ["user-metadata"]
             .expect("adversarial archive should finalize");
 
         PresolveBundle::decode(&encoded)
+    }
+
+    #[test]
+    fn component_bundle_constructor_rejects_container_workload() {
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "container-example"
+version = "1.0.0"
+
+[[workloads]]
+name = "api"
+kind = "container"
+"#,
+        )
+        .expect("container contract should parse");
+
+        let Err(error) = PresolveBundle::from_component(&contract, COMPONENT) else {
+            panic!("component bundle constructor should reject container workload");
+        };
+
+        assert!(matches!(
+            error,
+            BundleError::UnsupportedWorkloadKind {
+                workload,
+                kind: WorkloadKind::Container,
+            } if workload == "api"
+        ));
     }
 
     #[test]

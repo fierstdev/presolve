@@ -101,11 +101,14 @@ name = "api"
 kind = "component"
 ```
 
-Currently implemented workload kinds:
+Recognized workload kinds:
 
-| Value | Meaning |
-| --- | --- |
-| `component` | WebAssembly Component workload |
+| Value | Meaning | Current execution status |
+| --- | --- | --- |
+| `component` | WebAssembly Component workload | implemented |
+| `container` | OCI-compatible container workload | schema + resolution implemented; execution in progress |
+
+Workload kind is application semantics. Build artifact paths, image registry locations, and deployment placement do not belong in `presolve.toml`.
 
 Workload names are unique within the application and follow the same name rules as the application name.
 

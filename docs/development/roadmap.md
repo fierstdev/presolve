@@ -65,6 +65,19 @@ Add a second serious workload execution class.
 
 This is intended to test whether the application/environment model remains valid when workload portability is not provided by WebAssembly.
 
+Current subdivision:
+
+```text
+16.1  container workload vocabulary + explicit workload resolution in DeploymentPlan
+16.2  OCI artifact identity and `.presolved` representation
+16.3  container executor/materialization boundary
+16.4  local container runtime adapter
+16.5  container capability transport
+16.6  end-to-end portability proof + checkpoint
+```
+
+16.1 establishes `container` as Application/Environment semantics and makes resolved workloads explicit in `DeploymentPlan`. It deliberately does not pretend that the existing Component bundle/runtime can execute container artifacts.
+
 ## Chunk 17 — TypeScript authoring
 
 Introduce a productive TypeScript-facing application authoring path while preserving the existing semantic boundaries.

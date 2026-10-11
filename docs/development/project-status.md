@@ -36,12 +36,14 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | `presolve check` application/environment compatibility | Implemented |
 | Plan-scoped local provider realization | Implemented |
 | `presolve dev` single-workload local Component execution | Implemented |
+| Container workload schema/resolution vocabulary | Implemented |
+| Explicit resolved workloads in `DeploymentPlan` | Implemented |
 
 ## Next
 
 Chunk 15 local developer experience is complete for the current WebAssembly Component/Rust authoring path.
 
-The next major implementation area is OCI/container workload execution. This will test whether the same Application -> Environment -> Deployment model remains valid when workload portability is provided by a container image rather than the WebAssembly Component Model.
+OCI/container workload execution is now in progress. The Application Contract, Environment Specification, resolver, and `DeploymentPlan` recognize container workloads; OCI artifact packaging and actual container execution are the next steps.
 
 ## Planned after OCI/container execution
 

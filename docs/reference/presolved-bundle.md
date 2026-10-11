@@ -56,6 +56,8 @@ WebAssembly artifacts currently use:
 application/wasm
 ```
 
+Bundle format `0.1` currently packages Component workload artifacts only. Although the Application Contract and resolver now recognize `container` workloads, OCI artifact identity and packaging are intentionally not guessed here. Component bundle constructors and bundle verification reject container workloads until the OCI artifact model is defined.
+
 ## Release identity
 
 Application release identity is derived from the canonical serialization of `manifest.json`.

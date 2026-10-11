@@ -247,10 +247,30 @@ version = "0.1.0"
     }
 
     #[test]
-    fn unsupported_workload_kind_is_rejected_during_deserialization() {
+    fn container_workload_kind_is_accepted_during_deserialization() {
         let input = canonical_input().replacen(
             "workloads = [\"component\"]",
-            "workloads = [\"container\"]",
+            "workloads = [\"component\", \"container\"]",
+            1,
+        );
+
+        let specification =
+            parse_environment(&input).expect("container workload support should parse");
+        let workloads = specification
+            .execution()
+            .workloads()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+
+        assert_eq!(workloads, ["component", "container"]);
+    }
+
+    #[test]
+    fn unknown_workload_kind_is_rejected_during_deserialization() {
+        let input = canonical_input().replacen(
+            "workloads = [\"component\"]",
+            "workloads = [\"native\"]",
             1,
         );
 

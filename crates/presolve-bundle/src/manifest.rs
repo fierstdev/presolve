@@ -75,6 +75,15 @@ impl BundleManifest {
 
         expected.sort_by(|left, right| left.0.cmp(&right.0));
 
+        for (workload, kind) in &expected {
+            if *kind != WorkloadKind::Component {
+                return Err(BundleError::UnsupportedWorkloadKind {
+                    workload: workload.clone(),
+                    kind: *kind,
+                });
+            }
+        }
+
         let mut supplied = BTreeMap::<String, &[u8]>::new();
 
         for component in components {
@@ -110,25 +119,21 @@ impl BundleManifest {
                 return Err(BundleError::MissingWorkloadArtifact(name));
             };
 
-            match kind {
-                WorkloadKind::Component => {
-                    let size = u64::try_from(bytes.len())
-                        .map_err(|_| BundleError::ArtifactSizeOverflow { size: bytes.len() })?;
+            let size = u64::try_from(bytes.len())
+                .map_err(|_| BundleError::ArtifactSizeOverflow { size: bytes.len() })?;
 
-                    let artifact = ArtifactManifest {
-                        path: component_artifact_path(&name),
-                        digest: ArtifactDigest::from_content(bytes),
-                        size,
-                        media_type: WASM_MEDIA_TYPE.to_owned(),
-                    };
+            let artifact = ArtifactManifest {
+                path: component_artifact_path(&name),
+                digest: ArtifactDigest::from_content(bytes),
+                size,
+                media_type: WASM_MEDIA_TYPE.to_owned(),
+            };
 
-                    workloads.push(WorkloadManifest {
-                        name,
-                        kind,
-                        artifacts: vec![artifact],
-                    });
-                }
-            }
+            workloads.push(WorkloadManifest {
+                name,
+                kind,
+                artifacts: vec![artifact],
+            });
         }
 
         Ok(Self {

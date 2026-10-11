@@ -11,7 +11,7 @@ mod problem;
 mod report;
 mod resolve;
 
-pub use plan::{CapabilityBinding, DeploymentPlan};
+pub use plan::{CapabilityBinding, DeploymentPlan, ResolvedWorkload};
 pub use presolve_environment::{
     CapabilityFeatureError, EnvironmentInventory, EnvironmentResources, ProvidedCapability,
     ProviderDescriptor,

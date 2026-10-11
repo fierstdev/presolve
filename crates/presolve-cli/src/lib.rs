@@ -297,6 +297,11 @@ fn print_compatibility_check(check: &CompatibilityCheck) {
 
     if let Some(plan) = check.report.plan() {
         println!("Status: compatible");
+        println!("  workloads:");
+
+        for workload in plan.workloads() {
+            println!("    {} -> {}", workload.name(), workload.kind());
+        }
 
         if plan.bindings().is_empty() {
             println!("  capability bindings: none");

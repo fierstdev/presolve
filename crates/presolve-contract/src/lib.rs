@@ -210,6 +210,27 @@ version = "0.0.1"
     }
 
     #[test]
+    fn container_workload_kind_parses() {
+        let source = r#"
+    contract_version = "0.1"
+
+    [application]
+    name = "container-example"
+    version = "1.0.0"
+
+    [[workloads]]
+    name = "api"
+    kind = "container"
+    "#;
+
+        let contract = parse_contract(source).expect("container workload should parse");
+
+        assert_eq!(contract.workloads().len(), 1);
+        assert_eq!(contract.workloads()[0].name(), "api");
+        assert_eq!(contract.workloads()[0].kind(), WorkloadKind::Container);
+    }
+
+    #[test]
     fn unsupported_workload_kind_is_rejected() {
         let source = r#"
     contract_version = "0.1"

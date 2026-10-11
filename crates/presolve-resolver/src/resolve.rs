@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
 
 use presolve_contract::{ApplicationContract, CapabilityRequirement};
+use presolve_core::WorkloadKind;
 
 use crate::{
     CapabilityBinding, DeploymentPlan, EnvironmentInventory, ProvidedCapability,
-    ProviderDescriptor, ResolutionProblem, ResolutionReport,
+    ProviderDescriptor, ResolutionProblem, ResolutionReport, ResolvedWorkload,
 };
 
 /// Resolves an application contract against an environment inventory.
@@ -15,7 +16,7 @@ pub fn resolve(
 ) -> ResolutionReport {
     let mut problems = Vec::new();
 
-    resolve_workloads(contract, environment, &mut problems);
+    let workloads = resolve_workloads(contract, environment, &mut problems);
     resolve_resources(contract, environment, &mut problems);
 
     let mut bindings = Vec::new();
@@ -66,6 +67,7 @@ pub fn resolve(
 
     ResolutionReport::resolved(DeploymentPlan::new(
         *environment.id(),
+        workloads,
         bindings,
         unbound_optional_capabilities,
     ))
@@ -75,18 +77,39 @@ fn resolve_workloads(
     contract: &ApplicationContract,
     environment: &EnvironmentInventory,
     problems: &mut Vec<ResolutionProblem>,
-) {
-    for workload in contract.workloads() {
-        if environment.supported_workloads().contains(&workload.kind()) {
+) -> Vec<ResolvedWorkload> {
+    let declared = if contract.workloads().is_empty() {
+        vec![("main".to_owned(), WorkloadKind::Component)]
+    } else {
+        contract
+            .workloads()
+            .iter()
+            .map(|workload| (workload.name().to_owned(), workload.kind()))
+            .collect::<Vec<_>>()
+    };
+
+    let mut resolved = Vec::new();
+
+    for (name, kind) in declared {
+        if environment.supported_workloads().contains(&kind) {
+            resolved.push(ResolvedWorkload::new(name, kind));
             continue;
         }
 
         problems.push(ResolutionProblem::UnsupportedWorkload {
-            workload: workload.name().to_owned(),
-            kind: workload.kind(),
+            workload: name,
+            kind,
             supported_kinds: environment.supported_workloads().to_vec(),
         });
     }
+
+    resolved.sort_by(|left, right| {
+        left.name()
+            .cmp(right.name())
+            .then_with(|| left.kind().cmp(&right.kind()))
+    });
+
+    resolved
 }
 
 fn resolve_resources(
