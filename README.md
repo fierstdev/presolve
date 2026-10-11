@@ -335,6 +335,10 @@ Implemented foundations include:
 - environment-scoped provider declaration with generated stable IDs
 - `presolve check` application/environment compatibility workflow
 - plan-scoped local provider realization
+- node-side provider realization profiles and secret-resolution boundary
+- installed provider-adapter registry with plan-scoped materialization
+- Cloudflare Workers KV adapter
+- live external cloud-provider portability checkpoint
 - `presolve dev` local Component execution for the current single-workload Rust path
 
 The project is still pre-stable.
@@ -364,6 +368,16 @@ Execution-specific bootstrap is separate:
 The OCI TypeScript path has an end-to-end Docker proof. The Component adapter matches the existing Presolve WIT surface, but automated TypeScript-to-Component compilation is not yet part of the developer workflow.
 
 See [TypeScript authoring](docs/architecture/typescript-authoring.md) and the [Chunk 17 checkpoint](docs/development/chunk-17-checkpoint.md).
+
+## External provider portability
+
+Presolve now has a live portability proof against Cloudflare Workers KV.
+
+A provider-neutral KV requirement resolves to a stable `ProviderId`; node-side realization then maps that identity to the Cloudflare adapter, non-secret settings, and secret references. Cloudflare-specific account, namespace, endpoint, and credential details do not enter the Application Contract or `.presolved` release.
+
+The normal root-level configuration surface remains `presolve.toml` and `presolve.env.toml`. Chunk 18 does not introduce another mandatory provider/node TOML file.
+
+See [Provider realization](docs/architecture/provider-realization.md) and the [Chunk 18 checkpoint](docs/development/chunk-18-checkpoint.md).
 
 ## Local development
 

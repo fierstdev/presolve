@@ -52,6 +52,7 @@ The initial local developer workflow is implemented. See [Getting started](getti
 - [Project status](development/project-status.md) — implemented, next, and planned surfaces.
 - [Roadmap](development/roadmap.md) — current sequencing of major implementation chunks.
 - [Chunk 17 checkpoint](development/chunk-17-checkpoint.md) — TypeScript authoring proof and explicit non-claims.
+- [Chunk 18 checkpoint](development/chunk-18-checkpoint.md) — real cloud-provider portability proof, configuration boundary, and operational-characteristics conclusions.
 
 ## Status language
 

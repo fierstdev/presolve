@@ -173,3 +173,32 @@ Run the live proof with:
 ```
 
 The script never prints the API token.
+
+## Chunk 18 conclusion
+
+The real cloud proof validates the provider-realization boundary without requiring provider implementation details to enter application identity or resolver-facing environment supply.
+
+The durable file-surface conclusion is intentionally conservative:
+
+```text
+project/environment authoring:
+  presolve.toml
+  presolve.env.toml
+
+realization/operator concerns:
+  not another mandatory root TOML file
+```
+
+The realization model remains an internal/node-side abstraction until more providers establish what persisted operator configuration actually needs to look like.
+
+The Cloudflare proof also establishes a second boundary:
+
+```text
+capability semantics
+    operations + portable guarantees
+
+provider operational characteristics
+    consistency + propagation + quotas + latency + rate limits
+```
+
+Presolve should not conflate those categories. Chunk 18 does not standardize the latter after observing a single external provider. Future compatibility vocabulary should be vendor-neutral and justified by comparisons across multiple concrete providers.

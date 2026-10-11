@@ -60,6 +60,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Cloudflare Workers KV provider adapter | Implemented |
 | Plan-scoped provider adapter materialization | Implemented |
 | Live Cloudflare Workers KV portability proof | Implemented |
+| Cloud-provider portability checkpoint | Implemented |
 
 ## Next
 
@@ -69,7 +70,9 @@ OCI/container architectural execution work in Chunk 16 is complete. A real OCI w
 
 TypeScript authoring Chunk 17 is complete. `@presolve/sdk` provides transport-neutral typed KV/object APIs, with container and Component execution adapters. The OCI TypeScript path has a real end-to-end proof; the Component path is proven at the adapter/WIT boundary. `presolve.toml` remains the canonical language-independent Application Contract.
 
-The real cloud-provider portability proof is nearing completion. An opt-in live checkpoint now exercises the full provider-neutral resolution/materialization path against a real Cloudflare Workers KV namespace while keeping credentials outside Presolve application/environment files. The remaining Chunk 18 work is the provider checkpoint and documentation closure.
+Chunk 18 real cloud-provider portability is complete. Presolve can resolve a provider-neutral KV requirement, preserve the exact selected `ProviderId` through node realization, materialize a Cloudflare Workers KV adapter, resolve secrets only for selected providers, and exercise that provider against real managed infrastructure. No additional required Presolve configuration file was introduced.
+
+The next roadmap chunk is the first-class build/package workflow around the already implemented `.presolved` release format.
 
 Automated TypeScript-to-Component compilation remains part of the later build/package workflow.
 
@@ -77,7 +80,6 @@ Automated TypeScript-to-Component compilation remains part of the later build/pa
 
 Current roadmap direction includes:
 
-- a real cloud-provider portability proof
 - higher-level build/package workflow
 - richer `check`/`inspect`/`plan` UX
 

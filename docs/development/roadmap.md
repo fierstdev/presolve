@@ -114,7 +114,7 @@ Current subdivision:
 
 17.5 closes the TypeScript authoring chunk with a reproducible SDK checkpoint and explicit status boundaries. The real OCI path is proven end to end; the Component projection is proven at the adapter/WIT boundary; automated TypeScript-to-Component compilation remains part of the later build/package workflow. See [Chunk 17 checkpoint](chunk-17-checkpoint.md).
 
-## Chunk 18 — real cloud provider proof
+## Chunk 18 — real cloud provider proof (complete)
 
 Implement at least one real provider/environment path outside the in-memory/local proof.
 
@@ -127,7 +127,7 @@ Current subdivision:
 18.2  first real cloud adapter: Cloudflare Workers KV (complete)
 18.3  adapter registry + plan-scoped cloud materialization (complete)
 18.4  live cloud portability proof (complete)
-18.5  cloud-provider checkpoint + docs
+18.5  cloud-provider checkpoint + docs (complete)
 ```
 
 18.1 preserves the existing Environment Specification boundary: provider credentials, endpoints, SDK configuration, and adapter identity remain outside resolver-facing environment supply. A separate node-side `ProviderRealizationProfile` maps stable `ProviderId` values to adapter identity, non-secret settings, and secret references. No persisted node configuration format is locked yet.
@@ -137,6 +137,8 @@ Current subdivision:
 18.3 adds an installed `ProviderAdapterRegistry` and plan-scoped node materialization. The exact `ProviderId` selected by `DeploymentPlan` is joined to its realization profile, adapter, secret resolver, and finally the concrete `ProviderRegistry` implementation. Unselected provider profiles are never instantiated or secret-resolved.
 
 18.4 adds an opt-in live checkpoint against a real Cloudflare Workers KV namespace. The proof resolves a provider-neutral KV requirement, materializes the exact selected `ProviderId` through the Cloudflare adapter, writes and reads a unique live key with a bounded eventual-consistency poll, and deletes the proof key. Credentials remain process-local realization inputs and are never written to Presolve application/environment files.
+
+18.5 closes the cloud-provider proof with a reproducible non-live checkpoint and explicit architectural conclusions. Chunk 18 does not add another required Presolve configuration file and does not prematurely standardize provider consistency/latency/quota vocabulary after observing only one external provider. See [Chunk 18 checkpoint](chunk-18-checkpoint.md).
 
 ## Chunk 19 — build/package workflow
 
