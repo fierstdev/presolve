@@ -1305,6 +1305,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "presolve-provider-realization"
+version = "0.0.1"
+dependencies = [
+ "presolve-core",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "presolve-provider-sdk"
 version = "0.0.1"
 dependencies = [

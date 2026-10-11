@@ -45,6 +45,7 @@ The initial local developer workflow is implemented. See [Getting started](getti
 - [Capability contracts](architecture/capability-contracts.md) — canonical semantic capability IR and bindings.
 - [Runtime and materialization](architecture/runtime-and-materialization.md) — symbolic plans, provider IDs, node assembly, and runtime isolation.
 - [TypeScript authoring](architecture/typescript-authoring.md) — transport-neutral SDK semantics and execution-target adapters.
+- [Provider realization](architecture/provider-realization.md) — node-side adapter configuration, ProviderId joining, and secret-resolution boundary.
 
 ### Development
 

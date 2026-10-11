@@ -120,6 +120,18 @@ Implement at least one real provider/environment path outside the in-memory/loca
 
 The goal is to validate portability against infrastructure Presolve does not control.
 
+Current subdivision:
+
+```text
+18.1  provider realization profile + secret-resolution boundary (complete)
+18.2  first real cloud adapter: Cloudflare Workers KV
+18.3  adapter registry + plan-scoped cloud materialization
+18.4  live cloud portability proof
+18.5  cloud-provider checkpoint + docs
+```
+
+18.1 preserves the existing Environment Specification boundary: provider credentials, endpoints, SDK configuration, and adapter identity remain outside resolver-facing environment supply. A separate node-side `ProviderRealizationProfile` maps stable `ProviderId` values to adapter identity, non-secret settings, and secret references. No persisted node configuration format is locked yet.
+
 ## Chunk 19 — build/package workflow
 
 Make creation of `.presolved` releases a first-class developer workflow around the already implemented canonical bundle format.

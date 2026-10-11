@@ -56,6 +56,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Real TypeScript OCI workload proof | Implemented |
 | TypeScript Component/WIT adapter boundary | Implemented |
 | TypeScript authoring checkpoint | Implemented |
+| Provider realization configuration/secret boundary | Implemented |
 
 ## Next
 
@@ -65,7 +66,9 @@ OCI/container architectural execution work in Chunk 16 is complete. A real OCI w
 
 TypeScript authoring Chunk 17 is complete. `@presolve/sdk` provides transport-neutral typed KV/object APIs, with container and Component execution adapters. The OCI TypeScript path has a real end-to-end proof; the Component path is proven at the adapter/WIT boundary. `presolve.toml` remains the canonical language-independent Application Contract.
 
-The next roadmap chunk is a real cloud-provider portability proof. Automated TypeScript-to-Component compilation remains part of the later build/package workflow.
+The real cloud-provider portability proof is now in progress. Chunk 18.1 establishes a provider-realization and secret-resolution boundary without adding implementation configuration to `presolve.env.toml`. The next step is a real Cloudflare Workers KV adapter.
+
+Automated TypeScript-to-Component compilation remains part of the later build/package workflow.
 
 ## Planned next
 
