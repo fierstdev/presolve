@@ -279,7 +279,7 @@ Environment and provider IDs are opaque stable identities. Normal user-facing to
 
 The resolver does not instantiate providers and does not execute workloads. A Presolve node later materializes selected provider IDs into concrete implementations.
 
-See [`docs/environment-specification.md`](docs/environment-specification.md) for the Environment Specification contract and identity rules.
+See [`docs/reference/environment-specification.md`](docs/reference/environment-specification.md) for the Environment Specification contract and identity rules.
 
 A Presolve node later materializes the plan into concrete runtime and provider bindings.
 
@@ -374,6 +374,18 @@ examples/                 Example Presolve applications
 docs/                     Design and format references
 scripts/                  Validation and end-to-end checks
 ```
+
+## Documentation
+
+Public documentation lives in [`docs/`](docs/README.md).
+
+Start with:
+
+- [Application portability](docs/concepts/application-portability.md)
+- [Application Contract reference](docs/reference/application-contract.md)
+- [Environment Specification reference](docs/reference/environment-specification.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Project status](docs/development/project-status.md)
 
 ## Project direction
 

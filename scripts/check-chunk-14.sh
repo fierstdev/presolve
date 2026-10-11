@@ -27,6 +27,10 @@ cargo test \
   --test environment_materialization
 
 echo
+echo "== documentation links =="
+python3 scripts/check-docs.py
+
+echo
 echo "== workspace tests =="
 cargo test --workspace
 

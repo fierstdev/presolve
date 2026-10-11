@@ -423,3 +423,10 @@ presolve check
 The exact CLI surface is not yet locked.
 
 Chunk 15 should provide automatic generation and persistence of `EnvironmentId` and `ProviderId`, file discovery for `presolve.env.toml`, useful diagnostics, and a local environment workflow that avoids requiring users to manually manage opaque IDs during normal use.
+
+## Related documentation
+
+- [Environments](../concepts/environments.md)
+- [Capabilities and providers](../concepts/capabilities-and-providers.md)
+- [Resolution and deployment](../concepts/resolution-and-deployment.md)
+- [Architecture overview](../architecture/overview.md)
