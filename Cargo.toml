@@ -33,6 +33,7 @@ homepage = "https://presolve.dev"
 rust-version = "1.85"
 
 [workspace.dependencies]
+clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 hex = "0.4"
 semver = { version = "1", features = ["serde"] }

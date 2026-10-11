@@ -1,5 +1,13 @@
 #![forbid(unsafe_code)]
 
-fn main() {
-    println!("{}", presolve_core::PRODUCT_NAME);
+use std::process::ExitCode;
+
+fn main() -> ExitCode {
+    match presolve_cli::run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error:#}");
+            ExitCode::FAILURE
+        }
+    }
 }

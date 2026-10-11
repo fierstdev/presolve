@@ -8,10 +8,13 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "ez"
+name = "presolve"
 path = "src/main.rs"
 
 [dependencies]
+anyhow.workspace = true
+clap.workspace = true
+presolve-environment.workspace = true
 presolve-core.workspace = true
 
 [lints]
