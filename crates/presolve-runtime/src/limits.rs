@@ -11,6 +11,15 @@ pub const DEFAULT_FUEL: u64 = 10_000_000;
 /// Default maximum size of each WebAssembly linear memory.
 pub const DEFAULT_MAX_MEMORY_BYTES: usize = 64 * MIB;
 
+/// Default maximum aggregate bytes buffered by pending object writes in one invocation.
+///
+/// Object upload buffers live in host memory rather than WebAssembly linear memory,
+/// so they require an independent ceiling.
+pub const DEFAULT_MAX_OBJECT_BUFFER_BYTES: usize = 64 * MIB;
+
+/// Default maximum number of simultaneously open object transport sessions.
+pub const DEFAULT_MAX_OBJECT_SESSIONS: usize = 128;
+
 /// Default maximum number of core instances in one store.
 pub const DEFAULT_MAX_INSTANCES: usize = 1_024;
 
@@ -42,6 +51,8 @@ pub const EPOCH_TICK_INTERVAL: Duration = Duration::from_millis(10);
 pub struct RuntimeLimits {
     fuel: u64,
     max_memory_bytes: usize,
+    max_object_buffer_bytes: usize,
+    max_object_sessions: usize,
     max_instances: usize,
     max_memories: usize,
     max_tables: usize,
@@ -56,6 +67,8 @@ impl RuntimeLimits {
         Self {
             fuel: DEFAULT_FUEL,
             max_memory_bytes: DEFAULT_MAX_MEMORY_BYTES,
+            max_object_buffer_bytes: DEFAULT_MAX_OBJECT_BUFFER_BYTES,
+            max_object_sessions: DEFAULT_MAX_OBJECT_SESSIONS,
             max_instances: DEFAULT_MAX_INSTANCES,
             max_memories: DEFAULT_MAX_MEMORIES,
             max_tables: DEFAULT_MAX_TABLES,
@@ -75,6 +88,20 @@ impl RuntimeLimits {
     #[must_use]
     pub const fn with_max_memory_bytes(mut self, max_memory_bytes: usize) -> Self {
         self.max_memory_bytes = max_memory_bytes;
+        self
+    }
+
+    /// Sets the maximum aggregate bytes buffered by pending object writes.
+    #[must_use]
+    pub const fn with_max_object_buffer_bytes(mut self, max_object_buffer_bytes: usize) -> Self {
+        self.max_object_buffer_bytes = max_object_buffer_bytes;
+        self
+    }
+
+    /// Sets the maximum number of simultaneously open object transport sessions.
+    #[must_use]
+    pub const fn with_max_object_sessions(mut self, max_object_sessions: usize) -> Self {
+        self.max_object_sessions = max_object_sessions;
         self
     }
 
@@ -127,6 +154,18 @@ impl RuntimeLimits {
     #[must_use]
     pub const fn max_memory_bytes(self) -> usize {
         self.max_memory_bytes
+    }
+
+    /// Returns the maximum aggregate pending object-write buffer size.
+    #[must_use]
+    pub const fn max_object_buffer_bytes(self) -> usize {
+        self.max_object_buffer_bytes
+    }
+
+    /// Returns the maximum simultaneously open object transport sessions.
+    #[must_use]
+    pub const fn max_object_sessions(self) -> usize {
+        self.max_object_sessions
     }
 
     /// Returns the maximum number of core instances.
@@ -201,6 +240,11 @@ mod tests {
 
         assert_eq!(limits.fuel(), DEFAULT_FUEL);
         assert_eq!(limits.max_memory_bytes(), DEFAULT_MAX_MEMORY_BYTES);
+        assert_eq!(
+            limits.max_object_buffer_bytes(),
+            DEFAULT_MAX_OBJECT_BUFFER_BYTES
+        );
+        assert_eq!(limits.max_object_sessions(), DEFAULT_MAX_OBJECT_SESSIONS);
         assert_eq!(limits.max_instances(), DEFAULT_MAX_INSTANCES);
         assert_eq!(limits.max_memories(), DEFAULT_MAX_MEMORIES);
         assert_eq!(limits.max_tables(), DEFAULT_MAX_TABLES);
@@ -213,6 +257,8 @@ mod tests {
         let limits = RuntimeLimits::new()
             .with_fuel(123)
             .with_max_memory_bytes(8 * MIB)
+            .with_max_object_buffer_bytes(4 * MIB)
+            .with_max_object_sessions(7)
             .with_max_instances(10)
             .with_max_memories(4)
             .with_max_tables(5)
@@ -221,6 +267,8 @@ mod tests {
 
         assert_eq!(limits.fuel(), 123);
         assert_eq!(limits.max_memory_bytes(), 8 * MIB);
+        assert_eq!(limits.max_object_buffer_bytes(), 4 * MIB);
+        assert_eq!(limits.max_object_sessions(), 7);
         assert_eq!(limits.max_instances(), 10);
         assert_eq!(limits.max_memories(), 4);
         assert_eq!(limits.max_tables(), 5);

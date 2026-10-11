@@ -551,3 +551,72 @@ fn object_provider_with_features(
 
     ProviderDescriptor::new(provider_id, name, vec![capability])
 }
+
+#[test]
+fn canonical_feature_vocabulary_is_not_inferred_as_provider_support() {
+    let contract = contract(
+        r#"
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+required_features = ["range-read"]
+"#,
+        "",
+    );
+
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        vec![object_provider(ProviderId::new(), "baseline-objects")],
+    );
+
+    let report = resolve(&contract, &environment);
+
+    assert!(matches!(
+        report.problems(),
+        [ResolutionProblem::MissingCapabilityFeatures {
+            required_features,
+            available_features,
+            ..
+        }] if required_features == &["range-read"] && available_features.is_empty()
+    ));
+}
+
+#[test]
+fn required_semantic_feature_outranks_higher_version_without_feature() {
+    let contract = contract(
+        r#"
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+required_features = ["range-read"]
+"#,
+        "",
+    );
+
+    let semantic_provider_id = ProviderId::new();
+
+    let environment = EnvironmentInventory::new(
+        EnvironmentId::new(),
+        EnvironmentResources::new(512, 1_000),
+        vec![
+            ProviderDescriptor::new(
+                ProviderId::new(),
+                "higher-version-baseline",
+                vec![ProvidedCapability::new(
+                    OBJECT_STORE_INTERFACE,
+                    Version::new(0, 1, 9),
+                )],
+            ),
+            object_provider_with_features(semantic_provider_id, "range-provider", &["range-read"]),
+        ],
+    );
+
+    let report = resolve(&contract, &environment);
+    let plan = report
+        .plan()
+        .expect("provider satisfying required semantics should resolve");
+
+    assert_eq!(plan.bindings()[0].provider_id(), &semantic_provider_id);
+    assert_eq!(plan.bindings()[0].negotiated_features(), ["range-read"]);
+}

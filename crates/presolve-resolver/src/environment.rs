@@ -360,3 +360,35 @@ mod feature_advertisement_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod adversarial_feature_advertisement_tests {
+    use semver::Version;
+
+    use super::{CapabilityFeatureError, ProvidedCapability};
+
+    #[test]
+    fn generic_capability_cannot_advertise_semantic_features() {
+        let error = ProvidedCapability::new("presolve:objects/store", Version::new(0, 1, 0))
+            .with_supported_features(["range-read"])
+            .expect_err("feature claims without a semantic contract must fail");
+
+        assert_eq!(error, CapabilityFeatureError::MissingSemanticContract);
+    }
+
+    #[test]
+    fn duplicate_semantic_feature_claim_is_rejected() {
+        let error = ProvidedCapability::from_contract(
+            presolve_capability::object_store_contract().expect("object contract should be valid"),
+        )
+        .with_supported_features(["range-read", "range-read"])
+        .expect_err("duplicate feature claim must fail");
+
+        assert_eq!(
+            error,
+            CapabilityFeatureError::DuplicateFeature {
+                feature: "range-read".to_owned(),
+            }
+        );
+    }
+}

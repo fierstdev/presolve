@@ -17,6 +17,7 @@ wasmtime-wasi.workspace = true
 [dev-dependencies]
 anyhow.workspace = true
 presolve-provider-kv-memory.workspace = true
+presolve-provider-objects-memory.workspace = true
 
 [lints]
 workspace = true

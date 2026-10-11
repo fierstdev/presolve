@@ -1166,6 +1166,7 @@ dependencies = [
  "anyhow",
  "presolve-core",
  "presolve-provider-kv-memory",
+ "presolve-provider-objects-memory",
  "presolve-provider-sdk",
  "thiserror 2.0.21",
  "wasmtime",

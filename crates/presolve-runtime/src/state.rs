@@ -24,6 +24,9 @@ pub(crate) struct RuntimeState {
     object_store_provider: Arc<dyn ObjectStoreProvider>,
     object_reads: BTreeMap<u64, ObjectRead>,
     object_writes: BTreeMap<u64, PendingObjectWrite>,
+    max_object_buffer_bytes: usize,
+    object_buffered_write_bytes: usize,
+    max_object_sessions: usize,
     next_object_handle: u64,
 }
 
@@ -44,6 +47,9 @@ impl RuntimeState {
             object_store_provider,
             object_reads: BTreeMap::new(),
             object_writes: BTreeMap::new(),
+            max_object_buffer_bytes: runtime_limits.max_object_buffer_bytes(),
+            object_buffered_write_bytes: 0,
+            max_object_sessions: runtime_limits.max_object_sessions(),
             next_object_handle: 1,
         }
     }
@@ -80,6 +86,39 @@ impl RuntimeState {
 
     pub(crate) fn insert_object_write(&mut self, handle: u64, write: PendingObjectWrite) {
         self.object_writes.insert(handle, write);
+    }
+
+    pub(crate) fn object_write(&self, handle: u64) -> Option<&PendingObjectWrite> {
+        self.object_writes.get(&handle)
+    }
+
+    pub(crate) fn can_open_object_session(&self) -> bool {
+        self.object_reads
+            .len()
+            .checked_add(self.object_writes.len())
+            .is_some_and(|open| open < self.max_object_sessions)
+    }
+
+    pub(crate) const fn max_object_buffer_bytes(&self) -> usize {
+        self.max_object_buffer_bytes
+    }
+
+    pub(crate) fn reserve_object_buffer_bytes(&mut self, bytes: usize) -> bool {
+        let Some(next) = self.object_buffered_write_bytes.checked_add(bytes) else {
+            return false;
+        };
+
+        if next > self.max_object_buffer_bytes {
+            return false;
+        }
+
+        self.object_buffered_write_bytes = next;
+        true
+    }
+
+    pub(crate) fn release_object_buffer_bytes(&mut self, bytes: usize) {
+        debug_assert!(bytes <= self.object_buffered_write_bytes);
+        self.object_buffered_write_bytes = self.object_buffered_write_bytes.saturating_sub(bytes);
     }
 
     pub(crate) fn object_write_mut(&mut self, handle: u64) -> Option<&mut PendingObjectWrite> {
