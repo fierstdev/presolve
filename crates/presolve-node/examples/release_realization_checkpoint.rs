@@ -1,4 +1,9 @@
-use std::{env, fs, sync::Arc, thread, time::{Duration, Instant}};
+use std::{
+    env, fs,
+    sync::Arc,
+    thread,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result, bail};
 use presolve_bundle::{PresolveBundle, WorkloadKind, application_contract_for_resolution};
