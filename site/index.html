@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presolve — Build software once. Decide where it runs later.</title>
+  <meta name="description" content="Presolve packages applications into immutable releases, matches them against environment capabilities, and emits inspectable deployment plans.">
+  <link rel="canonical" href="https://presolve.dev/">
+  <meta property="og:title" content="Presolve">
+  <meta property="og:description" content="Build software once. Decide where it runs later.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://presolve.dev/">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell nav-shell">
+      <a class="brand" href="/" aria-label="Presolve home">
+        <img src="/assets/presolve-mark.svg" alt="" width="26" height="31">
+        <span>Presolve</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#model">How it works</a>
+        <a href="#proof">Current proof</a>
+        <a href="/docs/">Docs</a>
+        <a href="/status/">Status</a>
+        <a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero shell">
+      <div class="eyebrow"><span class="dot"></span> Developer Preview</div>
+      <h1>Build software once.<br>Decide where it runs later.</h1>
+      <p class="hero-copy">Presolve packages an application and its requirements into an immutable release. Environments declare what they can provide. Presolve resolves the two and produces an inspectable deployment plan.</p>
+      <div class="hero-actions">
+        <a class="button primary" href="/docs/">Read the docs</a>
+        <a class="button secondary" href="https://github.com/fierstdev/presolve">View source ↗</a>
+      </div>
+      <div class="hero-terminal" aria-label="Presolve command line workflow">
+        <div class="terminal-top"><span></span><span></span><span></span><strong>presolve</strong></div>
+        <pre><code><span class="prompt">$</span> presolve build
+<span class="dim">release:</span> dist/orders.presolved
+<span class="dim">digest:</span>  sha256:8f6d…
+
+<span class="prompt">$</span> presolve check
+<span class="good">Status: compatible</span>
+
+<span class="prompt">$</span> presolve plan
+<span class="dim">presolve:kv/store</span> → memory-services <span class="dim">@ 0.1.0</span></code></pre>
+      </div>
+    </section>
+
+    <section id="model" class="section shell">
+      <div class="section-heading">
+        <span class="kicker">The model</span>
+        <h2>Application requirements stay separate from deployment supply.</h2>
+        <p>The application describes what it needs. The environment describes what exists here. The resolver joins them without putting infrastructure choices into application identity.</p>
+      </div>
+
+      <div class="model-grid">
+        <article class="model-card">
+          <div class="model-label">Application Contract</div>
+          <code>presolve.toml</code>
+          <ul>
+            <li>workloads</li>
+            <li>capabilities</li>
+            <li>resource requirements</li>
+            <li>network policy</li>
+          </ul>
+        </article>
+        <div class="resolver-card">
+          <div class="resolver-mark">P</div>
+          <strong>Resolver</strong>
+          <span>compatibility + selection</span>
+        </div>
+        <article class="model-card">
+          <div class="model-label">Environment Specification</div>
+          <code>presolve.env.toml</code>
+          <ul>
+            <li>execution support</li>
+            <li>provider supply</li>
+            <li>resource capacity</li>
+            <li>stable provider IDs</li>
+          </ul>
+        </article>
+      </div>
+      <div class="plan-strip">
+        <span>output</span>
+        <strong>DeploymentPlan</strong>
+        <code>exact workloads · providers · versions · negotiated features</code>
+      </div>
+    </section>
+
+    <section class="section section-rule shell">
+      <div class="split-heading">
+        <div>
+          <span class="kicker">Immutable release</span>
+          <h2>The release does not know where it will run.</h2>
+        </div>
+        <p>A <code>.presolved</code> bundle carries application identity, requirements, workload artifact identity, and topology. Environment-specific endpoints, credentials, provider configuration, registry locations, and placement stay outside it.</p>
+      </div>
+      <div class="release-demo">
+        <div class="release-file">
+          <span class="file-type">.presolved</span>
+          <strong>orders.presolved</strong>
+          <code>sha256:8f6dc2…</code>
+        </div>
+        <div class="release-lines" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="environment-stack">
+          <div><strong>Local</strong><span>memory KV · Component runtime</span></div>
+          <div><strong>Container host</strong><span>Docker · capability bridge</span></div>
+          <div><strong>Managed infrastructure</strong><span>provider-specific realization</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="proof" class="section section-rule shell">
+      <div class="section-heading compact">
+        <span class="kicker">Current proof</span>
+        <h2>Implemented today.</h2>
+        <p>Presolve is pre-stable, but the core portability path is working and covered by checkpoints.</p>
+      </div>
+      <div class="proof-grid">
+        <article><span>01</span><strong>Workloads</strong><p>WebAssembly Components and OCI/container workload identity and execution paths.</p></article>
+        <article><span>02</span><strong>Capabilities</strong><p>Versioned KV and object-storage capability contracts with feature negotiation.</p></article>
+        <article><span>03</span><strong>Providers</strong><p>In-memory implementations plus a real Cloudflare Workers KV adapter.</p></article>
+        <article><span>04</span><strong>Builds</strong><p>Deterministic <code>.presolved</code> packaging across Component, OCI, mixed, and TypeScript paths.</p></article>
+        <article><span>05</span><strong>Resolution</strong><p>Deterministic compatibility checks and inspectable symbolic deployment plans.</p></article>
+        <article><span>06</span><strong>Authoring</strong><p>Rust and TypeScript paths, with <code>presolve.toml</code> remaining the language-neutral contract.</p></article>
+      </div>
+    </section>
+
+    <section class="section section-rule shell workflow-section">
+      <div class="section-heading compact">
+        <span class="kicker">Workflow</span>
+        <h2>Four commands, four different questions.</h2>
+      </div>
+      <div class="workflow-list">
+        <div><code>presolve inspect</code><span>What does this application require?</span></div>
+        <div><code>presolve build</code><span>What immutable release are we distributing?</span></div>
+        <div><code>presolve check</code><span>Can this environment satisfy it?</span></div>
+        <div><code>presolve plan</code><span>What exactly did the resolver select?</span></div>
+      </div>
+    </section>
+
+    <section class="section section-rule shell boundaries">
+      <div class="split-heading">
+        <div>
+          <span class="kicker">Scope</span>
+          <h2>Presolve is not a control plane.</h2>
+        </div>
+        <div>
+          <p>The current project stops at deterministic compatibility, immutable application identity, provider selection, and execution/materialization boundaries.</p>
+          <p>Scheduling, service mesh, fleet management, registries, and full deployment lifecycle management are not being folded into the core before the portability model has external proof.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta shell">
+      <span class="kicker">Developer Preview</span>
+      <h2>Read the model. Run the checkpoints. Break the assumptions.</h2>
+      <p>Presolve is being developed in public under Apache-2.0.</p>
+      <div class="hero-actions">
+        <a class="button primary" href="/docs/">Get started</a>
+        <a class="button secondary" href="https://github.com/fierstdev/presolve">github.com/fierstdev/presolve ↗</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a>
+      <p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p>
+    </div>
+  </footer>
+</body>
+</html>
