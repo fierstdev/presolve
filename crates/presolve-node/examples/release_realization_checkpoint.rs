@@ -26,8 +26,8 @@ use tar::Archive;
 const ACCOUNT_ID_ENV: &str = "PRESOLVE_CLOUDFLARE_ACCOUNT_ID";
 const NAMESPACE_ID_ENV: &str = "PRESOLVE_CLOUDFLARE_KV_NAMESPACE_ID";
 const API_TOKEN_ENV: &str = "PRESOLVE_CLOUDFLARE_API_TOKEN";
-const CLOUD_RETRY_TIMEOUT: Duration = Duration::from_secs(75);
-const CLOUD_RETRY_INTERVAL: Duration = Duration::from_secs(1);
+const CLOUD_VISIBILITY_TIMEOUT: Duration = Duration::from_secs(75);
+const CLOUD_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RealizationMode {
@@ -41,6 +41,13 @@ impl RealizationMode {
             "local" => Ok(Self::Local),
             "cloudflare" => Ok(Self::Cloudflare),
             _ => bail!("realization mode must be `local` or `cloudflare`, got `{value}`"),
+        }
+    }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Local => "local",
+            Self::Cloudflare => "cloudflare",
         }
     }
 }
@@ -107,7 +114,7 @@ fn main() -> Result<()> {
     let component = component_bytes(&release_bytes, &bundle)?;
     let runtime = assemble_runtime(plan, &registry)
         .context("could not assemble runtime for detached release")?;
-    let output = execute_until_observed(mode, &runtime, &component, &input)?;
+    let output = execute_kv_proof(mode, &runtime, &component, &input)?;
 
     println!("release digest: {release_digest}");
     println!(
@@ -116,10 +123,7 @@ fn main() -> Result<()> {
         specification.environment().id()
     );
     println!("provider: {} ({provider_id})", binding.provider_name());
-    println!("mode: {}", match mode {
-        RealizationMode::Local => "local",
-        RealizationMode::Cloudflare => "cloudflare",
-    });
+    println!("mode: {}", mode.label());
     println!("output: {output}");
 
     Ok(())
@@ -226,40 +230,60 @@ fn extract_archive_entry(release_bytes: &[u8], expected_path: &str) -> Result<Ve
     bail!("release archive does not contain `{expected_path}`")
 }
 
-fn execute_until_observed(
+fn execute_kv_proof(
     mode: RealizationMode,
     runtime: &presolve_runtime::Runtime,
     component: &[u8],
     input: &str,
 ) -> Result<String> {
-    let expected = format!("stored:{input}");
-    let deadline = Instant::now() + CLOUD_RETRY_TIMEOUT;
-    let mut last_output = None;
+    let key = format!("presolve/chunk21/{input}");
+    let set_command = format!("set:{key}:{input}");
+    let set_output = runtime
+        .run_bytes(component, &set_command)
+        .context("detached Component KV write failed")?;
 
-    loop {
+    if set_output != "stored" {
+        bail!("detached Component KV write returned `{set_output}` instead of `stored`");
+    }
+
+    let expected = format!("value:{input}");
+    let get_command = format!("get:{key}");
+    let deadline = Instant::now() + CLOUD_VISIBILITY_TIMEOUT;
+
+    let observed = loop {
         let output = runtime
-            .run_bytes(component, input)
-            .context("detached Component execution failed")?;
+            .run_bytes(component, &get_command)
+            .context("detached Component KV read failed")?;
 
         if output == expected {
-            return Ok(output);
+            break output;
         }
 
         if mode == RealizationMode::Local {
-            bail!("local detached-release execution returned `{output}`, expected `{expected}`");
+            bail!("local detached-release read returned `{output}`, expected `{expected}`");
         }
 
-        last_output = Some(output);
-
         if Instant::now() >= deadline {
-            let observed = last_output.as_deref().unwrap_or("<none>");
             bail!(
-                "timed out waiting for Cloudflare KV visibility through the detached release; last output `{observed}`"
+                "timed out waiting for Cloudflare KV visibility through the detached release; last output `{output}`"
             );
         }
 
-        thread::sleep(CLOUD_RETRY_INTERVAL);
+        thread::sleep(CLOUD_POLL_INTERVAL);
+    };
+
+    let delete_command = format!("delete:{key}");
+    let delete_output = runtime
+        .run_bytes(component, &delete_command)
+        .context("detached Component KV cleanup failed")?;
+
+    if delete_output != "deleted" {
+        bail!(
+            "detached Component KV cleanup returned `{delete_output}` instead of `deleted`"
+        );
     }
+
+    Ok(observed)
 }
 
 fn required_env(name: &str) -> Result<String> {
