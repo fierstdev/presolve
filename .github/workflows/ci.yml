@@ -138,3 +138,48 @@ jobs:
 
       - name: Check diff hygiene
         run: git diff --check
+
+  docker-portability:
+    name: Docker portability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pnpm
+        run: npm install --global pnpm@12.8.1
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Verify Docker and Buildx
+        run: |
+          docker version
+          docker buildx version
+
+      - name: Run OCI container portability checkpoint
+        run: ./scripts/smoke-container-oci.sh
+
+      - name: Run TypeScript OCI portability checkpoint
+        run: ./scripts/smoke-typescript-container-oci.sh
