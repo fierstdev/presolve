@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - proof/chunk-21-3a
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
