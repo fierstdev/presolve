@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/release.yml"
       - "scripts/package-cli-release.sh"
+      - "docs/releases/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/**"
@@ -158,10 +159,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          NOTES_FILE="docs/releases/${GITHUB_REF_NAME}.md"
+          if [[ -f "$NOTES_FILE" ]]; then
+            NOTES_ARGS=(--notes-file "$NOTES_FILE")
+          else
+            NOTES_ARGS=(--generate-notes)
+          fi
+
           gh release create "$GITHUB_REF_NAME" \
             release-artifacts/*.tar.gz \
             release-artifacts/*.tar.gz.sha256 \
             --verify-tag \
             --prerelease \
-            --generate-notes \
+            "${NOTES_ARGS[@]}" \
             --title "Presolve $GITHUB_REF_NAME"
