@@ -8,6 +8,7 @@
 mod bundle;
 mod input;
 mod manifest;
+mod resolution;
 mod version;
 
 pub use bundle::{BundleError, PresolveBundle};
@@ -20,4 +21,5 @@ pub use manifest::{
     WorkloadManifest, component_artifact_path,
 };
 pub use presolve_core::{InterfaceKind, WorkloadKind};
+pub use resolution::{ReleaseContractError, application_contract_for_resolution};
 pub use version::{BUNDLE_VERSION, BUNDLE_VERSION_0_1, BundleVersion, BundleVersionParseError};
