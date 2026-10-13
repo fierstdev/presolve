@@ -1,0 +1,167 @@
+name: Release
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "scripts/package-cli-release.sh"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "providers/**"
+      - "executors/**"
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  package:
+    name: Package ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Linux x86_64
+            runner: ubuntu-24.04
+          - label: Linux arm64
+            runner: ubuntu-24.04-arm
+          - label: macOS Intel
+            runner: macos-15-intel
+          - label: macOS Apple Silicon
+            runner: macos-15
+
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            release-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Package native CLI
+        id: package
+        shell: bash
+        run: bash ./scripts/package-cli-release.sh "$RUNNER_TEMP/presolve-release"
+
+      - name: Verify packaged binary
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/presolve-verify"
+          tar -xzf "${{ steps.package.outputs.archive }}" -C "$RUNNER_TEMP/presolve-verify"
+          "$RUNNER_TEMP/presolve-verify/${{ steps.package.outputs.package_name }}/presolve" --version
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: presolve-${{ steps.package.outputs.target }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify tag matches workspace version
+        shell: bash
+        run: |
+          VERSION="$(python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          with Path('Cargo.toml').open('rb') as handle:
+              document = tomllib.load(handle)
+
+          print(document['workspace']['package']['version'])
+          PY
+          )"
+
+          EXPECTED_TAG="v${VERSION}"
+          if [[ "$GITHUB_REF_NAME" != "$EXPECTED_TAG" ]]; then
+            echo "release tag $GITHUB_REF_NAME does not match workspace version $VERSION" >&2
+            echo "expected tag: $EXPECTED_TAG" >&2
+            exit 1
+          fi
+
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: presolve-*
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Verify checksums
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
+
+          root = Path('release-artifacts')
+          archives = sorted(root.glob('*.tar.gz'))
+          checksums = sorted(root.glob('*.tar.gz.sha256'))
+
+          if len(archives) != 4 or len(checksums) != 4:
+              raise SystemExit(
+                  f"expected four archives and four checksums, got {len(archives)} archives and {len(checksums)} checksums"
+              )
+
+          for checksum_path in checksums:
+              expected, name = checksum_path.read_text(encoding='utf-8').strip().split(maxsplit=1)
+              archive = root / name
+              if not archive.is_file():
+                  raise SystemExit(f"checksum references missing archive: {name}")
+              actual = sha256(archive.read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f"checksum mismatch for {name}")
+              print(f"verified {name}: {actual}")
+          PY
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            release-artifacts/*.tar.gz \
+            release-artifacts/*.tar.gz.sha256 \
+            --verify-tag \
+            --prerelease \
+            --generate-notes \
+            --title "Presolve $GITHUB_REF_NAME"
