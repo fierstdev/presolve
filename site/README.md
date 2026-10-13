@@ -2,7 +2,7 @@
 
 Static source for `presolve.dev`.
 
-The site intentionally has no application framework or build step. Cloudflare Pages can publish the `site/` directory directly.
+The site intentionally has no application framework or build step. Cloudflare Workers Static Assets serves the `site/` directory directly through the repository-root `wrangler.jsonc`.
 
 ## Local preview
 
@@ -14,15 +14,28 @@ python3 -m http.server 8788 --directory site
 
 Then open `http://localhost:8788`.
 
-## Cloudflare Pages
+## Cloudflare Workers
 
 Recommended Git deployment settings:
 
 ```text
-Repository:        fierstdev/presolve
+Repository:      fierstdev/presolve
 Production branch: main
-Build command:     (none)
-Build output:      site
+Path:            /
+Build command:   (none)
+Deploy command:  npx wrangler@latest deploy
+Preview command: npx wrangler@latest versions upload
+```
+
+`wrangler.jsonc` declares:
+
+```json
+{
+  "name": "presolve",
+  "assets": {
+    "directory": "./site"
+  }
+}
 ```
 
 The custom domain is `presolve.dev`.
