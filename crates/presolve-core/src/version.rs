@@ -196,6 +196,6 @@ mod tests {
             .parse::<ProductVersion>()
             .expect("Cargo package version must be semantic");
 
-        assert_eq!(version.to_string(), "0.0.1");
+        assert_eq!(version.to_string(), "0.1.0-alpha.1");
     }
 }
