@@ -101,13 +101,14 @@ Presolve packaging
 
 Presolve cannot make every external compiler reproducible merely by packaging its output.
 
-For the pinned TypeScript checkpoint, the build is executed twice from a clean `.presolve/` generated-state directory. The generated WebAssembly Component and final `.presolved` bytes must both compare equal.
+For the TypeScript checkpoint, Presolve executes two clean source builds and requires the Presolve-generated bootstrap, generated WIT package, and resulting Component WIT interface to remain identical. The emitted Component bytes are observed but are not a Presolve-controlled invariant.
 
-This proves the current pinned Jco/ComponentizeJS checkpoint is reproducible under the tested toolchain/platform conditions.
+Public CI demonstrated why this boundary matters: the same locked Jco/ComponentizeJS toolchain on the same Ubuntu runner emitted different Component bytes across two clean builds seconds apart, while preserving the same generated Presolve inputs and Component interface.
 
-It is **not** a general promise that:
+The checkpoint therefore does **not** claim that:
 
-- every future Jco/ComponentizeJS version is reproducible
+- repeated Jco/ComponentizeJS builds are byte-identical even on the same platform
+- different Jco/ComponentizeJS versions are reproducible
 - different Node.js versions produce identical Component bytes
 - different operating systems produce identical compiler output
 - every Rust toolchain produces byte-identical Wasm from identical source
@@ -115,7 +116,7 @@ It is **not** a general promise that:
 
 Those are source-toolchain properties.
 
-Presolve's durable guarantee target remains narrower and stronger: equal workload artifact identity plus equal Application Contract semantics produces equal release identity and deterministic `.presolved` encoding.
+Presolve's durable guarantee is narrower and stronger: equal workload artifact identity plus equal Application Contract semantics produces equal release identity and deterministic `.presolved` encoding. The TypeScript checkpoint separately proves that Presolve generates stable compiler inputs and a stable semantic Component interface around the external toolchain.
 
 ## TypeScript build adapter boundary
 
@@ -175,8 +176,10 @@ The checkpoint covers:
 - multi-workload mapping-order reproducibility
 - OCI descriptor packaging reproducibility
 - mixed workload packaging reproducibility
-- clean repeated TypeScript Component builds
-- TypeScript generated WIT inspection
+- clean repeated TypeScript Component source builds
+- deterministic generated TypeScript bootstrap/WIT inputs
+- stable TypeScript-generated Component WIT interface
+- deterministic `.presolved` packaging when the same generated Component artifact is supplied twice
 
 It does not require an Environment Specification, provider credentials, cloud access, Docker, or deployment infrastructure.
 
@@ -188,7 +191,7 @@ Chunk 19 does not establish:
 - arbitrary language source auto-detection
 - automatic multi-workload source orchestration
 - general custom-capability WIT/binding generation
-- cross-platform source compiler byte reproducibility
+- same-platform or cross-platform source compiler byte reproducibility
 - container image building or registry publishing
 - deployment realization from the build command
 - a stable Presolve CLI or bundle format
