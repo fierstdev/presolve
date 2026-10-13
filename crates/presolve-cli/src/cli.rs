@@ -24,10 +24,10 @@ pub(crate) enum RootCommand {
     /// Inspect the nearest application or an immutable `.presolved` release.
     Inspect(InspectArgs),
 
-    /// Check whether the nearest application can run in the nearest environment.
+    /// Check whether an application source or detached release can run here.
     Check(StructuredOutputArgs),
 
-    /// Show the exact `DeploymentPlan` selected for the nearest application and environment.
+    /// Show the exact `DeploymentPlan` for an application source or detached release.
     Plan(StructuredOutputArgs),
 
     /// Build and run the nearest application in the local environment.
@@ -103,6 +103,10 @@ pub(crate) struct InspectArgs {
 
 #[derive(Debug, Args)]
 pub(crate) struct StructuredOutputArgs {
+    /// Immutable `.presolved` release to resolve instead of the nearest Application Contract.
+    #[arg(value_name = "RELEASE")]
+    pub(crate) release: Option<PathBuf>,
+
     /// Emit versioned machine-readable JSON to standard output.
     #[arg(long)]
     pub(crate) json: bool,
@@ -411,6 +415,17 @@ mod tests {
             panic!("expected check command");
         };
 
+        assert!(args.release.is_none());
+        assert!(args.json);
+
+        let cli = Cli::try_parse_from(["presolve", "check", "dist/orders.presolved", "--json"])
+            .expect("detached release check command should parse");
+
+        let RootCommand::Check(args) = cli.command else {
+            panic!("expected check command");
+        };
+
+        assert_eq!(args.release, Some(PathBuf::from("dist/orders.presolved")));
         assert!(args.json);
     }
 
@@ -423,6 +438,17 @@ mod tests {
             panic!("expected plan command");
         };
 
+        assert!(args.release.is_none());
+        assert!(args.json);
+
+        let cli = Cli::try_parse_from(["presolve", "plan", "dist/orders.presolved", "--json"])
+            .expect("detached release plan command should parse");
+
+        let RootCommand::Plan(args) = cli.command else {
+            panic!("expected plan command");
+        };
+
+        assert_eq!(args.release, Some(PathBuf::from("dist/orders.presolved")));
         assert!(args.json);
     }
 

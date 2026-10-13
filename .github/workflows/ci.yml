@@ -133,6 +133,9 @@ jobs:
       - name: Check inspection and planning workflow
         run: ./scripts/check-inspection-planning.sh
 
+      - name: Check detached-release portability proof
+        run: bash ./scripts/check-portability-proof.sh
+
       - name: Check documentation
         run: python3 scripts/check-docs.py
 
