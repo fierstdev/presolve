@@ -1,0 +1,41 @@
+name: Refresh release lockfile
+
+on:
+  push:
+    branches:
+      - release/chunk-21-2b
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/chunk-21-2b
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Regenerate Cargo lockfile metadata
+        run: cargo metadata --format-version 1 > /dev/null
+
+      - name: Commit updated lockfile
+        shell: bash
+        run: |
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "release: refresh Cargo lockfile for v0.1.0-alpha.1"
+          git push origin HEAD:release/chunk-21-2b
