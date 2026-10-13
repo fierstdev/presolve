@@ -1,14 +1,8 @@
-use std::{
-    env, fs,
-    io::{Cursor, Read},
-    path::Path,
-    sync::Arc,
-    thread,
-    time::{Duration, Instant},
-};
+use std::{env, fs, sync::Arc, thread, time::{Duration, Instant}};
 
 use anyhow::{Context, Result, bail};
 use presolve_bundle::{PresolveBundle, WorkloadKind, application_contract_for_resolution};
+use presolve_core::ArtifactDigest;
 use presolve_environment::{inventory_from_specification, parse_environment};
 use presolve_node::{assemble_runtime, realize_local_providers, realize_plan_providers};
 use presolve_provider_kv_cloudflare::{
@@ -21,7 +15,6 @@ use presolve_provider_realization::{
 };
 use presolve_provider_sdk::KEY_VALUE_INTERFACE;
 use presolve_resolver::{DeploymentPlan, resolve};
-use tar::Archive;
 
 const ACCOUNT_ID_ENV: &str = "PRESOLVE_CLOUDFLARE_ACCOUNT_ID";
 const NAMESPACE_ID_ENV: &str = "PRESOLVE_CLOUDFLARE_KV_NAMESPACE_ID";
@@ -65,11 +58,14 @@ fn main() -> Result<()> {
     let environment_path = args
         .next()
         .context("missing Environment Specification path")?;
+    let component_path = args
+        .next()
+        .context("missing Component artifact extracted from the detached release")?;
     let input = args.next().context("missing application input")?;
 
     if args.next().is_some() {
         bail!(
-            "usage: release_realization_checkpoint <local|cloudflare> <release.presolved> <presolve.env.toml> <input>"
+            "usage: release_realization_checkpoint <local|cloudflare> <release.presolved> <presolve.env.toml> <component.wasm> <input>"
         );
     }
 
@@ -111,7 +107,7 @@ fn main() -> Result<()> {
         RealizationMode::Cloudflare => realize_cloudflare_provider(plan, provider_id)?,
     };
 
-    let component = component_bytes(&release_bytes, &bundle)?;
+    let component = verified_component_bytes(&component_path, &bundle)?;
     let runtime = assemble_runtime(plan, &registry)
         .context("could not assemble runtime for detached release")?;
     let output = execute_kv_proof(mode, &runtime, &component, &input)?;
@@ -174,7 +170,7 @@ fn realize_cloudflare_provider(
         .context("could not realize plan-selected Cloudflare KV provider")
 }
 
-fn component_bytes(release_bytes: &[u8], bundle: &PresolveBundle) -> Result<Vec<u8>> {
+fn verified_component_bytes(component_path: &str, bundle: &PresolveBundle) -> Result<Vec<u8>> {
     let workload = match bundle.manifest().workloads() {
         [workload] => workload,
         workloads => bail!(
@@ -199,35 +195,26 @@ fn component_bytes(release_bytes: &[u8], bundle: &PresolveBundle) -> Result<Vec<
         ),
     };
 
-    extract_archive_entry(release_bytes, artifact.path()).with_context(|| {
-        format!(
-            "could not extract Component artifact `{}` from detached release",
-            artifact.path()
-        )
-    })
-}
+    let bytes = fs::read(component_path)
+        .with_context(|| format!("could not read extracted Component `{component_path}`"))?;
+    let actual_size = u64::try_from(bytes.len()).context("Component size does not fit in u64")?;
 
-fn extract_archive_entry(release_bytes: &[u8], expected_path: &str) -> Result<Vec<u8>> {
-    let mut archive = Archive::new(Cursor::new(release_bytes));
-
-    for entry in archive.entries().context("could not read release archive")? {
-        let mut entry = entry.context("could not read release archive entry")?;
-        let path = entry
-            .path()
-            .context("could not read release archive entry path")?;
-
-        if path.as_ref() != Path::new(expected_path) {
-            continue;
-        }
-
-        let mut bytes = Vec::new();
-        entry
-            .read_to_end(&mut bytes)
-            .context("could not read embedded Component bytes")?;
-        return Ok(bytes);
+    if actual_size != artifact.size() {
+        bail!(
+            "extracted Component size mismatch: release manifest requires {} bytes, got {actual_size}",
+            artifact.size()
+        );
     }
 
-    bail!("release archive does not contain `{expected_path}`")
+    let actual_digest = ArtifactDigest::from_content(&bytes);
+    if actual_digest != artifact.digest() {
+        bail!(
+            "extracted Component digest mismatch: release manifest requires {}, got {actual_digest}",
+            artifact.digest()
+        );
+    }
+
+    Ok(bytes)
 }
 
 fn execute_kv_proof(
