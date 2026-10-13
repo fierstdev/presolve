@@ -1,0 +1,53 @@
+.docs-layout,
+.docs-nav,
+.docs-content,
+.docs-content section,
+.code-block,
+.link-row,
+.link-card {
+  min-width: 0;
+}
+
+.code-block {
+  width: 100%;
+  max-width: 100%;
+}
+
+.code-block pre {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.docs-content h2,
+.docs-content h3,
+.docs-content p,
+.docs-content li,
+.docs-nav a,
+.link-card {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .docs-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .docs-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 20px;
+  }
+}
+
+@media (max-width: 620px) {
+  .docs-nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .code-block pre {
+    padding: 16px;
+    font-size: 12px;
+  }
+}
