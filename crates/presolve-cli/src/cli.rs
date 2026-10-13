@@ -27,6 +27,9 @@ pub(crate) enum RootCommand {
     /// Check whether the nearest application can run in the nearest environment.
     Check,
 
+    /// Show the exact `DeploymentPlan` selected for the nearest application and environment.
+    Plan,
+
     /// Build and run the nearest application in the local environment.
     Dev(DevArgs),
 
@@ -371,6 +374,13 @@ mod tests {
         let cli = Cli::try_parse_from(["presolve", "check"]).expect("check command should parse");
 
         assert!(matches!(cli.command, RootCommand::Check));
+    }
+
+    #[test]
+    fn plan_command_parses() {
+        let cli = Cli::try_parse_from(["presolve", "plan"]).expect("plan command should parse");
+
+        assert!(matches!(cli.command, RootCommand::Plan));
     }
 
     #[test]

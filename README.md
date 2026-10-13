@@ -334,7 +334,9 @@ Implemented foundations include:
 - deterministic packaging and integrity verification
 - local Environment Specification discovery, creation, and validation
 - environment-scoped provider declaration with generated stable IDs
+- `presolve inspect` application semantic inspection
 - `presolve check` application/environment compatibility workflow
+- `presolve plan` exact symbolic DeploymentPlan inspection
 - plan-scoped local provider realization
 - node-side provider realization profiles and secret-resolution boundary
 - installed provider-adapter registry with plan-scoped materialization
@@ -406,16 +408,19 @@ Inspect the nearest Application Contract without requiring an environment:
 presolve inspect
 ```
 
-For compatibility checking and local execution against the nearest environment:
+For compatibility checking, exact plan inspection, and local execution against the nearest environment:
 
 ```bash
 presolve check
+presolve plan
 presolve dev --input "example"
 ```
 
 `presolve build` packages the Application Contract and workload artifact into a verified `.presolved` release without loading `presolve.env.toml`.
 
 `presolve check` answers whether the nearest Application Contract can be resolved against the nearest Environment Specification.
+
+`presolve plan` exposes the exact successful symbolic `DeploymentPlan`, including resolved workloads and selected provider IDs/versions.
 
 `presolve dev` performs that same resolution, realizes supported baseline providers locally, assembles the runtime, and executes the application.
 

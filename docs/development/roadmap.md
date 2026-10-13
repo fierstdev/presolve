@@ -172,13 +172,15 @@ Current subdivision:
 
 ```text
 20.1  `presolve inspect` application semantic view (complete)
-20.2  `presolve plan` exact DeploymentPlan view
+20.2  `presolve plan` exact DeploymentPlan view (complete)
 20.3  structured `--json` output for check/inspect/plan
 20.4  immutable `.presolved` release inspection
 20.5  UX checkpoint + docs
 ```
 
 20.1 adds an environment-independent `presolve inspect` command. It discovers only the nearest Application Contract and renders the normalized application semantics: workloads, capabilities and feature requirements, topology, resources, and network policy. It does not load an Environment Specification or perform provider resolution.
+
+20.2 adds `presolve plan`. It runs the existing resolver and exposes the exact successful `DeploymentPlan`: resolved workloads, selected provider IDs and exact versions, negotiated features, attached semantic capability contracts, and unbound optional capabilities. Failed resolution produces the existing stable resolver diagnostics rather than a partial or invented plan.
 
 ## Longer-term directions
 

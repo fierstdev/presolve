@@ -385,6 +385,36 @@ PS2005  unsupported workload execution class
 
 Environment selection is currently discovery-based. Explicit environment selection can be added later without changing this default.
 
+## Inspect the resolved deployment plan
+
+When compatibility succeeds, inspect the exact resolver result with:
+
+```bash
+presolve plan
+```
+
+`presolve plan` uses the same nearest Application Contract and Environment Specification as `presolve check`, but focuses on the resulting `DeploymentPlan`:
+
+```text
+Presolve plan
+  application: orders 1.0.0
+  environment: local (env_...)
+  workloads:
+    api -> component
+  capability bindings:
+    presolve:kv/store@0.1.0
+      provider: memory-services
+      provider id: prv_...
+      negotiated features: none
+      semantic contract: presolve:kv/store@0.1.0
+        operations: delete, get, set
+        guarantees: ...
+```
+
+The command shows only state that actually exists in the symbolic `DeploymentPlan`. It does not infer placement, endpoints, credentials, provider realization adapters, or infrastructure actions.
+
+If compatibility fails, no plan exists. `presolve plan` reports the same stable resolver diagnostics as `presolve check` and exits unsuccessfully.
+
 ## Local provider realization
 
 Presolve now has a node-side local realization profile for resolved plans.
