@@ -43,7 +43,7 @@ mod tests {
     }
 
     #[test]
-    fn package_version_is_zero_zero_one() {
-        assert_eq!(PRODUCT_VERSION, "0.0.1");
+    fn package_version_matches_first_developer_preview() {
+        assert_eq!(PRODUCT_VERSION, "0.1.0-alpha.1");
     }
 }
