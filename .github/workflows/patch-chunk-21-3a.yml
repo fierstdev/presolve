@@ -1,0 +1,128 @@
+name: Patch chunk 21.3a
+
+on:
+  push:
+    branches:
+      - proof/chunk-21-3a
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout proof branch
+        uses: actions/checkout@v4
+        with:
+          ref: proof/chunk-21-3a
+
+      - name: Patch detached-release CLI surface
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              source = file.read_text()
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one anchor, found {count}: {old[:80]!r}")
+              file.write_text(source.replace(old, new, 1))
+
+          replace_once(
+              "crates/presolve-cli/src/cli.rs",
+              "    /// Check whether the nearest application can run in the nearest environment.\n    Check(StructuredOutputArgs),\n\n    /// Show the exact `DeploymentPlan` selected for the nearest application and environment.\n    Plan(StructuredOutputArgs),",
+              "    /// Check whether an application source or detached release can run here.\n    Check(StructuredOutputArgs),\n\n    /// Show the exact `DeploymentPlan` for an application source or detached release.\n    Plan(StructuredOutputArgs),",
+          )
+          replace_once(
+              "crates/presolve-cli/src/cli.rs",
+              "#[derive(Debug, Args)]\npub(crate) struct StructuredOutputArgs {\n    /// Emit versioned machine-readable JSON to standard output.\n    #[arg(long)]\n    pub(crate) json: bool,\n}",
+              "#[derive(Debug, Args)]\npub(crate) struct StructuredOutputArgs {\n    /// Immutable `.presolved` release to resolve instead of the nearest Application Contract.\n    #[arg(value_name = \"RELEASE\")]\n    pub(crate) release: Option<PathBuf>,\n\n    /// Emit versioned machine-readable JSON to standard output.\n    #[arg(long)]\n    pub(crate) json: bool,\n}",
+          )
+          replace_once(
+              "crates/presolve-cli/src/cli.rs",
+              "        assert!(args.json);\n    }\n\n    #[test]\n    fn plan_command_supports_json_output()",
+              "        assert!(args.release.is_none());\n        assert!(args.json);\n\n        let cli = Cli::try_parse_from([\n            \"presolve\",\n            \"check\",\n            \"dist/orders.presolved\",\n            \"--json\",\n        ])\n        .expect(\"detached release check command should parse\");\n\n        let RootCommand::Check(args) = cli.command else {\n            panic!(\"expected check command\");\n        };\n\n        assert_eq!(args.release, Some(PathBuf::from(\"dist/orders.presolved\")));\n        assert!(args.json);\n    }\n\n    #[test]\n    fn plan_command_supports_json_output()",
+          )
+          replace_once(
+              "crates/presolve-cli/src/cli.rs",
+              "        assert!(args.json);\n    }\n\n    #[test]\n    fn dev_command_has_empty_input_by_default()",
+              "        assert!(args.release.is_none());\n        assert!(args.json);\n\n        let cli = Cli::try_parse_from([\n            \"presolve\",\n            \"plan\",\n            \"dist/orders.presolved\",\n            \"--json\",\n        ])\n        .expect(\"detached release plan command should parse\");\n\n        let RootCommand::Plan(args) = cli.command else {\n            panic!(\"expected plan command\");\n        };\n\n        assert_eq!(args.release, Some(PathBuf::from(\"dist/orders.presolved\")));\n        assert!(args.json);\n    }\n\n    #[test]\n    fn dev_command_has_empty_input_by_default()",
+          )
+
+          replace_once(
+              "crates/presolve-cli/src/lib.rs",
+              "    check::{CompatibilityCheck, check_compatibility},",
+              "    check::{CompatibilityCheck, check_compatibility, check_release_compatibility},",
+          )
+          replace_once(
+              "crates/presolve-cli/src/lib.rs",
+              "fn execute_check(args: &StructuredOutputArgs, current_directory: &Path) -> Result<()> {\n    let check = check_compatibility(current_directory)?;",
+              "fn execute_check(args: &StructuredOutputArgs, current_directory: &Path) -> Result<()> {\n    let check = compatibility_check_for_args(args, current_directory)?;",
+          )
+          replace_once(
+              "crates/presolve-cli/src/lib.rs",
+              "fn execute_plan(args: &StructuredOutputArgs, current_directory: &Path) -> Result<()> {\n    let check = check_compatibility(current_directory)?;",
+              "fn execute_plan(args: &StructuredOutputArgs, current_directory: &Path) -> Result<()> {\n    let check = compatibility_check_for_args(args, current_directory)?;",
+          )
+          replace_once(
+              "crates/presolve-cli/src/lib.rs",
+              "fn execute_dev(args: &cli::DevArgs, current_directory: &Path) -> Result<()> {",
+              "fn compatibility_check_for_args(\n    args: &StructuredOutputArgs,\n    current_directory: &Path,\n) -> Result<CompatibilityCheck> {\n    match args.release.as_deref() {\n        Some(release) => check_release_compatibility(current_directory, release),\n        None => check_compatibility(current_directory),\n    }\n}\n\nfn execute_dev(args: &cli::DevArgs, current_directory: &Path) -> Result<()> {",
+          )
+          replace_once(
+              "crates/presolve-cli/src/lib.rs",
+              "    println!(\"  contract: {}\", check.application.path.display());\n    println!(\"Environment: {}\", environment.name());",
+              "    println!(\n        \"  {}: {}\",\n        check.application.source_label(),\n        check.application.path.display()\n    );\n    if let Some(digest) = check.application.release_digest() {\n        println!(\"  release digest: {digest}\");\n    }\n    println!(\"Environment: {}\", environment.name());",
+          )
+
+          replace_once(
+              "crates/presolve-cli/src/plan.rs",
+              "    line(\n        &mut output,\n        format_args!(\"  contract: {}\", check.application.path.display()),\n    );",
+              "    line(\n        &mut output,\n        format_args!(\n            \"  {}: {}\",\n            check.application.source_label(),\n            check.application.path.display()\n        ),\n    );\n    if let Some(digest) = check.application.release_digest() {\n        line(&mut output, format_args!(\"  release digest: {digest}\"));\n    }",
+          )
+
+          replace_once(
+              "crates/presolve-cli/src/json_output.rs",
+              "    check::CompatibilityCheck,",
+              "    check::{CompatibilityApplication, CompatibilityCheck},",
+          )
+          replace_once(
+              "crates/presolve-cli/src/json_output.rs",
+              '        "application": application_context_json(&check.application),',
+              '        "application": compatibility_application_context_json(&check.application),',
+          )
+          replace_once(
+              "crates/presolve-cli/src/json_output.rs",
+              '        "application": application_context_json(&check.application),',
+              '        "application": compatibility_application_context_json(&check.application),',
+          )
+          replace_once(
+              "crates/presolve-cli/src/json_output.rs",
+              "fn inspection_workloads_json(document: &ApplicationDocument) -> Vec<Value> {",
+              "fn compatibility_application_context_json(document: &CompatibilityApplication) -> Value {\n    let contract = &document.contract;\n    let application = contract.application();\n    let source_kind = document.source_label();\n    let source_path = document.path.display().to_string();\n\n    json!({\n        \"name\": application.name(),\n        \"version\": application.version().to_string(),\n        \"contract\": if source_kind == \"contract\" { Some(source_path.as_str()) } else { None },\n        \"release\": if source_kind == \"release\" { Some(source_path.as_str()) } else { None },\n        \"release_digest\": document.release_digest(),\n        \"contract_version\": contract.contract_version().to_string(),\n    })\n}\n\nfn inspection_workloads_json(document: &ApplicationDocument) -> Vec<Value> {",
+          )
+
+          replace_once(
+              "crates/presolve-cli/src/check.rs",
+              "        assert_eq!(\n            check.application.release_digest(),\n            Some(bundle.release_digest().unwrap().to_string().as_str())\n        );",
+              "        let expected_digest = bundle.release_digest().unwrap().to_string();\n        assert_eq!(check.application.release_digest(), Some(expected_digest.as_str()));",
+          )
+          PY
+
+      - name: Format
+        run: cargo fmt --all
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/presolve-cli crates/presolve-bundle
+          git commit -m "feat(cli): plan detached immutable releases"
+          git push origin HEAD:proof/chunk-21-3a
