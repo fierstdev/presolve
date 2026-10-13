@@ -15,6 +15,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag; must match v<workspace version>"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -88,7 +93,9 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    if: >-
+      (github.event_name == 'push' && github.ref_type == 'tag') ||
+      (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
     needs: package
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -99,8 +106,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify tag matches workspace version
+      - name: Verify release request
+        id: release-meta
         shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
         run: |
           VERSION="$(python3 - <<'PY'
           import tomllib
@@ -114,11 +124,39 @@ jobs:
           )"
 
           EXPECTED_TAG="v${VERSION}"
-          if [[ "$GITHUB_REF_NAME" != "$EXPECTED_TAG" ]]; then
-            echo "release tag $GITHUB_REF_NAME does not match workspace version $VERSION" >&2
-            echo "expected tag: $EXPECTED_TAG" >&2
-            exit 1
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$GITHUB_REF_NAME" != "main" ]]; then
+              echo "manual release publication must be dispatched from main" >&2
+              exit 1
+            fi
+
+            RELEASE_TAG="$REQUESTED_TAG"
+            if [[ "$RELEASE_TAG" != "$EXPECTED_TAG" ]]; then
+              echo "requested release tag $RELEASE_TAG does not match workspace version $VERSION" >&2
+              echo "expected tag: $EXPECTED_TAG" >&2
+              exit 1
+            fi
+
+            if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+              echo "release tag $RELEASE_TAG already exists; refusing to recreate it from a manual dispatch" >&2
+              exit 1
+            fi
+
+            MODE="manual"
+          else
+            RELEASE_TAG="$GITHUB_REF_NAME"
+            if [[ "$RELEASE_TAG" != "$EXPECTED_TAG" ]]; then
+              echo "release tag $RELEASE_TAG does not match workspace version $VERSION" >&2
+              echo "expected tag: $EXPECTED_TAG" >&2
+              exit 1
+            fi
+
+            MODE="tag"
           fi
+
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
 
       - name: Download packaged artifacts
         uses: actions/download-artifact@v4
@@ -157,19 +195,27 @@ jobs:
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release-meta.outputs.tag }}
+          RELEASE_MODE: ${{ steps.release-meta.outputs.mode }}
         shell: bash
         run: |
-          NOTES_FILE="docs/releases/${GITHUB_REF_NAME}.md"
+          NOTES_FILE="docs/releases/${RELEASE_TAG}.md"
           if [[ -f "$NOTES_FILE" ]]; then
             NOTES_ARGS=(--notes-file "$NOTES_FILE")
           else
             NOTES_ARGS=(--generate-notes)
           fi
 
-          gh release create "$GITHUB_REF_NAME" \
+          if [[ "$RELEASE_MODE" == "manual" ]]; then
+            TAG_ARGS=(--target "$GITHUB_SHA")
+          else
+            TAG_ARGS=(--verify-tag)
+          fi
+
+          gh release create "$RELEASE_TAG" \
             release-artifacts/*.tar.gz \
             release-artifacts/*.tar.gz.sha256 \
-            --verify-tag \
+            "${TAG_ARGS[@]}" \
             --prerelease \
             "${NOTES_ARGS[@]}" \
-            --title "Presolve $GITHUB_REF_NAME"
+            --title "Presolve $RELEASE_TAG"
