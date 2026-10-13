@@ -14,13 +14,13 @@ struct KeyValueComponent;
 
 impl bindings::Guest for KeyValueComponent {
     fn run(input: String) -> String {
-        const KEY: &str = "message";
+        let key = format!("message/{input}");
 
-        if let Err(error) = store::set(KEY, &input) {
+        if let Err(error) = store::set(&key, &input) {
             return format!("error:{}", error_code(error));
         }
 
-        let value = match store::get(KEY) {
+        let value = match store::get(&key) {
             Ok(Some(value)) => value,
             Ok(None) => {
                 return "error:missing".to_owned();
@@ -30,7 +30,7 @@ impl bindings::Guest for KeyValueComponent {
             }
         };
 
-        match store::delete(KEY) {
+        match store::delete(&key) {
             Ok(true) => {
                 format!("stored:{value}")
             }
