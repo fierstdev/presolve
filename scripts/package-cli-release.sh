@@ -8,8 +8,11 @@ cd "$ROOT"
 mkdir -p "$OUTPUT_DIRECTORY"
 OUTPUT_DIRECTORY="$(cd "$OUTPUT_DIRECTORY" && pwd)"
 
+echo "== verify locked dependency graph =="
+cargo metadata --locked --format-version 1 > /dev/null
+
 echo "== build Presolve CLI release binary =="
-cargo build --release -p presolve-cli
+cargo build --locked --release -p presolve-cli
 
 BINARY="$ROOT/target/release/presolve"
 if [[ ! -x "$BINARY" ]]; then
