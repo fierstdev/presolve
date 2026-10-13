@@ -58,6 +58,7 @@ The initial local developer workflow is implemented. See [Getting started](getti
 - [Chunk 18 checkpoint](development/chunk-18-checkpoint.md) — real cloud-provider portability proof, configuration boundary, and operational-characteristics conclusions.
 - [Chunk 19 checkpoint](development/chunk-19-checkpoint.md) — build/package workflow, deterministic release packaging, and source-toolchain reproducibility boundary.
 - [Chunk 20 checkpoint](development/chunk-20-checkpoint.md) — source/release inspection, compatibility, exact planning, structured output, and rejected-resolution behavior.
+- [Chunk 21 release infrastructure](development/chunk-21-release-infrastructure.md) — public CI evidence, native CLI packaging, checksum verification, and tag-gated release publication.
 
 ## Status language
 
