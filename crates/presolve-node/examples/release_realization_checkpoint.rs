@@ -88,9 +88,8 @@ fn main() -> Result<()> {
     let environment_text = fs::read_to_string(&environment_path).with_context(|| {
         format!("could not read Environment Specification `{environment_path}`")
     })?;
-    let specification = parse_environment(&environment_text).with_context(|| {
-        format!("invalid Environment Specification `{environment_path}`")
-    })?;
+    let specification = parse_environment(&environment_text)
+        .with_context(|| format!("invalid Environment Specification `{environment_path}`"))?;
     let inventory = inventory_from_specification(&specification)
         .context("could not normalize Environment Specification for resolution")?;
 
@@ -270,9 +269,7 @@ fn execute_kv_proof(
         .context("detached Component KV cleanup failed")?;
 
     if delete_output != "deleted" {
-        bail!(
-            "detached Component KV cleanup returned `{delete_output}` instead of `deleted`"
-        );
+        bail!("detached Component KV cleanup returned `{delete_output}` instead of `deleted`");
     }
 
     Ok(observed)
