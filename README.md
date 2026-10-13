@@ -20,6 +20,10 @@
   <strong>Build software once. Decide where it runs later.</strong>
 </p>
 
+<p align="center">
+  <a href="https://github.com/fierstdev/presolve/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fierstdev/presolve/actions/workflows/ci.yml/badge.svg"></a>
+</p>
+
 Presolve is an open application portability and distribution layer.
 
 It separates **what an application is** from **where and how that application is realized**.
@@ -79,71 +83,46 @@ Presolve introduces a compatibility boundary between the application and its exe
 
 An application asks for abstract capabilities:
 
-```text
-application
-├── SQL database
-├── key-value storage
-├── object storage
-├── secrets
-├── compute resources
-└── network access
+```toml
+[[capabilities]]
+interface = "presolve:kv/store"
+version = "^0.1"
 ```
 
-An environment advertises what it can provide:
+The environment declares providers that can satisfy those capabilities:
 
-```text
-environment
-├── provider A → SQL
-├── provider B → KV
-├── provider C → objects
-└── available compute/resources
+```toml
+[[providers]]
+id = "prv_..."
+name = "memory-services"
+
+[[providers.capabilities]]
+interface = "presolve:kv/store"
+version = "0.1.0"
 ```
 
-The resolver determines whether the environment can satisfy the application and explains why.
+The resolver either rejects the pairing with stable diagnostics or returns a deterministic `DeploymentPlan`.
 
-The application does not need to know which vendor or infrastructure implementation was selected.
+## Current state
 
-## Application model
+Presolve is pre-stable. The current repository proves the core portability model end to end across WebAssembly Components, OCI/container workload identity, environment specifications, capability negotiation, provider selection, deterministic release packaging, local execution, TypeScript authoring, and a real Cloudflare Workers KV provider adapter.
 
-A Presolve application can contain multiple workloads.
+The public CI workflow runs the secret-free baseline continuously: workspace Rust formatting/tests/Clippy, TypeScript authoring checks, deterministic build/package checks, inspection/planning checks, cloud-provider boundary tests, and documentation validation. Docker-backed and live-cloud execution proofs remain explicit follow-up checkpoints rather than hidden CI requirements.
 
-```text
-Application
-├── Workloads
-│   ├── api
-│   └── worker
-├── Interfaces
-├── Relationships
-├── Capabilities
-├── Resource requirements
-└── Network policy
-```
+See [Project status](docs/development/project-status.md) for the current implementation boundary.
 
-For example:
+## Application Contract
+
+`presolve.toml` is the language-independent Application Contract.
+
+Example:
 
 ```toml
 contract_version = "0.1"
 
 [application]
-name = "commerce"
+name = "orders"
 version = "1.0.0"
-
-[[workloads]]
-name = "api"
-kind = "component"
-
-[[workloads]]
-name = "worker"
-kind = "component"
-
-[[interfaces]]
-name = "jobs"
-kind = "request_response"
-
-[[relationships]]
-from = "api"
-to = "worker"
-interface = "jobs"
 
 [[capabilities]]
 interface = "presolve:kv/store"
@@ -157,268 +136,77 @@ cpu_millis = 250
 outbound = "deny"
 ```
 
-This describes application semantics:
+Application code does not choose a provider, region, credential, endpoint, or deployment target.
 
-```text
-commerce@1.0.0
+## Environment Specification
 
-api ──jobs──▶ worker
+`presolve.env.toml` describes execution supply.
 
-requires:
-  presolve:kv/store ^0.1
-  memory >= 128 MiB
-  CPU >= 250m
-  outbound network denied
+Example:
+
+```toml
+format_version = "0.1"
+
+[environment]
+id = "env_..."
+name = "local"
+
+[resources]
+memory_mib = 4096
+cpu_millis = 4000
+
+[execution]
+workloads = ["component"]
+
+[[providers]]
+id = "prv_..."
+name = "memory-services"
+
+[[providers.capabilities]]
+interface = "presolve:kv/store"
+version = "0.1.0"
 ```
 
-It does **not** specify whether the application runs on a developer laptop, in a cloud account, on Kubernetes, inside a private VPC, or on some future Presolve-compatible environment.
+The resolver normalizes this specification into an `EnvironmentInventory` and evaluates it against the application requirements.
 
-Those are realization decisions.
+## Immutable application releases
 
-## Workloads, capabilities, and interfaces
-
-Presolve deliberately separates three concepts.
-
-### Workloads
-
-A workload is one executable constituent of an application.
-
-The application model currently recognizes:
-
-- WebAssembly Component
-- OCI-compatible container
-
-WebAssembly Component execution is implemented end to end. OCI container execution now also has an end-to-end local architectural proof through immutable release identity, backend-neutral materialization, Docker execution, and authenticated provider-neutral capability transport.
-
-Presolve's application model is designed so additional workload classes can be added without changing application identity semantics. Future execution classes may include native executables, static assets, and other software artifacts.
-
-### Capabilities
-
-Capabilities express dependencies between an application and its environment.
-
-Examples include:
-
-- SQL
-- key-value storage
-- object storage
-- secrets
-- queues
-- identity
-- networking
-- device access
-
-Providers satisfy capabilities.
-
-Application code depends on the capability contract rather than a vendor-specific implementation.
-
-### Interfaces and relationships
-
-Interfaces describe communication inside an application.
-
-```text
-api ── jobs ──▶ worker
-```
-
-The relationship is semantic. It does not require a specific transport.
-
-Depending on the eventual environment and deployment model, the same relationship could be realized through component linking, IPC, networking, service bindings, or another compatible mechanism.
-
-## Application releases
-
-Presolve packages immutable application releases as `.presolved` bundles.
-
-A release contains application semantics and workload artifacts, but does not contain deployment-specific provider selections or infrastructure configuration.
-
-```text
-application.presolved
-├── manifest.json
-└── artifacts/
-    ├── api.wasm
-    └── worker.wasm
-```
-
-Release identity is derived from the canonical manifest.
-
-The manifest records cryptographic digests for the artifacts it references, forming a content-addressed relationship between application semantics and executable content.
-
-Changing an artifact or changing application semantics changes the release identity.
-
-Repacking the same logical release does not.
-
-## Resolution and deployment
-
-Presolve distinguishes three first-class concepts:
-
-```text
-Application
-    what the software is
-
-Environment
-    what execution resources and capabilities are available
-
-Deployment
-    one realization of an Application Release in an Environment
-```
-
-The environment side begins with a versioned declarative Environment Specification. Its canonical filename is `presolve.env.toml`.
-
-The specification describes stable environment/provider identity, resource capacity, supported workload classes, and provider capability supply. Presolve validates and normalizes it into the Environment Inventory consumed by the resolver.
-
-```text
-Application Contract          Environment Specification
-        │                              │
-        │                              ▼
-        │                     Environment Inventory
-        │                              │
-        └──────────────┬───────────────┘
-                       ▼
-                    Resolver
-                       │
-                       ▼
-                 Deployment Plan
-```
-
-Environment and provider IDs are opaque stable identities. Normal user-facing tooling is expected to generate them when environments/providers are created and persist them into the Environment Specification; parsing never silently invents new identities.
-
-The resolver does not instantiate providers and does not execute workloads. A Presolve node later materializes selected provider IDs into concrete implementations.
-
-See [`docs/reference/environment-specification.md`](docs/reference/environment-specification.md) for the Environment Specification contract and identity rules.
-
-A Presolve node later materializes the plan into concrete runtime and provider bindings.
-
-## Current implementation
-
-Presolve is in active early development.
-
-Current version:
-
-```text
-0.0.1
-```
-
-Implemented foundations include:
-
-- Application Contract parsing and validation
-- stable Presolve diagnostics
-- WebAssembly Component workloads
-- Wasmtime-based execution
-- fuel, memory, and deadline isolation
-- capability/provider abstraction
-- canonical semantic capability contracts
-- in-memory key-value provider
-- in-memory object-storage provider
-- reusable provider conformance suites
-- versioned Environment Specification parsing, validation, and deterministic normalization
-- specification-to-inventory semantic enrichment
-- explicit workload execution compatibility
-- environment inventories
-- deterministic capability resolution
-- required and preferred semantic capability-feature negotiation
-- symbolic deployment plans
-- deployment-plan materialization
-- Wasm object-storage bindings with chunked guest/host transfer
-- bounded host-side object transfer state
-- end-to-end object-storage workload validation
-- deterministic `.presolved` bundles
-- immutable OCI image descriptor identity for container workloads
-- backend-neutral container materialization and local Docker execution
-- authenticated container KV/object capability transport
-- end-to-end OCI/container execution checkpoint
-- TypeScript `@presolve/sdk` with typed KV/object capability APIs
-- TypeScript container and Component execution adapters
-- real TypeScript OCI capability-path checkpoint
-- automated TypeScript-to-Component `presolve build` path
-- SHA-256 application release identity
-- multiple workloads per application
-- application-internal interfaces and topology at the contract layer
-- deterministic packaging and integrity verification
-- local Environment Specification discovery, creation, and validation
-- environment-scoped provider declaration with generated stable IDs
-- `presolve inspect` application semantic inspection
-- verified immutable `.presolved` release inspection
-- `presolve check` application/environment compatibility workflow
-- `presolve plan` exact symbolic DeploymentPlan inspection
-- plan-scoped local provider realization
-- node-side provider realization profiles and secret-resolution boundary
-- installed provider-adapter registry with plan-scoped materialization
-- Cloudflare Workers KV adapter
-- live external cloud-provider portability checkpoint
-- environment-independent `presolve build` for Component, OCI, mixed, Rust-source, and TypeScript-source `.presolved` releases
-- `presolve dev` local Component execution for the current single-workload Rust path
-
-The project is still pre-stable.
-
-No API, protocol, bundle format, capability interface, or contract schema should be considered stable until explicitly documented as such.
-
-## TypeScript authoring
-
-The experimental TypeScript authoring layer lives in `@presolve/sdk`.
-
-Application code uses provider-neutral capability APIs:
-
-```ts
-import { kv, objects } from "@presolve/sdk";
-
-await kv.set("session", "abc");
-const value = await kv.get("session");
-```
-
-Execution-specific bootstrap remains separate:
-
-```text
-@presolve/sdk/container       authenticated HTTP/JSON bridge
-@presolve/sdk/component       normalized direct Component/WIT imports
-@presolve/sdk/component-jco   Jco guest-import normalization
-```
-
-The OCI TypeScript path has an end-to-end Docker proof. `presolve build` now also automates the TypeScript-to-Component path for the currently supported Component WIT projection, while keeping Jco-specific glue out of application source.
-
-See [TypeScript authoring](docs/architecture/typescript-authoring.md) and the [Chunk 17 checkpoint](docs/development/chunk-17-checkpoint.md).
-
-## External provider portability
-
-Presolve now has a live portability proof against Cloudflare Workers KV.
-
-A provider-neutral KV requirement resolves to a stable `ProviderId`; node-side realization then maps that identity to the Cloudflare adapter, non-secret settings, and secret references. Cloudflare-specific account, namespace, endpoint, and credential details do not enter the Application Contract or `.presolved` release.
-
-The normal root-level configuration surface remains `presolve.toml` and `presolve.env.toml`. Chunk 18 does not introduce another mandatory provider/node TOML file.
-
-See [Provider realization](docs/architecture/provider-realization.md) and the [Chunk 18 checkpoint](docs/development/chunk-18-checkpoint.md).
-
-## Local development
-
-The initial local developer workflow is implemented through the `presolve` CLI.
-
-A typical local environment begins with:
-
-```bash
-presolve env init
-presolve env provider add memory-services --provides kv,objects
-presolve env check
-```
-
-From an application directory, construct an immutable release independently of any environment:
+`presolve build` constructs an environment-independent `.presolved` release.
 
 ```bash
 presolve build
 ```
 
-Inspect the nearest Application Contract without requiring an environment, or inspect a built immutable release directly:
+The same normalized Application Contract and the same workload artifact identity produce the same canonical manifest, release digest, and archive bytes.
+
+A `.presolved` release may contain embedded WebAssembly Component artifacts and/or immutable OCI image descriptors. It does not contain target-environment bindings, provider credentials, registry credentials, runtime instance IDs, or infrastructure placement.
+
+Inspect a release directly:
 
 ```bash
+presolve inspect dist/orders.presolved
+presolve inspect dist/orders.presolved --json
+```
+
+## Inspection, compatibility, and planning
+
+The CLI separates four questions:
+
+```text
 presolve inspect
-presolve inspect dist/<application>.presolved
-```
+    What does this application require?
 
-For compatibility checking, exact plan inspection, and local execution against the nearest environment:
+presolve build
+    What immutable application release are we distributing?
 
-```bash
 presolve check
+    Can this environment satisfy it?
+
 presolve plan
-presolve dev --input "example"
+    What exact symbolic selections did the resolver make?
 ```
 
-Automation can request versioned structured output:
+Machine-readable automation surfaces are available for inspection, compatibility, and planning:
 
 ```bash
 presolve inspect --json
@@ -426,109 +214,231 @@ presolve check --json
 presolve plan --json
 ```
 
-`presolve build` packages the Application Contract and workload artifact into a verified `.presolved` release without loading `presolve.env.toml`.
+Rejected `check --json` and `plan --json` invocations still return non-zero after emitting structured stable problem data to stdout.
 
-`presolve check` answers whether the nearest Application Contract can be resolved against the nearest Environment Specification.
+See [CLI JSON output](docs/reference/cli-json.md).
 
-`presolve plan` exposes the exact successful symbolic `DeploymentPlan`, including resolved workloads and selected provider IDs/versions.
+## Workloads
 
-`presolve dev` performs that same resolution, realizes supported baseline providers locally, assembles the runtime, and executes the application.
+Current workload vocabulary includes:
 
-Automatic source builds currently cover the implemented single-workload Rust `cdylib` path targeting `wasm32-wasip2`. A prebuilt WebAssembly Component can be supplied with `--component PATH`, so that Rust build convention is not part of the Application Contract.
+- WebAssembly Components
+- OCI/container image descriptors
 
-The local workflow remains experimental and pre-stable.
+WebAssembly Component execution is implemented end to end. OCI container execution also has an end-to-end local architectural proof through immutable release identity, backend-neutral materialization, Docker execution, and authenticated capability transport.
 
-## Design principles
+OCI image bytes are not embedded in `.presolved`; the release records immutable descriptor identity and resolves an environment-specific image source later.
 
-Presolve development follows several architectural constraints:
+## Capabilities
 
-1. **Application identity is independent of deployment environment.**
-2. **Application, Environment, and Deployment are distinct concepts.**
-3. **Applications request capabilities rather than vendors.**
-4. **Providers implement capabilities.**
-5. **The resolver decides compatibility and should explain its decisions.**
-6. **The runtime does not depend on the resolver or a control plane.**
-7. **Deployment plans remain symbolic until materialization.**
-8. **Presolve applications must remain usable without a Fierst-hosted service.**
-9. **Adding a new environment should not require rewriting application code.**
-10. **Build-system and developer-filesystem details are not application semantics.**
+Current built-in semantic contracts include:
 
-A useful test for new features is:
+### Key-value
 
-> Does this describe the application, or does it describe one particular way of deploying the application?
+```text
+presolve:kv/store@0.1.0
+```
 
-If the answer is the latter, it generally does not belong in the Application Contract.
+Operations:
+
+```text
+get
+set
+delete
+```
+
+### Object storage
+
+```text
+presolve:objects/store@0.1.0
+```
+
+Operations:
+
+```text
+get
+put
+delete
+head
+list
+```
+
+Optional features include:
+
+```text
+range-read
+conditional-write
+user-metadata
+```
+
+Applications can distinguish hard feature requirements from preferred features. The resolver rejects missing required semantics and ranks compatible providers using preferred features.
+
+## Providers
+
+Providers implement capability contracts.
+
+Presolve currently includes:
+
+- in-memory KV
+- in-memory object storage
+- Cloudflare Workers KV adapter
+
+Provider selection is represented by stable `ProviderId` values in `DeploymentPlan`. Runtime realization joins those IDs to concrete provider instances.
+
+The Cloudflare adapter is a real portability proof, not a production-support claim. Workers KV has operational characteristics that differ from the canonical KV conformance assumptions, including distributed eventual consistency and per-key write limits.
+
+See [Provider realization](docs/architecture/provider-realization.md).
+
+## TypeScript
+
+`@presolve/sdk` provides transport-neutral application-facing capability APIs.
+
+```ts
+import { kv } from "@presolve/sdk";
+
+await kv.set("order:42", bytes);
+const value = await kv.get("order:42");
+```
+
+The application-facing API does not expose Docker, HTTP, WIT, provider IDs, credentials, or environment discovery.
+
+Execution adapters live behind explicit package boundaries:
+
+```text
+@presolve/sdk/container
+@presolve/sdk/component
+```
+
+`presolve.toml` remains the canonical Application Contract. TypeScript does not introduce a second semantic configuration file.
+
+## Local development
+
+Create a local environment:
+
+```bash
+presolve env init
+```
+
+Declare a provider:
+
+```bash
+presolve env provider add memory-services --provides kv
+```
+
+Check compatibility:
+
+```bash
+presolve check
+```
+
+Inspect the exact resolver output:
+
+```bash
+presolve plan
+```
+
+Run a local Component workload:
+
+```bash
+presolve dev
+```
+
+## Build examples
+
+Build a precompiled Component:
+
+```bash
+presolve build --component app.wasm
+```
+
+Build explicit multi-workload Components:
+
+```bash
+presolve build \
+  --component-for api=api.wasm \
+  --component-for worker=worker.wasm
+```
+
+Build an OCI descriptor-backed workload:
+
+```bash
+presolve build \
+  --oci-image-for api=manifest,sha256:<digest>,<size>
+```
+
+Build from TypeScript Component source:
+
+```bash
+presolve build --typescript-entry src/application.ts
+```
+
+Build from Rust Component source:
+
+```bash
+presolve build --cargo-package my-component
+```
 
 ## Repository structure
 
 ```text
 crates/
-  presolve-core/          Shared vocabulary and foundational types
-  presolve-capability/    Canonical capability semantic contracts
-  presolve-contract/      Application Contract
-  presolve-runtime/       WebAssembly Component runtime
-  presolve-bundle/        Canonical application release bundles
-  presolve-policy/        Deployment and security policy
-  presolve-environment/   Environment Specification and normalized inventory
-  presolve-resolver/      Environment compatibility and resolution
-  presolve-provider-sdk/  Provider interfaces
-  presolve-provider-conformance/
-                          Reusable provider semantic conformance suites
-  presolve-node/          Deployment-plan materialization
-  presolve-cli/           Presolve command-line interface
+    presolve-core
+    presolve-capability
+    presolve-contract
+    presolve-runtime
+    presolve-bundle
+    presolve-policy
+    presolve-resolver
+    presolve-provider-sdk
+    presolve-provider-conformance
+    presolve-provider-realization
+    presolve-node
+    presolve-cli
+    presolve-environment
+    presolve-executor-sdk
+    presolve-capability-bridge
 
 providers/
-  kv-memory/              In-memory key-value provider
-  objects-memory/         In-memory object-storage provider
+    kv-memory
+    kv-cloudflare
+    objects-memory
+
+executors/
+    docker
 
 packages/
-  sdk/                    TypeScript authoring SDK and execution adapters
+    sdk
 
-wit/                      Versioned WebAssembly Component interfaces
-examples/                 Example Presolve applications
-docs/                     Design and format references
-scripts/                  Validation and end-to-end checks
+examples/
+    ...
 ```
 
 ## Documentation
 
-Public documentation lives in [`docs/`](docs/README.md).
-
 Start with:
 
+- [Documentation index](docs/README.md)
 - [Application portability](docs/concepts/application-portability.md)
-- [Application Contract reference](docs/reference/application-contract.md)
-- [Environment Specification reference](docs/reference/environment-specification.md)
-- [Architecture overview](docs/architecture/overview.md)
-- [TypeScript authoring](docs/architecture/typescript-authoring.md)
-- [Project status](docs/development/project-status.md)
+- [Applications](docs/concepts/applications.md)
+- [Environments](docs/concepts/environments.md)
+- [Capabilities and providers](docs/concepts/capabilities-and-providers.md)
+- [Resolution and deployment](docs/concepts/resolution-and-deployment.md)
+- [Application Contract](docs/reference/application-contract.md)
+- [Environment Specification](docs/reference/environment-specification.md)
+- [`.presolved` bundle](docs/reference/presolved-bundle.md)
+- [CLI JSON output](docs/reference/cli-json.md)
 
-## Project direction
+## Configuration model
 
-WebAssembly Components are the first execution substrate because they provide a strong portable foundation. They are not intended to define the outer boundary of Presolve.
-
-The longer-term goal is for the Presolve application model to describe software independently of its eventual execution substrate:
+Normal durable root-level Presolve configuration remains intentionally small:
 
 ```text
-Application
-├── Component workload
-├── OCI workload
-├── Native workload
-├── Static workload
-└── ...
+presolve.toml
+presolve.env.toml
 ```
 
-while preserving the same separation between application identity and deployment realization.
+Provider realization configuration belongs at the provider/node boundary rather than in another required application configuration file.
 
 ## License
 
-Presolve is licensed under the **Apache License, Version 2.0**.
-
-See [`LICENSE`](LICENSE).
-
-## Project
-
-Presolve is developed by **Fierst LLC**.
-
-- Website: https://presolve.dev
-- Repository: https://github.com/fierstdev/presolve
+Apache-2.0
