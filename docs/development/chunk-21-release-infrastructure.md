@@ -26,7 +26,7 @@ Live cloud credentials are not required by default CI.
 21.2 is split deliberately:
 
 ```text
-21.2a  release build/package infrastructure
+21.2a  release build/package infrastructure (complete)
 21.2b  first tagged developer-preview release
 ```
 
@@ -36,9 +36,9 @@ The release workflow builds the native `presolve` CLI on four GitHub-hosted runn
 
 ```text
 x86_64-unknown-linux-gnu
- aarch64-unknown-linux-gnu
+aarch64-unknown-linux-gnu
 x86_64-apple-darwin
- aarch64-apple-darwin
+aarch64-apple-darwin
 ```
 
 Each platform produces:
@@ -59,6 +59,30 @@ The packaged binary is executed with `--version` before the artifact is uploaded
 
 Pull requests and manual workflow runs build and upload temporary workflow artifacts only. They do not create GitHub Releases.
 
+### 21.2b first developer preview
+
+The first public binary release is intentionally versioned:
+
+```text
+0.1.0-alpha.1
+```
+
+with the matching Git tag:
+
+```text
+v0.1.0-alpha.1
+```
+
+This version identifies a developer preview, not a stable compatibility boundary. CLI behavior, schemas, capability contracts, bundle formats, and SDK APIs remain pre-stable unless separately documented otherwise.
+
+The release has curated notes at:
+
+```text
+docs/releases/v0.1.0-alpha.1.md
+```
+
+The tag is created only after the version-preparation pull request is merged and all normal CI plus all four native release-package jobs are green.
+
 ### Tag-gated publication
 
 Publication is reserved for pushed `v*` tags.
@@ -74,11 +98,11 @@ A mismatched tag fails instead of publishing an ambiguously versioned binary.
 
 The publication job then downloads all four native archives, independently verifies their SHA-256 checksum files, and creates a GitHub prerelease containing the archives and checksums.
 
-The first actual tag remains 21.2b so the release machinery can prove itself on a pull request before anything is published.
+If `docs/releases/<TAG>.md` exists in the tagged commit, the release uses that curated file. Otherwise the workflow falls back to GitHub-generated notes.
 
 ## Deliberate non-goals
 
-21.2a does not add:
+21.2 does not add:
 
 - Homebrew distribution
 - shell installer scripts
