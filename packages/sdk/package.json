@@ -1,6 +1,6 @@
 {
   "name": "@presolve/sdk",
-  "version": "0.0.1",
+  "version": "0.1.0-alpha.1",
   "description": "TypeScript authoring SDK for Presolve capability semantics",
   "type": "module",
   "license": "Apache-2.0",
