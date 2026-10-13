@@ -183,6 +183,8 @@ The checkpoint verifies byte-identical `.presolved` output when equivalent relea
 - immutable OCI descriptors
 - mixed Component/OCI mappings in different CLI orders
 
-It also runs the pinned TypeScript Component source build twice from clean generated state and compares both the generated Component and final `.presolved` archive.
+For TypeScript source builds, the checkpoint runs two clean builds and verifies that Presolve regenerates the same bootstrap source, the same WIT package, and the same exported/imported Component interface. It also repackages one generated Component artifact twice and requires byte-identical `.presolved` output.
 
-The distinction is deliberate: deterministic Presolve packaging is a Presolve invariant, while reproducibility of source compiler output is a property of the selected toolchain. The current TypeScript checkpoint proves the pinned toolchain under the tested conditions; it does not turn all language compilers or cross-platform source builds into byte-reproducible guarantees.
+The external Jco/ComponentizeJS compiler output itself is observed rather than treated as a Presolve invariant. Public CI demonstrated that the locked toolchain can emit different Component bytes across two clean builds on the same Ubuntu runner while preserving the same Presolve-generated inputs and Component interface.
+
+The distinction is deliberate: deterministic Presolve packaging is a Presolve invariant, while source compiler byte reproducibility belongs to the selected external toolchain. Presolve therefore guarantees deterministic packaging for equal artifact identity rather than claiming same-platform or cross-platform compiler reproducibility.
