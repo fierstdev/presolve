@@ -22,13 +22,13 @@ pub(crate) enum RootCommand {
     Build(BuildArgs),
 
     /// Inspect the semantic model of the nearest application.
-    Inspect,
+    Inspect(StructuredOutputArgs),
 
     /// Check whether the nearest application can run in the nearest environment.
-    Check,
+    Check(StructuredOutputArgs),
 
     /// Show the exact `DeploymentPlan` selected for the nearest application and environment.
-    Plan,
+    Plan(StructuredOutputArgs),
 
     /// Build and run the nearest application in the local environment.
     Dev(DevArgs),
@@ -88,6 +88,13 @@ impl BuiltinCapabilityAlias {
             _ => None,
         }
     }
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct StructuredOutputArgs {
+    /// Emit versioned machine-readable JSON to standard output.
+    #[arg(long)]
+    pub(crate) json: bool,
 }
 
 #[derive(Debug, Args)]
@@ -362,25 +369,48 @@ mod tests {
     }
 
     #[test]
-    fn inspect_command_parses() {
+    fn inspect_command_supports_json_output() {
         let cli =
             Cli::try_parse_from(["presolve", "inspect"]).expect("inspect command should parse");
 
-        assert!(matches!(cli.command, RootCommand::Inspect));
+        let RootCommand::Inspect(args) = cli.command else {
+            panic!("expected inspect command");
+        };
+
+        assert!(!args.json);
+
+        let cli = Cli::try_parse_from(["presolve", "inspect", "--json"])
+            .expect("inspect JSON command should parse");
+
+        let RootCommand::Inspect(args) = cli.command else {
+            panic!("expected inspect command");
+        };
+
+        assert!(args.json);
     }
 
     #[test]
-    fn check_command_parses() {
-        let cli = Cli::try_parse_from(["presolve", "check"]).expect("check command should parse");
+    fn check_command_supports_json_output() {
+        let cli = Cli::try_parse_from(["presolve", "check", "--json"])
+            .expect("check JSON command should parse");
 
-        assert!(matches!(cli.command, RootCommand::Check));
+        let RootCommand::Check(args) = cli.command else {
+            panic!("expected check command");
+        };
+
+        assert!(args.json);
     }
 
     #[test]
-    fn plan_command_parses() {
-        let cli = Cli::try_parse_from(["presolve", "plan"]).expect("plan command should parse");
+    fn plan_command_supports_json_output() {
+        let cli = Cli::try_parse_from(["presolve", "plan", "--json"])
+            .expect("plan JSON command should parse");
 
-        assert!(matches!(cli.command, RootCommand::Plan));
+        let RootCommand::Plan(args) = cli.command else {
+            panic!("expected plan command");
+        };
+
+        assert!(args.json);
     }
 
     #[test]

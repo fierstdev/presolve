@@ -9,6 +9,7 @@ mod cli;
 mod dev;
 mod environment;
 mod inspect;
+mod json_output;
 mod plan;
 mod provider;
 mod typescript;
@@ -23,10 +24,11 @@ use presolve_resolver::ResolutionProblem;
 use crate::{
     build::{BuildArtifactOutput, build_release},
     check::{CompatibilityCheck, check_compatibility},
-    cli::{Cli, EnvironmentCommand, EnvironmentProviderCommand, RootCommand},
+    cli::{Cli, EnvironmentCommand, EnvironmentProviderCommand, RootCommand, StructuredOutputArgs},
     dev::run_local_dev,
     environment::{create_environment, load_environment},
     inspect::inspect_application,
+    json_output::{render_application_json, render_check_json, render_plan_json},
     plan::render_deployment_plan,
     provider::{add_provider, expand_provider_supply, list_providers, remove_provider},
 };
@@ -46,9 +48,9 @@ pub fn run() -> Result<()> {
 fn execute(cli: Cli, current_directory: &Path) -> Result<()> {
     match cli.command {
         RootCommand::Build(args) => execute_build(&args, current_directory),
-        RootCommand::Inspect => execute_inspect(current_directory),
-        RootCommand::Check => execute_check(current_directory),
-        RootCommand::Plan => execute_plan(current_directory),
+        RootCommand::Inspect(args) => execute_inspect(&args, current_directory),
+        RootCommand::Check(args) => execute_check(&args, current_directory),
+        RootCommand::Plan(args) => execute_plan(&args, current_directory),
         RootCommand::Dev(args) => execute_dev(&args, current_directory),
         RootCommand::Env { command } => execute_environment(command, current_directory),
     }
@@ -91,16 +93,27 @@ fn execute_build(args: &cli::BuildArgs, current_directory: &Path) -> Result<()> 
     Ok(())
 }
 
-fn execute_inspect(current_directory: &Path) -> Result<()> {
-    let rendered = inspect_application(current_directory)?;
-    print!("{rendered}");
+fn execute_inspect(args: &StructuredOutputArgs, current_directory: &Path) -> Result<()> {
+    if args.json {
+        let rendered = render_application_json(current_directory)?;
+        println!("{rendered}");
+    } else {
+        let rendered = inspect_application(current_directory)?;
+        print!("{rendered}");
+    }
 
     Ok(())
 }
 
-fn execute_check(current_directory: &Path) -> Result<()> {
+fn execute_check(args: &StructuredOutputArgs, current_directory: &Path) -> Result<()> {
     let check = check_compatibility(current_directory)?;
-    print_compatibility_check(&check);
+
+    if args.json {
+        let rendered = render_check_json(&check)?;
+        println!("{rendered}");
+    } else {
+        print_compatibility_check(&check);
+    }
 
     if !check.report.is_resolved() {
         bail!(
@@ -113,21 +126,26 @@ fn execute_check(current_directory: &Path) -> Result<()> {
     Ok(())
 }
 
-fn execute_plan(current_directory: &Path) -> Result<()> {
+fn execute_plan(args: &StructuredOutputArgs, current_directory: &Path) -> Result<()> {
     let check = check_compatibility(current_directory)?;
 
-    if !check.report.is_resolved() {
+    if args.json {
+        let rendered = render_plan_json(&check)?;
+        println!("{rendered}");
+    } else if check.report.is_resolved() {
+        let rendered = render_deployment_plan(&check)?;
+        print!("{rendered}");
+    } else {
         print_compatibility_check(&check);
+    }
 
+    if !check.report.is_resolved() {
         bail!(
             "application `{}` has no DeploymentPlan in environment `{}`",
             check.application.contract.application().name(),
             check.environment.specification.environment().name()
         );
     }
-
-    let rendered = render_deployment_plan(&check)?;
-    print!("{rendered}");
 
     Ok(())
 }

@@ -88,6 +88,46 @@ plan
     exact successful resolver output
 ```
 
+## Structured output boundary
+
+`inspect`, `check`, and `plan` support `--json`.
+
+Machine output is an explicit CLI projection rather than direct serialization of internal Rust types. Every payload begins with:
+
+```json
+{
+  "schema": "presolve.cli",
+  "schema_version": "0.1",
+  "kind": "..."
+}
+```
+
+This keeps internal refactors from silently redefining the automation surface.
+
+The three structured commands retain their semantic boundaries:
+
+```text
+inspect --json
+    normalized application semantics
+    no environment required
+
+check --json
+    compatibility status + structured resolver problems
+    no full DeploymentPlan payload
+
+plan --json
+    exact symbolic DeploymentPlan when resolved
+    structured resolver problems when rejected
+```
+
+Rejected `check` and `plan` operations emit their structured payload to stdout and then exit unsuccessfully. This allows CI and other automation to inspect stable PS2xxx problem fields without scraping human diagnostics.
+
+`plan --json` does not fabricate a partial plan: rejected resolution uses `"plan": null`.
+
+Human-readable output remains the default and is unchanged by this chunk.
+
+See [CLI JSON output](../reference/cli-json.md) for the current schema.
+
 ## Chunk 20 direction
 
 Chunk 20 incrementally exposes existing Presolve state rather than creating a second operator model:

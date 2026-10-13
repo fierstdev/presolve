@@ -415,6 +415,24 @@ The command shows only state that actually exists in the symbolic `DeploymentPla
 
 If compatibility fails, no plan exists. `presolve plan` reports the same stable resolver diagnostics as `presolve check` and exits unsuccessfully.
 
+## Machine-readable inspection and planning
+
+Use `--json` for structured automation output:
+
+```bash
+presolve inspect --json
+presolve check --json
+presolve plan --json
+```
+
+Every payload identifies the `presolve.cli` schema and its current schema version.
+
+`check --json` focuses on compatibility status and structured resolver problems. `plan --json` carries the exact symbolic `DeploymentPlan` when resolution succeeds.
+
+On incompatible/rejected resolution, `check --json` and `plan --json` write the structured problem payload to stdout and then exit unsuccessfully. This makes stable PS2xxx diagnostics available to CI without parsing human prose.
+
+See [CLI JSON output](../reference/cli-json.md) for the current field shapes.
+
 ## Local provider realization
 
 Presolve now has a node-side local realization profile for resolved plans.

@@ -68,6 +68,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Build/package reproducibility checkpoint | Implemented |
 | `presolve inspect` application semantic view | Implemented |
 | `presolve plan` exact DeploymentPlan view | Implemented |
+| Versioned `--json` inspect/check/plan output | Implemented |
 
 ## Next
 
@@ -81,9 +82,9 @@ Chunk 18 real cloud-provider portability is complete. Presolve can resolve a pro
 
 Chunk 19 build/package workflow is complete. `presolve build` constructs verified environment-independent releases from Rust Component source, TypeScript Component source, prebuilt Components, immutable OCI descriptors, and mixed workload inputs. CLI-level checkpoint coverage proves deterministic `.presolved` packaging for equal artifact identity and exercises repeated clean TypeScript Component builds with the pinned checkpoint toolchain.
 
-Chunk 20 inspection/planning UX is in progress. `presolve inspect` exposes application semantics without requiring an environment, while `presolve plan` exposes the exact successful resolver output for the nearest Application Contract and Environment Specification.
+Chunk 20 inspection/planning UX is in progress. `presolve inspect`, `presolve check`, and `presolve plan` now have versioned machine-readable `--json` projections while preserving their distinct semantic boundaries. Rejected resolution remains a non-zero exit but carries structured PS2xxx problem data on stdout.
 
-Next is structured `--json` output for `check`, `inspect`, and `plan`, using the same semantic boundaries as their human-readable views.
+Next is immutable `.presolved` release inspection.
 
 ## Planned next
 

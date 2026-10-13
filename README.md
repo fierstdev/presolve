@@ -416,6 +416,14 @@ presolve plan
 presolve dev --input "example"
 ```
 
+Automation can request versioned structured output:
+
+```bash
+presolve inspect --json
+presolve check --json
+presolve plan --json
+```
+
 `presolve build` packages the Application Contract and workload artifact into a verified `.presolved` release without loading `presolve.env.toml`.
 
 `presolve check` answers whether the nearest Application Contract can be resolved against the nearest Environment Specification.
