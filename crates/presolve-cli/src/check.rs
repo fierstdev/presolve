@@ -255,8 +255,11 @@ cpu_millis = 100
         let bundle = PresolveBundle::from_component(&contract, b"component bytes")
             .expect("fixture release should build");
         let release_path = directory.path().join("detached-orders.presolved");
-        fs::write(&release_path, bundle.encode().expect("release should encode"))
-            .expect("release should be written");
+        fs::write(
+            &release_path,
+            bundle.encode().expect("release should encode"),
+        )
+        .expect("release should be written");
 
         assert!(!directory.path().join(CONTRACT_FILE_NAME).exists());
 
@@ -266,9 +269,10 @@ cpu_millis = 100
         assert!(check.report.is_resolved());
         assert_eq!(check.application.source_label(), "release");
         assert_eq!(check.application.path, release_path.canonicalize().unwrap());
+        let expected_digest = bundle.release_digest().unwrap().to_string();
         assert_eq!(
             check.application.release_digest(),
-            Some(bundle.release_digest().unwrap().to_string().as_str())
+            Some(expected_digest.as_str())
         );
         assert_eq!(
             check.report.plan().unwrap().bindings()[0].provider_name(),

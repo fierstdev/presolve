@@ -24,7 +24,7 @@ use presolve_resolver::ResolutionProblem;
 
 use crate::{
     build::{BuildArtifactOutput, build_release},
-    check::{CompatibilityCheck, check_compatibility},
+    check::{CompatibilityCheck, check_compatibility, check_release_compatibility},
     cli::{
         Cli, EnvironmentCommand, EnvironmentProviderCommand, InspectArgs, RootCommand,
         StructuredOutputArgs,
@@ -127,7 +127,7 @@ fn execute_inspect(args: &InspectArgs, current_directory: &Path) -> Result<()> {
 }
 
 fn execute_check(args: &StructuredOutputArgs, current_directory: &Path) -> Result<()> {
-    let check = check_compatibility(current_directory)?;
+    let check = compatibility_check_for_args(args, current_directory)?;
 
     if args.json {
         let rendered = render_check_json(&check)?;
@@ -148,7 +148,7 @@ fn execute_check(args: &StructuredOutputArgs, current_directory: &Path) -> Resul
 }
 
 fn execute_plan(args: &StructuredOutputArgs, current_directory: &Path) -> Result<()> {
-    let check = check_compatibility(current_directory)?;
+    let check = compatibility_check_for_args(args, current_directory)?;
 
     if args.json {
         let rendered = render_plan_json(&check)?;
@@ -169,6 +169,16 @@ fn execute_plan(args: &StructuredOutputArgs, current_directory: &Path) -> Result
     }
 
     Ok(())
+}
+
+fn compatibility_check_for_args(
+    args: &StructuredOutputArgs,
+    current_directory: &Path,
+) -> Result<CompatibilityCheck> {
+    match args.release.as_deref() {
+        Some(release) => check_release_compatibility(current_directory, release),
+        None => check_compatibility(current_directory),
+    }
 }
 
 fn execute_dev(args: &cli::DevArgs, current_directory: &Path) -> Result<()> {
@@ -403,7 +413,14 @@ fn print_compatibility_check(check: &CompatibilityCheck) {
         application.name(),
         application.version()
     );
-    println!("  contract: {}", check.application.path.display());
+    println!(
+        "  {}: {}",
+        check.application.source_label(),
+        check.application.path.display()
+    );
+    if let Some(digest) = check.application.release_digest() {
+        println!("  release digest: {digest}");
+    }
     println!("Environment: {}", environment.name());
     println!("  specification: {}", check.environment.path.display());
 

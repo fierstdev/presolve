@@ -27,8 +27,15 @@ pub(crate) fn render_deployment_plan(check: &CompatibilityCheck) -> Result<Strin
     );
     line(
         &mut output,
-        format_args!("  contract: {}", check.application.path.display()),
+        format_args!(
+            "  {}: {}",
+            check.application.source_label(),
+            check.application.path.display()
+        ),
     );
+    if let Some(digest) = check.application.release_digest() {
+        line(&mut output, format_args!("  release digest: {digest}"));
+    }
     line(
         &mut output,
         format_args!(

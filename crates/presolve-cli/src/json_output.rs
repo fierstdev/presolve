@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 
 use crate::{
     application::{ApplicationDocument, load_application},
-    check::CompatibilityCheck,
+    check::{CompatibilityApplication, CompatibilityCheck},
     release_inspect::ReleaseDocument,
 };
 
@@ -94,7 +94,7 @@ pub(crate) fn render_check_json(check: &CompatibilityCheck) -> Result<String> {
         "schema": CLI_JSON_SCHEMA,
         "schema_version": CLI_JSON_SCHEMA_VERSION,
         "kind": "compatibility_check",
-        "application": application_context_json(&check.application),
+        "application": compatibility_application_context_json(&check.application),
         "environment": environment_context_json(check),
         "status": if check.report.is_resolved() { "compatible" } else { "incompatible" },
         "problems": problems_json(check),
@@ -106,7 +106,7 @@ pub(crate) fn render_plan_json(check: &CompatibilityCheck) -> Result<String> {
         "schema": CLI_JSON_SCHEMA,
         "schema_version": CLI_JSON_SCHEMA_VERSION,
         "kind": "deployment_plan",
-        "application": application_context_json(&check.application),
+        "application": compatibility_application_context_json(&check.application),
         "environment": environment_context_json(check),
         "status": if check.report.is_resolved() { "resolved" } else { "rejected" },
         "plan": check.report.plan().map(deployment_plan_json),
@@ -159,6 +159,22 @@ fn application_context_json(document: &ApplicationDocument) -> Value {
         "name": application.name(),
         "version": application.version().to_string(),
         "contract": document.path.display().to_string(),
+        "contract_version": contract.contract_version().to_string(),
+    })
+}
+
+fn compatibility_application_context_json(document: &CompatibilityApplication) -> Value {
+    let contract = &document.contract;
+    let application = contract.application();
+    let source_kind = document.source_label();
+    let source_path = document.path.display().to_string();
+
+    json!({
+        "name": application.name(),
+        "version": application.version().to_string(),
+        "contract": if source_kind == "contract" { Some(source_path.as_str()) } else { None },
+        "release": if source_kind == "release" { Some(source_path.as_str()) } else { None },
+        "release_digest": document.release_digest(),
         "contract_version": contract.contract_version().to_string(),
     })
 }
