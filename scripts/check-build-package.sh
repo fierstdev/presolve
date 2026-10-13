@@ -177,7 +177,7 @@ oci_checkpoint
 echo "== mixed workload mapping-order reproducibility =="
 mixed_checkpoint
 
-echo "== TypeScript source-to-Component reproducibility =="
+echo "== TypeScript source-build boundary =="
 "$ROOT/scripts/smoke-typescript-component.sh"
 
 echo "Chunk 19 build/package checkpoint passed"
