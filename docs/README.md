@@ -57,6 +57,7 @@ The initial local developer workflow is implemented. See [Getting started](getti
 - [Chunk 17 checkpoint](development/chunk-17-checkpoint.md) — TypeScript authoring proof and explicit non-claims.
 - [Chunk 18 checkpoint](development/chunk-18-checkpoint.md) — real cloud-provider portability proof, configuration boundary, and operational-characteristics conclusions.
 - [Chunk 19 checkpoint](development/chunk-19-checkpoint.md) — build/package workflow, deterministic release packaging, and source-toolchain reproducibility boundary.
+- [Chunk 20 checkpoint](development/chunk-20-checkpoint.md) — source/release inspection, compatibility, exact planning, structured output, and rejected-resolution behavior.
 
 ## Status language
 

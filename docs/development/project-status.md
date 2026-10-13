@@ -70,6 +70,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | `presolve plan` exact DeploymentPlan view | Implemented |
 | Versioned `--json` inspect/check/plan output | Implemented |
 | Immutable `.presolved` release inspection | Implemented |
+| Inspection/planning UX checkpoint | Implemented |
 
 ## Next
 
@@ -83,15 +84,17 @@ Chunk 18 real cloud-provider portability is complete. Presolve can resolve a pro
 
 Chunk 19 build/package workflow is complete. `presolve build` constructs verified environment-independent releases from Rust Component source, TypeScript Component source, prebuilt Components, immutable OCI descriptors, and mixed workload inputs. CLI-level checkpoint coverage proves deterministic `.presolved` packaging for equal artifact identity and exercises repeated clean TypeScript Component builds with the pinned checkpoint toolchain.
 
-Chunk 20 inspection/planning UX is in progress. `presolve inspect` now supports both source Application Contract inspection and verified immutable `.presolved` release inspection; `check` and `plan` expose compatibility and exact resolver selections, with versioned JSON projections across the inspection/planning surface.
-
-Next is the Chunk 20 UX checkpoint and documentation closure.
+Chunk 20 inspection/planning UX is complete. `presolve inspect` covers both source Application Contract semantics and verified immutable `.presolved` releases; `presolve check` explains compatibility; `presolve plan` exposes exact symbolic resolver selections; and all inspection/planning surfaces have explicit versioned JSON projections where appropriate. The isolated Chunk 20 checkpoint also verifies structured non-zero failure behavior.
 
 ## Planned next
 
-Current roadmap direction includes:
+The next phase is product proof and external validation rather than another broad architecture chunk:
 
-- richer `check`/`inspect`/`plan` UX
+- visible public CI for the existing architectural checkpoints and conformance evidence
+- versioned Presolve CLI binaries/releases
+- a flagship same-`.presolved`-digest portability demo across genuinely different environments/providers
+- another materially different real provider to sharpen semantic negotiation
+- external developer validation before control-plane or lifecycle expansion
 
 ## Not yet a product guarantee
 

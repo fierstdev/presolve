@@ -167,9 +167,9 @@ plan
 
 Provider selections, credentials, realization adapters, endpoints, placement, and environment identity are therefore absent from release inspection.
 
-## Chunk 20 direction
+## Chunk 20 result
 
-Chunk 20 incrementally exposes existing Presolve state rather than creating a second operator model:
+Chunk 20 exposes existing Presolve state without creating a second operator model:
 
 ```text
 20.1  application inspection
@@ -179,4 +179,6 @@ Chunk 20 incrementally exposes existing Presolve state rather than creating a se
 20.5  UX checkpoint + docs
 ```
 
-Structured output will be added after the human-facing semantic boundaries are settled so machine-readable representations reflect the same model rather than driving it prematurely.
+The final surface keeps human and machine representations aligned around the same semantic boundaries. Structured output is an explicit CLI projection, release inspection is environment-independent, and planning never fabricates state that the resolver did not produce.
+
+The checkpoint is documented in [Chunk 20 checkpoint](../development/chunk-20-checkpoint.md).

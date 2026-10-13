@@ -164,7 +164,7 @@ Current subdivision:
 
 19.5 closes the build/package chunk with CLI-level byte reproducibility checks across Component, multi-Component, OCI, mixed, and pinned TypeScript source builds. The checkpoint distinguishes Presolve packaging determinism from the broader reproducibility properties of external source compilers. See [Chunk 19 checkpoint](chunk-19-checkpoint.md).
 
-## Chunk 20 — check/inspect/plan UX
+## Chunk 20 — check/inspect/plan UX (complete)
 
 Expose the resolver and application/environment models as useful operator/developer inspection tools.
 
@@ -175,7 +175,7 @@ Current subdivision:
 20.2  `presolve plan` exact DeploymentPlan view (complete)
 20.3  structured `--json` output for check/inspect/plan (complete)
 20.4  immutable `.presolved` release inspection (complete)
-20.5  UX checkpoint + docs
+20.5  UX checkpoint + docs (complete)
 ```
 
 20.1 adds an environment-independent `presolve inspect` command. It discovers only the nearest Application Contract and renders the normalized application semantics: workloads, capabilities and feature requirements, topology, resources, and network policy. It does not load an Environment Specification or perform provider resolution.
@@ -185,6 +185,25 @@ Current subdivision:
 20.3 adds versioned `--json` projections for `inspect`, `check`, and `plan`. JSON output is an explicit CLI schema rather than direct serialization of internal Rust structs. Rejected checks/plans still emit structured PS2xxx problem data before returning a non-zero exit status, and rejected plans use `plan: null`.
 
 20.4 extends `presolve inspect` with an optional `.presolved` path. Release inspection decodes and verifies the immutable bundle, then exposes release digest, bundle version, workload artifact/OCI identities, requirements, and topology in both human and versioned JSON forms without requiring source files or an environment.
+
+20.5 closes the inspection/planning chunk with an isolated CLI checkpoint covering source inspection before environment creation, compatible check/plan output, detached immutable-release inspection, versioned JSON projections, and structured rejected-resolution behavior. See [Chunk 20 checkpoint](chunk-20-checkpoint.md).
+
+## Post-Chunk-20 product proof priorities
+
+The next phase prioritizes external validation and visible product proof over broad scope expansion.
+
+Immediate priorities:
+
+- stabilize and exercise the machine-readable `presolve plan --json` surface through public examples and CI
+- put checkpoint, determinism, compatibility, build/package, inspection/planning, Docker execution, and provider-conformance evidence into visible public CI
+- begin publishing versioned Presolve CLI binaries/releases
+- create a flagship portability demo in which the exact same `.presolved` release digest is realized in two or three genuinely different environments with different provider implementations
+- add another real provider with materially different semantics, such as Redis, DynamoDB, PostgreSQL, or S3, to sharpen semantic negotiation and portability boundaries
+- use external developer feedback to decide what deserves stabilization before adding a control plane, scheduler, service mesh, registry, or lifecycle-management surface
+
+The product message remains:
+
+> One immutable application release declares what it requires; an environment declares what it can supply; Presolve deterministically proves whether and how that environment can satisfy the release and emits an inspectable deployment plan.
 
 ## Longer-term directions
 
