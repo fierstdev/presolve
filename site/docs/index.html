@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docs — Presolve</title>
+  <meta name="description" content="Get started with Presolve: Application Contracts, Environment Specifications, builds, compatibility checks, and deployment plans.">
+  <link rel="canonical" href="https://presolve.dev/docs/">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell nav-shell">
+      <a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="/#model">How it works</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero shell">
+      <span class="kicker">Documentation</span>
+      <h1>Start with the model.</h1>
+      <p>Presolve separates application requirements from environment supply. The CLI then builds, inspects, checks, and resolves that model.</p>
+    </section>
+
+    <div class="docs-layout shell">
+      <aside class="docs-nav">
+        <strong>On this page</strong>
+        <a href="#install">Build from source</a>
+        <a href="#application">Application Contract</a>
+        <a href="#environment">Environment</a>
+        <a href="#workflow">Workflow</a>
+        <a href="#json">JSON output</a>
+        <a href="#reference">Reference</a>
+      </aside>
+
+      <article class="docs-content">
+        <section id="install">
+          <span class="kicker">Developer Preview</span>
+          <h2>Build from source</h2>
+          <p>Versioned binaries are not published yet. For now, build the CLI from the repository.</p>
+          <div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
+cd presolve
+cargo build -p presolve-cli
+
+./target/debug/presolve --help</code></pre></div>
+          <div class="note">Presolve is pre-stable. CLI and schema compatibility are not guaranteed yet.</div>
+        </section>
+
+        <section id="application">
+          <span class="kicker">Application</span>
+          <h2>Declare requirements in <code>presolve.toml</code>.</h2>
+          <p>The Application Contract describes the application without choosing the infrastructure that will satisfy it.</p>
+          <div class="code-block"><pre><code>contract_version = "0.1"
+
+[application]
+name = "orders"
+version = "1.0.0"
+
+[[workloads]]
+name = "api"
+kind = "component"
+
+[[capabilities]]
+interface = "presolve:kv/store"
+version = "^0.1"
+
+[resources]
+memory_mib = 128
+cpu_millis = 250
+
+[network]
+outbound = "deny"</code></pre></div>
+          <p>Workloads, capability requirements, resource needs, topology, and network policy become part of the application model. Provider credentials and environment-specific endpoints do not.</p>
+        </section>
+
+        <section id="environment">
+          <span class="kicker">Environment</span>
+          <h2>Describe available supply in <code>presolve.env.toml</code>.</h2>
+          <p>The Environment Specification says what execution classes, resources, and capability providers are available here.</p>
+          <div class="code-block"><pre><code>presolve env init local
+presolve env provider add memory-services --provides kv
+presolve env check</code></pre></div>
+          <p>Providers receive stable <code>ProviderId</code> values. The resolver chooses among declared supply; provider realization details stay outside the Application Contract.</p>
+        </section>
+
+        <section id="workflow">
+          <span class="kicker">CLI</span>
+          <h2>The current workflow</h2>
+          <h3>Inspect source semantics</h3>
+          <div class="code-block"><pre><code>presolve inspect</code></pre></div>
+          <p>Shows Presolve's normalized view of the nearest Application Contract. No environment is required.</p>
+
+          <h3>Build an immutable release</h3>
+          <div class="code-block"><pre><code>presolve build
+presolve inspect dist/orders.presolved</code></pre></div>
+          <p>The <code>.presolved</code> release contains immutable application identity and requirements, not deployment configuration.</p>
+
+          <h3>Check compatibility</h3>
+          <div class="code-block"><pre><code>presolve check</code></pre></div>
+          <p>Answers whether the nearest environment can satisfy the application and reports stable resolver diagnostics when it cannot.</p>
+
+          <h3>Inspect the exact plan</h3>
+          <div class="code-block"><pre><code>presolve plan</code></pre></div>
+          <p>Shows the successful symbolic <code>DeploymentPlan</code>: workloads, exact selected providers and versions, negotiated features, and unbound optional capabilities.</p>
+        </section>
+
+        <section id="json">
+          <span class="kicker">Automation</span>
+          <h2>Versioned JSON projections</h2>
+          <div class="code-block"><pre><code>presolve inspect --json
+presolve check --json
+presolve plan --json
+presolve inspect dist/orders.presolved --json</code></pre></div>
+          <p>Machine output uses the explicit <code>presolve.cli</code> schema instead of serializing internal Rust structs directly. Rejected <code>check</code> and <code>plan</code> calls emit structured PS2xxx problems before returning a non-zero status.</p>
+        </section>
+
+        <section id="reference">
+          <span class="kicker">Repository docs</span>
+          <h2>Go deeper</h2>
+          <p>The repository documentation remains the source of truth while Presolve is in developer preview.</p>
+          <div class="link-row">
+            <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/application-contract.md"><strong>Application Contract ↗</strong><span><code>presolve.toml</code> reference</span></a>
+            <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/environment-specification.md"><strong>Environment Specification ↗</strong><span><code>presolve.env.toml</code> reference</span></a>
+            <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/presolved-bundle.md"><strong>.presolved bundle ↗</strong><span>Immutable release format</span></a>
+            <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/architecture/inspection-and-planning.md"><strong>Inspection and planning ↗</strong><span>CLI semantic boundaries</span></a>
+          </div>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
+</body>
+</html>
