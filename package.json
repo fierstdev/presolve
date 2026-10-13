@@ -1,6 +1,6 @@
 {
   "name": "presolve-workspace",
-  "version": "0.0.1",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "description": "Presolve universal software distribution platform",
   "license": "Apache-2.0",
