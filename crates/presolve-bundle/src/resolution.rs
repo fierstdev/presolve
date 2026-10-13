@@ -167,7 +167,7 @@ version = "^0.1"
         )
         .expect("fixture contract should parse");
 
-        assert!(contract.workloads().is_empty());
+        assert_eq!(contract.workloads(), []);
 
         let bundle = PresolveBundle::from_component(&contract, b"component bytes")
             .expect("fixture release should build");
