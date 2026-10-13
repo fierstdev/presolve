@@ -6,7 +6,7 @@ Chunk 21 moves Presolve from internal architectural checkpoints toward evidence 
 
 The flagship proof is stricter than building the same source for multiple targets:
 
-> Build one immutable application release once. Resolve those exact bytes in multiple environments without rebuilding the application.
+> Build one immutable application release once. Resolve and realize those exact bytes in multiple environments without rebuilding the application.
 
 The proof therefore starts from a `.presolved` release, not from the source `presolve.toml` used to create it.
 
@@ -84,15 +84,123 @@ The managed Cloudflare fixture in 21.3a is an Environment Specification and prov
 
 Live provider realization requires account/namespace/token material that deliberately does not belong in the Environment Specification or `.presolved` release.
 
-That is the next slice:
-
 ## 21.3b — same-release realization
 
-21.3b will take the same detached-release model and prove materially different realizations:
+21.3b connects the detached release directly to runtime execution.
 
-- local execution backed by the in-memory KV provider; and
-- managed execution/materialization backed by the real Cloudflare KV adapter.
+The proof path is:
 
-The release must remain byte-identical across both realizations. Any provider credentials or operational settings must remain external to the application release and Environment Specification.
+```text
+one kv-demo.presolved archive
+        ↓
+decode + verify bundle
+        ↓
+reconstruct resolver input from release manifest
+        ↓
+resolve against selected Environment Specification
+        ↓
+DeploymentPlan with exact ProviderId
+        ↓
+realize that provider implementation
+        ↓
+extract the Component bytes from the same release archive
+        ↓
+assemble runtime from the DeploymentPlan + ProviderRegistry
+        ↓
+execute the exact bundled Component
+```
 
-21.3b is not complete until the managed path executes through the real adapter rather than merely resolving to a provider declaration.
+The checkpoint intentionally does not rebuild from source after the `.presolved` archive is produced.
+
+### Provider-specific realization remains outside the release
+
+The local path realizes the plan-selected KV provider with Presolve's in-memory implementation.
+
+The managed path realizes the plan-selected provider through the existing `CloudflareKvAdapter`. Cloudflare operational inputs remain process-local:
+
+```text
+PRESOLVE_CLOUDFLARE_ACCOUNT_ID
+PRESOLVE_CLOUDFLARE_KV_NAMESPACE_ID
+PRESOLVE_CLOUDFLARE_API_TOKEN
+```
+
+These values do not enter:
+
+- `presolve.toml`;
+- `presolve.env.toml`;
+- `DeploymentPlan`;
+- the `.presolved` release; or
+- application release identity.
+
+### Visibility-aware KV demo protocol
+
+The same guest Component must run against both the immediate in-memory provider and eventually consistent Cloudflare Workers KV without claiming stronger semantics than the managed provider offers.
+
+For that reason the `kv-demo` guest exposes simple `set`, `get`, and `delete` commands. The checkpoint performs one write, then:
+
+- requires immediate visibility for the local in-memory realization;
+- polls the same guest `get` operation for the Cloudflare realization until the value becomes visible within a bounded timeout; and
+- runs guest-side cleanup after visibility is confirmed.
+
+The application bytes remain identical. Only the selected environment and provider realization differ.
+
+### Public non-live checkpoint
+
+Run:
+
+```bash
+bash ./scripts/check-release-realization.sh
+```
+
+This path is suitable for public CI. It:
+
+1. builds `kv-demo.presolved` exactly once;
+2. records its canonical release digest and archive SHA-256;
+3. resolves the detached release against the fixed local-memory environment;
+4. realizes the exact plan-selected ProviderId with the in-memory KV implementation;
+5. extracts and executes the bundled Component bytes;
+6. proves guest KV write/read/delete behavior through the realized provider; and
+7. verifies that the `.presolved` archive bytes remain unchanged after execution.
+
+### Live same-release Cloudflare proof
+
+With Cloudflare realization variables set, run:
+
+```bash
+bash ./scripts/check-release-realization.sh --cloudflare
+```
+
+The script still builds the release exactly once. It first executes that release through the local-memory environment, then executes the **same file** through the managed Cloudflare environment and real Cloudflare KV adapter. It verifies the same release digest in both outputs and requires the archive SHA-256 to remain unchanged after both executions.
+
+The proof therefore has the intended shape:
+
+```text
+same kv-demo.presolved bytes
+same release digest
+        |
+        +-- local Environment Specification
+        |       ↓
+        |   DeploymentPlan
+        |       ↓
+        |   memory-kv realization
+        |       ↓
+        |   Component execution
+        |
+        +-- managed Cloudflare Environment Specification
+                ↓
+            DeploymentPlan
+                ↓
+            CloudflareKvAdapter realization
+                ↓
+            real Workers KV
+                ↓
+            same Component execution
+```
+
+Public CI exercises the credential-free local detached-release realization path. The live Cloudflare half remains opt-in because Presolve does not place production credentials in the repository or release artifact.
+
+## 21.3b completion criterion
+
+21.3b is complete when the live `--cloudflare` path has been run successfully with real Cloudflare credentials and both realizations report the same detached release identity while the archive hash remains unchanged.
+
+At that point Presolve has evidence for the stronger flagship claim: one immutable application release can be resolved **and actually executed** through materially different provider implementations without changing the release.
