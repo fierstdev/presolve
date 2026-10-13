@@ -20,21 +20,19 @@ These operations share underlying models but have different dependency boundarie
 
 ## Inspection boundary
 
-`presolve inspect` is application-only.
-
-It discovers and validates the nearest:
+With no positional argument, `presolve inspect` discovers and validates the nearest:
 
 ```text
 presolve.toml
 ```
 
-It does not discover or require:
+This source-inspection mode does not discover or require:
 
 ```text
 presolve.env.toml
 ```
 
-Inspection renders the semantic Application Contract rather than merely echoing source TOML. The current human-readable view includes:
+It renders the semantic Application Contract rather than merely echoing source TOML. The current human-readable view includes:
 
 - application name, version, description, and contract version
 - explicit workloads or the legacy implicit `main` Component workload
@@ -127,6 +125,47 @@ Rejected `check` and `plan` operations emit their structured payload to stdout a
 Human-readable output remains the default and is unchanged by this chunk.
 
 See [CLI JSON output](../reference/cli-json.md) for the current schema.
+
+## Immutable release inspection boundary
+
+`presolve inspect` now has two environment-independent forms:
+
+```text
+presolve inspect
+    inspect the nearest source Application Contract
+
+presolve inspect path/to/application.presolved
+    inspect one immutable application release
+```
+
+The release form does not require the original source tree. It reads the requested `.presolved` file, decodes it through `PresolveBundle::decode`, and therefore verifies manifest/artifact integrity before displaying state.
+
+Release inspection exposes:
+
+- bundle format version
+- canonical application release digest
+- encoded bundle size
+- application metadata
+- originating Application Contract version
+- canonical capability/resource/network requirements
+- workload execution kinds
+- embedded Component artifact identity
+- immutable OCI descriptor identity
+- application-internal topology
+
+The release digest is derived from the canonical bundle manifest. Component bytes participate transitively through their content digests; OCI workloads participate through immutable OCI descriptor identity.
+
+Release inspection remains distinct from deployment planning:
+
+```text
+release inspection
+    what immutable application release is this?
+
+plan
+    how does this environment satisfy the application?
+```
+
+Provider selections, credentials, realization adapters, endpoints, placement, and environment identity are therefore absent from release inspection.
 
 ## Chunk 20 direction
 

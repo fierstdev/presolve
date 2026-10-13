@@ -335,6 +335,7 @@ Implemented foundations include:
 - local Environment Specification discovery, creation, and validation
 - environment-scoped provider declaration with generated stable IDs
 - `presolve inspect` application semantic inspection
+- verified immutable `.presolved` release inspection
 - `presolve check` application/environment compatibility workflow
 - `presolve plan` exact symbolic DeploymentPlan inspection
 - plan-scoped local provider realization
@@ -402,10 +403,11 @@ From an application directory, construct an immutable release independently of a
 presolve build
 ```
 
-Inspect the nearest Application Contract without requiring an environment:
+Inspect the nearest Application Contract without requiring an environment, or inspect a built immutable release directly:
 
 ```bash
 presolve inspect
+presolve inspect dist/<application>.presolved
 ```
 
 For compatibility checking, exact plan inspection, and local execution against the nearest environment:

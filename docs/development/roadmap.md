@@ -174,7 +174,7 @@ Current subdivision:
 20.1  `presolve inspect` application semantic view (complete)
 20.2  `presolve plan` exact DeploymentPlan view (complete)
 20.3  structured `--json` output for check/inspect/plan (complete)
-20.4  immutable `.presolved` release inspection
+20.4  immutable `.presolved` release inspection (complete)
 20.5  UX checkpoint + docs
 ```
 
@@ -183,6 +183,8 @@ Current subdivision:
 20.2 adds `presolve plan`. It runs the existing resolver and exposes the exact successful `DeploymentPlan`: resolved workloads, selected provider IDs and exact versions, negotiated features, attached semantic capability contracts, and unbound optional capabilities. Failed resolution produces the existing stable resolver diagnostics rather than a partial or invented plan.
 
 20.3 adds versioned `--json` projections for `inspect`, `check`, and `plan`. JSON output is an explicit CLI schema rather than direct serialization of internal Rust structs. Rejected checks/plans still emit structured PS2xxx problem data before returning a non-zero exit status, and rejected plans use `plan: null`.
+
+20.4 extends `presolve inspect` with an optional `.presolved` path. Release inspection decodes and verifies the immutable bundle, then exposes release digest, bundle version, workload artifact/OCI identities, requirements, and topology in both human and versioned JSON forms without requiring source files or an environment.
 
 ## Longer-term directions
 

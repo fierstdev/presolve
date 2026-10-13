@@ -328,7 +328,7 @@ The output must use the `.presolved` extension.
 
 Environment compatibility remains a separate operation handled by `presolve check`.
 
-## Inspect an application
+## Inspect an application or immutable release
 
 To inspect what Presolve understands from the nearest Application Contract:
 
@@ -336,9 +336,22 @@ To inspect what Presolve understands from the nearest Application Contract:
 presolve inspect
 ```
 
-Inspection is environment-independent. It shows the normalized application semantics, including workloads, capability requirements and features, topology, resource requirements, and outbound network policy.
+Source inspection is environment-independent. It shows normalized application semantics, including workloads, capability requirements and features, topology, resource requirements, and outbound network policy.
 
-It does not load `presolve.env.toml` or select providers.
+To inspect a built immutable release instead:
+
+```bash
+presolve inspect dist/<application>.presolved
+```
+
+Release inspection decodes and verifies the `.presolved` bundle before showing its canonical release digest, bundle format version, workload artifact or OCI descriptor identities, requirements, and topology. It does not require the original source tree or `presolve.env.toml`.
+
+Both forms support `--json`:
+
+```bash
+presolve inspect --json
+presolve inspect dist/<application>.presolved --json
+```
 
 ## Check application compatibility
 

@@ -38,7 +38,7 @@ The initial local developer workflow is implemented. See [Getting started](getti
 - [Environment Specification](reference/environment-specification.md) — `presolve.env.toml`.
 - [`.presolved` bundle](reference/presolved-bundle.md) — immutable application releases.
 - [Diagnostics](reference/diagnostics.md) — currently assigned stable diagnostic ranges and codes.
-- [CLI JSON output](reference/cli-json.md) — versioned machine-readable inspect/check/plan projections.
+- [CLI JSON output](reference/cli-json.md) — versioned machine-readable application, release, compatibility, and plan inspection projections.
 
 ### Architecture
 

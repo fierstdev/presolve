@@ -12,6 +12,7 @@ mod inspect;
 mod json_output;
 mod plan;
 mod provider;
+mod release_inspect;
 mod typescript;
 
 use std::{env, path::Path};
@@ -24,13 +25,19 @@ use presolve_resolver::ResolutionProblem;
 use crate::{
     build::{BuildArtifactOutput, build_release},
     check::{CompatibilityCheck, check_compatibility},
-    cli::{Cli, EnvironmentCommand, EnvironmentProviderCommand, RootCommand, StructuredOutputArgs},
+    cli::{
+        Cli, EnvironmentCommand, EnvironmentProviderCommand, InspectArgs, RootCommand,
+        StructuredOutputArgs,
+    },
     dev::run_local_dev,
     environment::{create_environment, load_environment},
     inspect::inspect_application,
-    json_output::{render_application_json, render_check_json, render_plan_json},
+    json_output::{
+        render_application_json, render_check_json, render_plan_json, render_release_json,
+    },
     plan::render_deployment_plan,
     provider::{add_provider, expand_provider_supply, list_providers, remove_provider},
+    release_inspect::{load_release, render_release},
 };
 
 /// Runs the Presolve CLI using process arguments and the current directory.
@@ -93,7 +100,21 @@ fn execute_build(args: &cli::BuildArgs, current_directory: &Path) -> Result<()> 
     Ok(())
 }
 
-fn execute_inspect(args: &StructuredOutputArgs, current_directory: &Path) -> Result<()> {
+fn execute_inspect(args: &InspectArgs, current_directory: &Path) -> Result<()> {
+    if let Some(release) = &args.release {
+        let document = load_release(current_directory, release)?;
+
+        if args.json {
+            let rendered = render_release_json(&document)?;
+            println!("{rendered}");
+        } else {
+            let rendered = render_release(&document)?;
+            print!("{rendered}");
+        }
+
+        return Ok(());
+    }
+
     if args.json {
         let rendered = render_application_json(current_directory)?;
         println!("{rendered}");

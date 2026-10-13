@@ -21,8 +21,8 @@ pub(crate) enum RootCommand {
     /// Build the nearest application into an immutable `.presolved` release.
     Build(BuildArgs),
 
-    /// Inspect the semantic model of the nearest application.
-    Inspect(StructuredOutputArgs),
+    /// Inspect the nearest application or an immutable `.presolved` release.
+    Inspect(InspectArgs),
 
     /// Check whether the nearest application can run in the nearest environment.
     Check(StructuredOutputArgs),
@@ -88,6 +88,17 @@ impl BuiltinCapabilityAlias {
             _ => None,
         }
     }
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct InspectArgs {
+    /// Immutable `.presolved` release to inspect instead of the nearest Application Contract.
+    #[arg(value_name = "RELEASE")]
+    pub(crate) release: Option<PathBuf>,
+
+    /// Emit versioned machine-readable JSON to standard output.
+    #[arg(long)]
+    pub(crate) json: bool,
 }
 
 #[derive(Debug, Args)]
@@ -369,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn inspect_command_supports_json_output() {
+    fn inspect_command_supports_source_release_and_json_modes() {
         let cli =
             Cli::try_parse_from(["presolve", "inspect"]).expect("inspect command should parse");
 
@@ -377,15 +388,17 @@ mod tests {
             panic!("expected inspect command");
         };
 
+        assert!(args.release.is_none());
         assert!(!args.json);
 
-        let cli = Cli::try_parse_from(["presolve", "inspect", "--json"])
-            .expect("inspect JSON command should parse");
+        let cli = Cli::try_parse_from(["presolve", "inspect", "dist/orders.presolved", "--json"])
+            .expect("release inspection JSON command should parse");
 
         let RootCommand::Inspect(args) = cli.command else {
             panic!("expected inspect command");
         };
 
+        assert_eq!(args.release, Some(PathBuf::from("dist/orders.presolved")));
         assert!(args.json);
     }
 

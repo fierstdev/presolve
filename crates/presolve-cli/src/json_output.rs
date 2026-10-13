@@ -9,6 +9,7 @@ use serde_json::{Value, json};
 use crate::{
     application::{ApplicationDocument, load_application},
     check::CompatibilityCheck,
+    release_inspect::ReleaseDocument,
 };
 
 const CLI_JSON_SCHEMA: &str = "presolve.cli";
@@ -17,6 +18,75 @@ const CLI_JSON_SCHEMA_VERSION: &str = "0.1";
 pub(crate) fn render_application_json(start: &Path) -> Result<String> {
     let document = load_application(start)?;
     encode(&application_inspection_json(&document))
+}
+
+pub(crate) fn render_release_json(document: &ReleaseDocument) -> Result<String> {
+    let manifest = document.bundle.manifest();
+    let application = manifest.application();
+    let requirements = manifest.requirements();
+    let release_digest = document
+        .bundle
+        .release_digest()
+        .context("could not compute canonical application release digest")?;
+
+    encode(&json!({
+        "schema": CLI_JSON_SCHEMA,
+        "schema_version": CLI_JSON_SCHEMA_VERSION,
+        "kind": "release_inspection",
+        "release": {
+            "path": document.path.display().to_string(),
+            "encoded_size": document.encoded_size,
+            "bundle_version": manifest.bundle_version().to_string(),
+            "digest": release_digest.to_string(),
+        },
+        "application": {
+            "name": application.name(),
+            "version": application.version().to_string(),
+            "description": application.description(),
+        },
+        "requirements": {
+            "contract_version": requirements.contract_version().to_string(),
+            "capabilities": requirements.capabilities().iter().map(|capability| json!({
+                "interface": capability.interface(),
+                "version": capability.version(),
+                "optional": capability.optional(),
+                "required_features": capability.required_features(),
+                "preferred_features": capability.preferred_features(),
+            })).collect::<Vec<_>>(),
+            "resources": {
+                "memory_mib": requirements.resources().memory_mib(),
+                "cpu_millis": requirements.resources().cpu_millis(),
+            },
+            "network": {
+                "outbound": outbound_mode(requirements.network().outbound()),
+                "allow": requirements.network().allow(),
+            },
+        },
+        "workloads": manifest.workloads().iter().map(|workload| json!({
+            "name": workload.name(),
+            "kind": workload.kind().to_string(),
+            "artifacts": workload.artifacts().iter().map(|artifact| json!({
+                "path": artifact.path(),
+                "digest": artifact.digest().to_string(),
+                "size": artifact.size(),
+                "media_type": artifact.media_type(),
+            })).collect::<Vec<_>>(),
+            "oci_image": workload.oci_image().map(|image| json!({
+                "media_type": image.media_type(),
+                "digest": image.digest(),
+                "size": image.size(),
+            })),
+        })).collect::<Vec<_>>(),
+        "interfaces": manifest.interfaces().iter().map(|interface| json!({
+            "name": interface.name(),
+            "kind": interface.kind().to_string(),
+        })).collect::<Vec<_>>(),
+        "relationships": manifest.relationships().iter().map(|relationship| json!({
+            "from": relationship.from(),
+            "to": relationship.to(),
+            "interface": relationship.interface(),
+        })).collect::<Vec<_>>(),
+    }))
 }
 
 pub(crate) fn render_check_json(check: &CompatibilityCheck) -> Result<String> {
@@ -341,6 +411,63 @@ version = "^0.1"
         assert_eq!(value["workloads"][0]["name"], "main");
         assert_eq!(value["workloads"][0]["kind"], "component");
         assert_eq!(value["workloads"][0]["implicit"], true);
+    }
+
+    #[test]
+    fn release_json_exposes_verified_immutable_identity() {
+        use presolve_bundle::PresolveBundle;
+        use presolve_contract::parse_contract;
+
+        let directory = TestDirectory::new();
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "release-json"
+version = "1.0.0"
+
+[resources]
+memory_mib = 64
+"#,
+        )
+        .expect("contract should parse");
+
+        let bundle = PresolveBundle::from_component(&contract, b"component bytes")
+            .expect("release should build");
+        let release = directory.path().join("release-json.presolved");
+        fs::write(&release, bundle.encode().expect("release should encode"))
+            .expect("release should be written");
+
+        let document = crate::release_inspect::load_release(
+            directory.path(),
+            Path::new("release-json.presolved"),
+        )
+        .expect("release should load");
+
+        let value = parse(&render_release_json(&document).expect("release JSON should render"));
+
+        assert_eq!(value["kind"], "release_inspection");
+        assert_eq!(value["release"]["bundle_version"], "0.2");
+        assert!(
+            value["release"]["digest"]
+                .as_str()
+                .expect("digest should be a string")
+                .starts_with("sha256:")
+        );
+        assert_eq!(value["application"]["name"], "release-json");
+        assert_eq!(value["requirements"]["resources"]["memory_mib"], 64);
+        assert_eq!(value["workloads"][0]["name"], "main");
+        assert_eq!(value["workloads"][0]["kind"], "component");
+        assert_eq!(
+            value["workloads"][0]["artifacts"][0]["path"],
+            "artifacts/main.wasm"
+        );
+        assert_eq!(
+            value["workloads"][0]["artifacts"][0]["media_type"],
+            "application/wasm"
+        );
+        assert!(value["workloads"][0]["oci_image"].is_null());
     }
 
     #[test]

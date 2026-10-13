@@ -101,3 +101,32 @@ The JSON representation is an explicit CLI projection. It is not direct serializ
 Object key ordering and whitespace are not semantic and should not be relied upon.
 
 No new project configuration file is introduced by structured output.
+
+## Immutable release inspection
+
+`presolve inspect <release>.presolved --json` decodes and verifies the immutable release before emitting a machine view.
+
+The payload uses:
+
+```json
+{
+  "schema": "presolve.cli",
+  "schema_version": "0.1",
+  "kind": "release_inspection"
+}
+```
+
+The release projection includes:
+
+- canonical `.presolved` path and encoded byte size
+- bundle format version
+- canonical application release digest
+- application name/version/description
+- originating Application Contract version
+- canonical capability/resource/network requirements
+- workload kinds
+- embedded Component artifact path, digest, size, and media type
+- immutable OCI descriptor media type, digest, and size
+- application-internal interfaces and relationships
+
+Release inspection does not require source files or an Environment Specification. Invalid, corrupted, or unsupported bundles fail decoding rather than producing an inspection payload.
