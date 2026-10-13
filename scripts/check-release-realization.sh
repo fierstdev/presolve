@@ -8,6 +8,7 @@ CLOUDFLARE_ENV="$ROOT/examples/portability-proof/managed-cloudflare/presolve.env
 PRESOLVE="$ROOT/target/debug/presolve"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/presolve-release-realization.XXXXXX")"
 RELEASE="$TMP/kv-demo.presolved"
+COMPONENT="$TMP/kv-demo.wasm"
 RUN_ID="proof-$$"
 LIVE_CLOUDFLARE=false
 
@@ -31,6 +32,49 @@ from pathlib import Path
 import sys
 
 print(sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+}
+
+extract_component() {
+  python3 - "$1" "$2" <<'PY'
+import json
+from pathlib import Path
+import sys
+import tarfile
+
+release = Path(sys.argv[1])
+output = Path(sys.argv[2])
+
+with tarfile.open(release, "r:*") as archive:
+    manifest_file = archive.extractfile("manifest.json")
+    if manifest_file is None:
+        raise SystemExit("release archive is missing manifest.json")
+
+    manifest = json.load(manifest_file)
+    workloads = manifest.get("workloads", [])
+    if len(workloads) != 1:
+        raise SystemExit(
+            f"release realization checkpoint requires one workload, found {len(workloads)}"
+        )
+
+    workload = workloads[0]
+    if workload.get("kind") != "component":
+        raise SystemExit(
+            f"release realization checkpoint requires a component workload, found {workload.get('kind')!r}"
+        )
+
+    artifacts = workload.get("artifacts", [])
+    if len(artifacts) != 1:
+        raise SystemExit(
+            f"component workload requires one artifact, found {len(artifacts)}"
+        )
+
+    artifact_path = artifacts[0]["path"]
+    component_file = archive.extractfile(artifact_path)
+    if component_file is None:
+        raise SystemExit(f"release archive is missing {artifact_path}")
+
+    output.write_bytes(component_file.read())
 PY
 }
 
@@ -63,6 +107,8 @@ echo "== build immutable kv-demo release exactly once =="
 test -f "$RELEASE"
 ARCHIVE_SHA_BEFORE="$(archive_sha256 "$RELEASE")"
 "$PRESOLVE" inspect "$RELEASE" --json > "$TMP/inspect.json"
+extract_component "$RELEASE" "$COMPONENT"
+test -f "$COMPONENT"
 
 RELEASE_DIGEST="$(python3 - "$TMP/inspect.json" <<'PY'
 import json
@@ -86,6 +132,7 @@ cargo run \
   local \
   "$RELEASE" \
   "$LOCAL_ENV" \
+  "$COMPONENT" \
   "$RUN_ID-local" | tee "$TMP/local.txt"
 
 ARCHIVE_SHA_AFTER_LOCAL="$(archive_sha256 "$RELEASE")"
@@ -111,6 +158,7 @@ if [[ "$LIVE_CLOUDFLARE" == true ]]; then
     cloudflare \
     "$RELEASE" \
     "$CLOUDFLARE_ENV" \
+    "$COMPONENT" \
     "$RUN_ID-cloudflare" | tee "$TMP/cloudflare.txt"
 
   ARCHIVE_SHA_AFTER_CLOUDFLARE="$(archive_sha256 "$RELEASE")"
