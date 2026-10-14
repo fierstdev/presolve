@@ -178,7 +178,7 @@ impl Runtime {
     ) -> Result<String, RuntimeError> {
         let mut store = Store::new(
             &self.engine,
-            RuntimeState::new(
+            RuntimeState::new_with_sql(
                 self.limits,
                 Arc::clone(&self.key_value_provider),
                 Arc::clone(&self.object_store_provider),
