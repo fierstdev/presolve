@@ -43,6 +43,41 @@ Those exact bytes are then resolved against two checked-in environments:
 
 Both environments advertise the same baseline object capability. The application release names neither implementation.
 
+## Public proof evidence
+
+The first successful public CI execution produced one immutable release identity:
+
+```text
+release digest: sha256:3d67508d77df06a9e9228d9128a579e64b0cc2bdce244f73e2aa148d76819670
+archive sha256: e97f42ffed06356c0f2716d0bfc0233afc81ee7ae3af96a849ed6864404f912f
+```
+
+That exact release resolved as:
+
+```text
+objects-local        memory-objects     resolved
+objects-s3           s3-objects         resolved
+```
+
+and executed as:
+
+```text
+objects-local        memory-objects     objects:objects-2441-local
+objects-s3           s3-objects         objects:objects-2441-s3
+```
+
+The checkpoint then verified:
+
+```text
+release digest unchanged: yes
+archive sha256 unchanged: yes
+
+PASS — one .presolved object release, two plans,
+two provider realizations, zero application rebuilds.
+```
+
+The concrete digest is evidence from that CI run, not a stable application-version identifier promised across future source/toolchain changes.
+
 ## S3-compatible realization
 
 The S3 adapter is intentionally provider-generic rather than MinIO-specific. It uses path-style S3 HTTP operations and AWS Signature Version 4 authentication.
