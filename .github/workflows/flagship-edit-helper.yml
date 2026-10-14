@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   edit:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout helper branch
@@ -98,10 +99,10 @@ jobs:
           python3 scripts/check-docs.py
           git diff --check
 
-      - name: Commit generated edits
+      - name: Commit generated documentation edits
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md .github/workflows/ci.yml docs/development/roadmap.md docs/development/project-status.md
+          git add README.md docs/development/roadmap.md docs/development/project-status.md
           git commit -m "demo: surface flagship portability proof"
           git push origin HEAD:tmp/flagship-demo-edits
