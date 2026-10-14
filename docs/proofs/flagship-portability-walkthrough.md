@@ -157,7 +157,7 @@ Those are the questions Presolve needs external engineers to test next.
 - Demo entry point: [`demo/portability/run.sh`](../../demo/portability/run.sh)
 - Demo documentation: [`demo/portability/README.md`](../../demo/portability/README.md)
 - Application example: [`examples/kv-demo`](../../examples/kv-demo)
-- Environment fixtures: [`examples/environments`](../../examples/environments)
+- Environment fixtures: [`examples/portability-proof`](../../examples/portability-proof)
 - Provider realization architecture: [`docs/architecture/provider-realization.md`](../architecture/provider-realization.md)
 - Inspection and planning boundary: [`docs/architecture/inspection-and-planning.md`](../architecture/inspection-and-planning.md)
 - Application portability concept: [`docs/concepts/application-portability.md`](../concepts/application-portability.md)
