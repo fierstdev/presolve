@@ -1,6 +1,5 @@
 use std::{
     env, fs,
-    io::{Cursor, Read},
     sync::Arc,
     thread,
     time::{Duration, Instant},
@@ -20,13 +19,13 @@ use presolve_provider_realization::{
 };
 use presolve_provider_sdk::KEY_VALUE_INTERFACE;
 use presolve_resolver::{DeploymentPlan, resolve};
-use tar::Archive;
 
 const ACCOUNT_ID_ENV: &str = "PRESOLVE_CLOUDFLARE_ACCOUNT_ID";
 const NAMESPACE_ID_ENV: &str = "PRESOLVE_CLOUDFLARE_KV_NAMESPACE_ID";
 const API_TOKEN_ENV: &str = "PRESOLVE_CLOUDFLARE_API_TOKEN";
 const CLOUD_VISIBILITY_TIMEOUT: Duration = Duration::from_secs(75);
 const CLOUD_POLL_INTERVAL: Duration = Duration::from_secs(1);
+const TAR_BLOCK_BYTES: usize = 512;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RealizationMode {
@@ -197,33 +196,73 @@ fn component_bytes_from_release(release_bytes: &[u8], bundle: &PresolveBundle) -
         ),
     };
 
-    let mut archive = Archive::new(Cursor::new(release_bytes));
-    let entries = archive
-        .entries()
-        .context("could not reopen verified detached release archive")?;
+    // `PresolveBundle::decode` above has already validated the archive topology,
+    // artifact size, and artifact digest. This small reader only selects the
+    // manifest-named bytes from that same verified in-memory archive so the proof
+    // does not need an extracted `.wasm` sidecar or another crate dependency.
+    read_verified_tar_entry(release_bytes, artifact.path())
+}
 
-    for entry in entries {
-        let mut entry = entry.context("could not read verified detached release entry")?;
-        let path = entry
-            .path()
-            .context("could not read verified detached release entry path")?;
+fn read_verified_tar_entry(release_bytes: &[u8], target_path: &str) -> Result<Vec<u8>> {
+    let mut offset = 0_usize;
 
-        if path.to_str() != Some(artifact.path()) {
-            continue;
+    while offset
+        .checked_add(TAR_BLOCK_BYTES)
+        .is_some_and(|end| end <= release_bytes.len())
+    {
+        let header_end = offset + TAR_BLOCK_BYTES;
+        let header = &release_bytes[offset..header_end];
+
+        if header.iter().all(|byte| *byte == 0) {
+            break;
         }
 
-        let mut bytes = Vec::new();
-        entry
-            .read_to_end(&mut bytes)
-            .with_context(|| format!("could not read embedded Component `{}`", artifact.path()))?;
+        let name = tar_text(&header[..100]).context("invalid verified tar entry name")?;
+        let prefix = tar_text(&header[345..500]).context("invalid verified tar entry prefix")?;
+        let path = if prefix.is_empty() {
+            name.to_owned()
+        } else {
+            format!("{prefix}/{name}")
+        };
+        let size = tar_octal(&header[124..136]).context("invalid verified tar entry size")?;
+        let data_start = header_end;
+        let data_end = data_start
+            .checked_add(size)
+            .context("verified tar entry size overflow")?;
 
-        return Ok(bytes);
+        if data_end > release_bytes.len() {
+            bail!("verified tar entry `{path}` extends past release bytes");
+        }
+
+        if path == target_path {
+            return Ok(release_bytes[data_start..data_end].to_vec());
+        }
+
+        let padded_size = size
+            .checked_add(TAR_BLOCK_BYTES - 1)
+            .context("verified tar padding overflow")?
+            / TAR_BLOCK_BYTES
+            * TAR_BLOCK_BYTES;
+        offset = data_start
+            .checked_add(padded_size)
+            .context("verified tar offset overflow")?;
     }
 
-    bail!(
-        "verified detached release does not expose embedded Component `{}`",
-        artifact.path()
-    )
+    bail!("verified detached release does not expose embedded Component `{target_path}`")
+}
+
+fn tar_text(field: &[u8]) -> Result<&str> {
+    let end = field.iter().position(|byte| *byte == 0).unwrap_or(field.len());
+    std::str::from_utf8(&field[..end]).context("tar field is not UTF-8")
+}
+
+fn tar_octal(field: &[u8]) -> Result<usize> {
+    let text = tar_text(field)?.trim();
+    if text.is_empty() {
+        return Ok(0);
+    }
+
+    usize::from_str_radix(text, 8).context("tar field is not an octal integer")
 }
 
 fn execute_kv_proof(
