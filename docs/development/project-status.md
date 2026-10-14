@@ -58,6 +58,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | TypeScript authoring checkpoint | Implemented |
 | Provider realization configuration/secret boundary | Implemented |
 | Cloudflare Workers KV provider adapter | Implemented |
+| Redis KV provider adapter | Implemented |
 | Plan-scoped provider adapter materialization | Implemented |
 | Live Cloudflare Workers KV portability proof | Implemented |
 | Cloud-provider portability checkpoint | Implemented |
@@ -71,6 +72,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Versioned `--json` inspect/check/plan output | Implemented |
 | Immutable `.presolved` release inspection | Implemented |
 | Inspection/planning UX checkpoint | Implemented |
+| Flagship same-release portability demo | Implemented |
 
 ## Next
 
@@ -86,15 +88,17 @@ Chunk 19 build/package workflow is complete. `presolve build` constructs verifie
 
 Chunk 20 inspection/planning UX is complete. `presolve inspect` covers both source Application Contract semantics and verified immutable `.presolved` releases; `presolve check` explains compatibility; `presolve plan` exposes exact symbolic resolver selections; and all inspection/planning surfaces have explicit versioned JSON projections where appropriate. The isolated Chunk 20 checkpoint also verifies structured non-zero failure behavior.
 
+Chunk 21 product proof is now externally reproducible. The flagship demo builds one `.presolved` release once, resolves it against memory, Redis, and Cloudflare Environment Specifications, executes the same release through memory and network Redis in public CI, and can opt into live Cloudflare execution with realization-time credentials. Redis adds a materially different networked provider while preserving the existing baseline KV application contract.
+
 ## Planned next
 
 The next phase is product proof and external validation rather than another broad architecture chunk:
 
-- visible public CI for the existing architectural checkpoints and conformance evidence
+- continue keeping architectural checkpoints, determinism, portability, and provider evidence visible in public CI
 - versioned Presolve CLI binaries/releases
-- a flagship same-`.presolved`-digest portability demo across genuinely different environments/providers
-- another materially different real provider to sharpen semantic negotiation
-- external developer validation before control-plane or lifecycle expansion
+- use the flagship demo and public releases for external developer validation
+- sharpen semantic negotiation from observed provider differences before adding broader capability vocabulary
+- defer control-plane or lifecycle expansion until external validation identifies a concrete need
 
 ## Not yet a product guarantee
 

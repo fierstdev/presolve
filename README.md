@@ -60,6 +60,18 @@ The central invariant is:
 
 > **An application release has immutable identity independent of the environment used to realize it.**
 
+## Flagship portability demo
+
+The repository includes a single-command demonstration of that invariant:
+
+```bash
+bash ./demo/portability/run.sh
+```
+
+It builds one immutable `.presolved` release exactly once, resolves those exact bytes against local memory, network Redis, and managed Cloudflare environments, executes the same release through memory and Redis, and verifies that both the Presolve release digest and encoded archive SHA-256 remain unchanged. With realization credentials supplied, `--cloudflare` executes that same release through live Cloudflare Workers KV as well.
+
+See the [flagship portability demo](demo/portability/README.md) for the proof shape, prerequisites, expected output, and scope of the claim.
+
 ## Why Presolve?
 
 Application software often accumulates assumptions about where it will run:
@@ -342,7 +354,9 @@ Implemented foundations include:
 - node-side provider realization profiles and secret-resolution boundary
 - installed provider-adapter registry with plan-scoped materialization
 - Cloudflare Workers KV adapter
+- Redis KV adapter over RESP/TCP
 - live external cloud-provider portability checkpoint
+- flagship same-release portability demo across memory, Redis, and Cloudflare environments
 - environment-independent `presolve build` for Component, OCI, mixed, Rust-source, and TypeScript-source `.presolved` releases
 - `presolve dev` local Component execution for the current single-workload Rust path
 
@@ -479,6 +493,7 @@ crates/
 
 providers/
   kv-memory/              In-memory key-value provider
+  kv-redis/               Redis key-value provider
   objects-memory/         In-memory object-storage provider
 
 packages/

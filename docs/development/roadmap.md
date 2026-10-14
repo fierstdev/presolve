@@ -197,8 +197,8 @@ Immediate priorities:
 - stabilize and exercise the machine-readable `presolve plan --json` surface through public examples and CI
 - put checkpoint, determinism, compatibility, build/package, inspection/planning, Docker execution, and provider-conformance evidence into visible public CI
 - begin publishing versioned Presolve CLI binaries/releases
-- create a flagship portability demo in which the exact same `.presolved` release digest is realized in two or three genuinely different environments with different provider implementations
-- add another real provider with materially different semantics, such as Redis, DynamoDB, PostgreSQL, or S3, to sharpen semantic negotiation and portability boundaries
+- **complete:** flagship portability demo in which the exact same `.presolved` release resolves across memory, Redis, and Cloudflare environments and executes unchanged through memory and Redis by default, with live Cloudflare execution available opt-in
+- **complete:** Redis provider over RESP/TCP as a materially different real implementation of the existing KV capability, sharpening the realization and semantic-portability boundary
 - use external developer feedback to decide what deserves stabilization before adding a control plane, scheduler, service mesh, registry, or lifecycle-management surface
 
 The product message remains:
