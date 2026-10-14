@@ -8,7 +8,7 @@
 //! Specification, or immutable `.presolved` release.
 //!
 //! The initial adapter uses path-style S3 requests, which makes the same
-//! implementation suitable for local MinIO and compatible managed endpoints
+//! implementation suitable for local `MinIO` and compatible managed endpoints
 //! such as Cloudflare R2. Optional object semantics remain outside the baseline
 //! capability until explicitly negotiated.
 
@@ -38,7 +38,7 @@ pub const S3_ENDPOINT_SETTING: &str = "endpoint";
 /// Provider-realization setting containing the bound bucket name.
 pub const S3_BUCKET_SETTING: &str = "bucket";
 
-/// Provider-realization setting containing the SigV4 region.
+/// Provider-realization setting containing the `SigV4` region.
 pub const S3_REGION_SETTING: &str = "region";
 
 /// Provider-realization secret binding containing the access-key identifier.
@@ -64,7 +64,7 @@ pub enum S3ObjectStoreConfigError {
     #[error("S3 bucket must be non-empty and must not contain `/` or ASCII control characters")]
     InvalidBucket,
 
-    /// Region is empty or cannot safely enter a SigV4 credential scope.
+    /// Region is empty or cannot safely enter a `SigV4` credential scope.
     #[error("S3 region must be non-empty lowercase ASCII letters, digits, or hyphens")]
     InvalidRegion,
 
@@ -564,6 +564,12 @@ mod tests {
 
     use super::*;
 
+    type TestResponse = (
+        &'static str,
+        Vec<(&'static str, &'static str)>,
+        &'static [u8],
+    );
+
     struct RecordedRequest {
         request_line: String,
         headers: Vec<(String, String)>,
@@ -591,11 +597,7 @@ mod tests {
     }
 
     fn serve(
-        responses: Vec<(
-            &'static str,
-            Vec<(&'static str, &'static str)>,
-            &'static [u8],
-        )>,
+        responses: Vec<TestResponse>,
     ) -> (
         String,
         mpsc::Receiver<Vec<RecordedRequest>>,
@@ -620,7 +622,9 @@ mod tests {
                 );
 
                 for (name, value) in headers {
-                    response.push_str(&format!("{name}: {value}\r\n"));
+                    use std::fmt::Write as _;
+                    write!(&mut response, "{name}: {value}\r\n")
+                        .expect("writing response header to String should succeed");
                 }
 
                 response.push_str("\r\n");
@@ -762,6 +766,7 @@ mod tests {
         );
         assert!(requests[0].header("x-amz-date").is_some());
         assert!(requests[0].header("x-amz-content-sha256").is_some());
+        assert_eq!(requests[0].body, Vec::<u8>::new());
     }
 
     #[test]
@@ -796,7 +801,7 @@ mod tests {
 
     #[test]
     fn list_uses_v2_prefix_query() {
-        let xml = br#"<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>false</IsTruncated><Contents><Key>demo%2Fa.bin</Key><Size>2</Size></Contents></ListBucketResult>"#;
+        let xml = br"<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>false</IsTruncated><Contents><Key>demo%2Fa.bin</Key><Size>2</Size></Contents></ListBucketResult>";
         let (endpoint, receiver, handle) = serve(vec![("200 OK", vec![], xml)]);
         let provider = provider(endpoint);
 
