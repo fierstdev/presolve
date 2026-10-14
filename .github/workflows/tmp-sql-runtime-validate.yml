@@ -1,0 +1,21 @@
+name: Temporary SQL runtime validation
+
+on:
+  push:
+    branches:
+      - tmp/sql-runtime-validate
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Compile SQL runtime binding
+        run: cargo check -p presolve-runtime -p presolve-provider-conformance
+      - name: Run focused tests
+        run: cargo test -p presolve-runtime -p presolve-provider-conformance
+      - name: Run focused Clippy
+        run: cargo clippy -p presolve-runtime -p presolve-provider-conformance --all-targets -- -D warnings
