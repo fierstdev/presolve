@@ -20,17 +20,31 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
 
-      - name: Fix stale SQL contract example
+      - name: Fix SQL source quality issues
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          path = Path("crates/presolve-contract/src/lib.rs")
-          text = path.read_text()
+
+          contract = Path("crates/presolve-contract/src/lib.rs")
+          text = contract.read_text()
           old = 'interface = "presolve:sql/database"\n    version = "^1.0"'
           new = 'interface = "presolve:sql/database"\n    version = "^0.1"'
           if old not in text:
               raise SystemExit("expected stale SQL example was not found")
-          path.write_text(text.replace(old, new, 1))
+          contract.write_text(text.replace(old, new, 1))
+
+          sql = Path("crates/presolve-provider-sdk/src/sql.rs")
+          text = sql.read_text()
+          old = '    /// Splits the result into column metadata and its row stream.\n    #[must_use]\n    pub fn into_parts('
+          new = '    /// Splits the result into column metadata and its row stream.\n    pub fn into_parts('
+          if old not in text:
+              raise SystemExit("expected into_parts must_use marker was not found")
+          text = text.replace(old, new, 1)
+          old = '        let values = vec![\n            SqlValue::Null,\n            SqlValue::Integer(-7),\n            SqlValue::Real(3.5),\n            SqlValue::Text("hello".to_owned()),\n            SqlValue::Bytes(vec![0, 1, 2]),\n        ];'
+          new = '        let values = [\n            SqlValue::Null,\n            SqlValue::Integer(-7),\n            SqlValue::Real(3.5),\n            SqlValue::Text("hello".to_owned()),\n            SqlValue::Bytes(vec![0, 1, 2]),\n        ];'
+          if old not in text:
+              raise SystemExit("expected scalar-values Vec was not found")
+          sql.write_text(text.replace(old, new, 1))
           PY
 
       - name: Apply rustfmt
