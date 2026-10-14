@@ -145,8 +145,8 @@ jobs:
       - name: Check diff hygiene
         run: git diff --check
 
-  redis-provider-proof:
-    name: Redis provider proof
+  flagship-portability-demo:
+    name: Flagship portability demo
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -174,8 +174,8 @@ jobs:
       - name: Verify Docker
         run: docker version
 
-      - name: Execute same detached release through memory and Redis
-        run: bash ./scripts/check-release-realization.sh --redis
+      - name: Run flagship portability demonstration
+        run: bash ./demo/portability/run.sh
 
   docker-portability:
     name: Docker portability
