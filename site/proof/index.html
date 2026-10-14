@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portability proof — Presolve</title>
+  <meta name="description" content="Run Presolve's flagship portability proof: one immutable application release, three environments, multiple provider realizations, zero application rebuilds.">
+  <link rel="canonical" href="https://presolve.dev/proof/">
+  <meta property="og:title" content="Presolve portability proof">
+  <meta property="og:description" content="One immutable release. Three environments. Multiple provider realizations. Zero application rebuilds.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://presolve.dev/proof/">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell nav-shell">
+      <a class="brand" href="/" aria-label="Presolve home">
+        <img src="/assets/presolve-mark.svg" alt="" width="26" height="31">
+        <span>Presolve</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="/#model">How it works</a>
+        <a href="/proof/">Proof</a>
+        <a href="/docs/">Docs</a>
+        <a href="/status/">Status</a>
+        <a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero shell">
+      <span class="kicker">Flagship portability proof</span>
+      <h1>One release.<br>Different environments.</h1>
+      <p>Presolve builds one immutable application release, resolves those exact bytes against different environments, realizes different providers, and verifies that the application identity never changes.</p>
+      <div class="hero-actions">
+        <a class="button primary" href="https://github.com/fierstdev/presolve/tree/main/demo/portability">Run the proof ↗</a>
+        <a class="button secondary" href="https://github.com/fierstdev/presolve/blob/main/docs/proofs/flagship-portability-walkthrough.md">Technical walkthrough ↗</a>
+      </div>
+    </section>
+
+    <section class="section shell">
+      <div class="section-heading compact">
+        <span class="kicker">The claim</span>
+        <h2>Build software once. Decide where it runs later.</h2>
+        <p>The proof is intentionally small. It tests Presolve's central architectural invariant directly rather than hiding it inside a larger application.</p>
+      </div>
+
+      <div class="model-grid">
+        <article class="model-card">
+          <div class="model-label">Build once</div>
+          <code>kv-demo.presolved</code>
+          <ul>
+            <li>one application build</li>
+            <li>one canonical release digest</li>
+            <li>one encoded archive SHA-256</li>
+            <li>no environment embedded in identity</li>
+          </ul>
+        </article>
+        <div class="resolver-card">
+          <div class="resolver-mark">P</div>
+          <strong>Resolver</strong>
+          <span>same release bytes</span>
+        </div>
+        <article class="model-card">
+          <div class="model-label">Decide later</div>
+          <code>presolve.env.toml</code>
+          <ul>
+            <li>local memory provider</li>
+            <li>network Redis provider</li>
+            <li>managed Cloudflare provider</li>
+            <li>realization details stay external</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section section-rule shell">
+      <div class="section-heading compact">
+        <span class="kicker">Reproduce it</span>
+        <h2>One public command.</h2>
+        <p>The command below is the same entry point exercised by Presolve's public CI.</p>
+      </div>
+      <div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
+cd presolve
+bash ./demo/portability/run.sh</code></pre></div>
+      <div class="note">Prerequisites: Rust with the <code>wasm32-wasip2</code> target, Docker, Bash, and Python 3. The default proof requires no cloud credentials.</div>
+    </section>
+
+    <section class="section section-rule shell">
+      <div class="section-heading compact">
+        <span class="kicker">Resolution</span>
+        <h2>The exact same release resolves three ways.</h2>
+      </div>
+      <div class="workflow-list">
+        <div><code>portability-local</code><span><strong>memory-kv</strong> · in-process provider · resolved</span></div>
+        <div><code>portability-redis</code><span><strong>redis-kv</strong> · RESP/TCP network provider · resolved</span></div>
+        <div><code>portability-cloudflare</code><span><strong>cloudflare-kv</strong> · managed cloud provider · resolved</span></div>
+      </div>
+    </section>
+
+    <section class="section section-rule shell">
+      <div class="section-heading compact">
+        <span class="kicker">Realization</span>
+        <h2>Different provider implementations execute without rebuilding the application.</h2>
+        <p>The credential-free path executes the release through memory and a real Redis process. Cloudflare execution is an explicit opt-in because it requires account credentials.</p>
+      </div>
+      <div class="proof-grid">
+        <article><span>01</span><strong>Memory</strong><p>The provider is realized in-process. The release executes successfully without changing its application identity.</p></article>
+        <article><span>02</span><strong>Redis</strong><p>A pinned Redis container is started and Presolve realizes a networked RESP/TCP provider against the same release.</p></article>
+        <article><span>03</span><strong>Cloudflare</strong><p>The same release resolves to Workers KV. Passing <code>--cloudflare</code> promotes the plan to live execution with realization-time credentials.</p></article>
+      </div>
+    </section>
+
+    <section class="section section-rule shell">
+      <div class="split-heading">
+        <div>
+          <span class="kicker">Identity check</span>
+          <h2>The application never changes.</h2>
+        </div>
+        <div>
+          <p>Before any environment is selected, the script records both the canonical Presolve release digest and the encoded archive SHA-256.</p>
+          <p>After resolution and execution, it computes both values again and fails unless they are identical.</p>
+        </div>
+      </div>
+      <div class="code-block"><pre><code>release digest unchanged: yes
+archive sha256 unchanged: yes
+
+PASS — one .presolved release, three plans,
+two provider realizations, zero application rebuilds.</code></pre></div>
+    </section>
+
+    <section class="section section-rule shell">
+      <div class="section-heading compact">
+        <span class="kicker">What this proves</span>
+        <h2>A deliberately narrow result.</h2>
+      </div>
+      <div class="status-grid">
+        <article class="status-card">
+          <span class="kicker">Proven</span>
+          <h2>Core invariant</h2>
+          <ul class="status-list">
+            <li class="yes">Application release identity is independent of environment selection.</li>
+            <li class="yes">A detached release can reconstruct the resolver input it needs.</li>
+            <li class="yes">Different ProviderIds can satisfy the same provider-neutral KV requirement.</li>
+            <li class="yes">The same release bytes execute through in-process and networked provider implementations.</li>
+            <li class="yes">Cloud-specific credentials and endpoints remain outside the application release.</li>
+          </ul>
+        </article>
+        <article class="status-card">
+          <span class="kicker">Not claimed</span>
+          <h2>Still outside this proof</h2>
+          <ul class="status-list">
+            <li class="no">Production readiness or stable public APIs.</li>
+            <li class="no">Every workload or capability can run everywhere.</li>
+            <li class="no">Automatic infrastructure provisioning.</li>
+            <li class="no">A scheduler, service mesh, registry, or hosted control plane.</li>
+            <li class="no">That all providers have identical semantics beyond negotiated contracts.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section section-rule shell workflow-section">
+      <div class="section-heading compact">
+        <span class="kicker">Inspect it</span>
+        <h2>Do not take the claim on faith.</h2>
+        <p>The proof is meant to be inspected, challenged, and reproduced.</p>
+      </div>
+      <div class="link-row">
+        <a class="link-card" href="https://github.com/fierstdev/presolve/tree/main/demo/portability"><strong>Demo source ↗</strong><span>The exact public runner and proof documentation.</span></a>
+        <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/proofs/flagship-portability-walkthrough.md"><strong>Technical walkthrough ↗</strong><span>What happens at each stage and why it matters.</span></a>
+        <a class="link-card" href="https://github.com/fierstdev/presolve/actions"><strong>Public CI ↗</strong><span>The same demo entry point is continuously verified.</span></a>
+        <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/architecture/overview.md"><strong>Architecture ↗</strong><span>How Application, Environment, Deployment, resolver, and realization fit together.</span></a>
+      </div>
+    </section>
+
+    <section class="cta shell">
+      <span class="kicker">Developer validation</span>
+      <h2>Run it. Try to break the model.</h2>
+      <p>The highest-value feedback right now is architectural: where does the application/environment boundary leak, which semantics are underspecified, and what real deployment would invalidate the portability claim?</p>
+      <div class="hero-actions">
+        <a class="button primary" href="https://github.com/fierstdev/presolve/issues">Open an issue ↗</a>
+        <a class="button secondary" href="https://github.com/fierstdev/presolve">Inspect the repository ↗</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a>
+      <p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p>
+    </div>
+  </footer>
+</body>
+</html>
