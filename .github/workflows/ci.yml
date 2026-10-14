@@ -136,6 +136,9 @@ jobs:
       - name: Check detached-release portability proof
         run: bash ./scripts/check-portability-proof.sh
 
+      - name: Check detached-release provider realization
+        run: bash ./scripts/check-release-realization.sh
+
       - name: Check documentation
         run: python3 scripts/check-docs.py
 

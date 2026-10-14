@@ -14,32 +14,56 @@ struct KeyValueComponent;
 
 impl bindings::Guest for KeyValueComponent {
     fn run(input: String) -> String {
-        const KEY: &str = "message";
-
-        if let Err(error) = store::set(KEY, &input) {
-            return format!("error:{}", error_code(error));
-        }
-
-        let value = match store::get(KEY) {
-            Ok(Some(value)) => value,
-            Ok(None) => {
-                return "error:missing".to_owned();
-            }
-            Err(error) => {
-                return format!("error:{}", error_code(error));
-            }
-        };
-
-        match store::delete(KEY) {
-            Ok(true) => {
-                format!("stored:{value}")
-            }
-            Ok(false) => "error:delete-missing".to_owned(),
-            Err(error) => {
-                format!("error:{}", error_code(error))
-            }
+        match command(&input) {
+            Ok(Command::Set { key, value }) => match store::set(key, value) {
+                Ok(()) => "stored".to_owned(),
+                Err(error) => format!("error:{}", error_code(error)),
+            },
+            Ok(Command::Get { key }) => match store::get(key) {
+                Ok(Some(value)) => format!("value:{value}"),
+                Ok(None) => "missing".to_owned(),
+                Err(error) => format!("error:{}", error_code(error)),
+            },
+            Ok(Command::Delete { key }) => match store::delete(key) {
+                Ok(true) => "deleted".to_owned(),
+                Ok(false) => "missing".to_owned(),
+                Err(error) => format!("error:{}", error_code(error)),
+            },
+            Err(message) => format!("error:{message}"),
         }
     }
+}
+
+enum Command<'a> {
+    Set { key: &'a str, value: &'a str },
+    Get { key: &'a str },
+    Delete { key: &'a str },
+}
+
+fn command(input: &str) -> Result<Command<'_>, &'static str> {
+    if let Some(rest) = input.strip_prefix("set:") {
+        let (key, value) = rest.split_once(':').ok_or("invalid-command")?;
+        if key.is_empty() {
+            return Err("invalid-command");
+        }
+        return Ok(Command::Set { key, value });
+    }
+
+    if let Some(key) = input.strip_prefix("get:") {
+        if key.is_empty() {
+            return Err("invalid-command");
+        }
+        return Ok(Command::Get { key });
+    }
+
+    if let Some(key) = input.strip_prefix("delete:") {
+        if key.is_empty() {
+            return Err("invalid-command");
+        }
+        return Ok(Command::Delete { key });
+    }
+
+    Err("invalid-command")
 }
 
 fn error_code(error: store::Error) -> &'static str {
