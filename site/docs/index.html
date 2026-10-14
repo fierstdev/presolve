@@ -16,7 +16,7 @@
     <div class="shell nav-shell">
       <a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a>
       <nav class="nav-links" aria-label="Primary navigation">
-        <a href="/#model">How it works</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a>
+        <a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a>
       </nav>
     </div>
   </header>
@@ -32,6 +32,7 @@
       <aside class="docs-nav">
         <strong>On this page</strong>
         <a href="#install">Build from source</a>
+        <a href="#proof">Run the proof</a>
         <a href="#application">Application Contract</a>
         <a href="#environment">Environment</a>
         <a href="#workflow">Workflow</a>
@@ -50,6 +51,14 @@ cargo build -p presolve-cli
 
 ./target/debug/presolve --help</code></pre></div>
           <div class="note">Presolve is pre-stable. CLI and schema compatibility are not guaranteed yet.</div>
+        </section>
+
+        <section id="proof">
+          <span class="kicker">Flagship proof</span>
+          <h2>Reproduce the core portability claim.</h2>
+          <p>The fastest way to evaluate Presolve is to run the same proof used by public CI. It builds one immutable release once, resolves it against memory, Redis, and Cloudflare environments, executes the same release through memory and Redis, and verifies that the application identity did not change.</p>
+          <div class="code-block"><pre><code>bash ./demo/portability/run.sh</code></pre></div>
+          <p>The default path requires no cloud credentials. See <a href="/proof/">the proof page</a> for the provider matrix, scope, and links to the technical walkthrough.</p>
         </section>
 
         <section id="application">
@@ -125,6 +134,7 @@ presolve inspect dist/orders.presolved --json</code></pre></div>
           <h2>Go deeper</h2>
           <p>The repository documentation remains the source of truth while Presolve is in developer preview.</p>
           <div class="link-row">
+            <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/proofs/flagship-portability-walkthrough.md"><strong>Portability walkthrough ↗</strong><span>Step-by-step explanation of the flagship proof</span></a>
             <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/application-contract.md"><strong>Application Contract ↗</strong><span><code>presolve.toml</code> reference</span></a>
             <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/environment-specification.md"><strong>Environment Specification ↗</strong><span><code>presolve.env.toml</code> reference</span></a>
             <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/presolved-bundle.md"><strong>.presolved bundle ↗</strong><span>Immutable release format</span></a>
