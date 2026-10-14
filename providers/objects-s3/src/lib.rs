@@ -55,7 +55,9 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum S3ObjectStoreConfigError {
     /// Endpoint is not a supported root HTTP(S) URL.
-    #[error("S3 endpoint must be a root http:// or https:// URL without credentials, query, or fragment")]
+    #[error(
+        "S3 endpoint must be a root http:// or https:// URL without credentials, query, or fragment"
+    )]
     InvalidEndpoint,
 
     /// Bucket name cannot be represented by this path-style adapter.
@@ -149,9 +151,9 @@ impl S3ObjectStoreProvider {
         }
 
         if region.is_empty()
-            || !region.bytes().all(|byte| {
-                byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-'
-            })
+            || !region
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
         {
             return Err(S3ObjectStoreConfigError::InvalidRegion);
         }
@@ -203,11 +205,7 @@ impl S3ObjectStoreProvider {
     }
 
     fn object_uri(&self, key: &str) -> String {
-        format!(
-            "{}/{}",
-            self.bucket_uri(),
-            aws_percent_encode(key, false)
-        )
+        format!("{}/{}", self.bucket_uri(), aws_percent_encode(key, false))
     }
 
     fn request_url(&self, canonical_uri: &str, canonical_query: &str) -> String {
@@ -225,9 +223,7 @@ impl S3ObjectStoreProvider {
         canonical_query: &str,
         body: Option<Vec<u8>>,
     ) -> Result<Response, ObjectStoreError> {
-        let payload_hash = body
-            .as_deref()
-            .map_or_else(|| sha256_hex(b""), sha256_hex);
+        let payload_hash = body.as_deref().map_or_else(|| sha256_hex(b""), sha256_hex);
         let timestamp = now().map_err(ObjectStoreError::internal)?;
         let authorization = authorization(&SigV4Input {
             access_key_id: self.access_key_id.expose_secret(),
@@ -244,10 +240,7 @@ impl S3ObjectStoreProvider {
 
         let mut request = self
             .client
-            .request(
-                method,
-                self.request_url(canonical_uri, canonical_query),
-            )
+            .request(method, self.request_url(canonical_uri, canonical_query))
             .header("x-amz-content-sha256", &payload_hash)
             .header("x-amz-date", &timestamp.full)
             .header(AUTHORIZATION, authorization);
@@ -426,7 +419,9 @@ fn read_exact_body(size: u64, body: &mut dyn Read) -> Result<Vec<u8>, ObjectStor
 
 fn map_transport_error(error: &reqwest::Error) -> ObjectStoreError {
     if error.is_timeout() || error.is_connect() {
-        ObjectStoreError::unavailable(format!("S3-compatible object storage is unavailable: {error}"))
+        ObjectStoreError::unavailable(format!(
+            "S3-compatible object storage is unavailable: {error}"
+        ))
     } else {
         ObjectStoreError::internal(format!("S3-compatible object request failed: {error}"))
     }
@@ -506,16 +501,11 @@ impl presolve_provider_realization::ProviderAdapter for S3ObjectStoreAdapter {
         let access_key_id = resolve_secret(profile, S3_ACCESS_KEY_ID_SECRET, secrets)?;
         let secret_access_key = resolve_secret(profile, S3_SECRET_ACCESS_KEY_SECRET, secrets)?;
 
-        let provider = S3ObjectStoreProvider::new(
-            endpoint,
-            bucket,
-            region,
-            access_key_id,
-            secret_access_key,
-        )
-        .map_err(|error| ProviderAdapterError::Configuration {
-            message: error.to_string(),
-        })?;
+        let provider =
+            S3ObjectStoreProvider::new(endpoint, bucket, region, access_key_id, secret_access_key)
+                .map_err(|error| ProviderAdapterError::Configuration {
+                    message: error.to_string(),
+                })?;
 
         Ok(
             presolve_provider_realization::RealizedProvider::new(*profile.provider_id())
@@ -594,7 +584,11 @@ mod tests {
     }
 
     fn serve(
-        responses: Vec<(&'static str, Vec<(&'static str, &'static str)>, &'static [u8])>,
+        responses: Vec<(
+            &'static str,
+            Vec<(&'static str, &'static str)>,
+            &'static [u8],
+        )>,
     ) -> (
         String,
         mpsc::Receiver<Vec<RecordedRequest>>,
