@@ -60,17 +60,37 @@ The central invariant is:
 
 > **An application release has immutable identity independent of the environment used to realize it.**
 
-## Flagship portability demo
+## Flagship portability proof
 
-The repository includes a single-command demonstration of that invariant:
+Presolve includes a public, reproducible proof of that invariant:
 
 ```bash
 bash ./demo/portability/run.sh
 ```
 
-It builds one immutable `.presolved` release exactly once, resolves those exact bytes against local memory, network Redis, and managed Cloudflare environments, executes the same release through memory and Redis, and verifies that both the Presolve release digest and encoded archive SHA-256 remain unchanged. With realization credentials supplied, `--cloudflare` executes that same release through live Cloudflare Workers KV as well.
+One `.presolved` release is built exactly once and then resolved against three different environments:
 
-See the [flagship portability demo](demo/portability/README.md) for the proof shape, prerequisites, expected output, and scope of the claim.
+| Environment | Provider | Default proof |
+| --- | --- | --- |
+| `portability-local` | `memory-kv` | resolved + executed |
+| `portability-redis` | `redis-kv` | resolved + executed over TCP |
+| `portability-cloudflare` | `cloudflare-kv` | resolved; live execution with `--cloudflare` |
+
+The same release bytes are used throughout. The proof re-inspects and re-hashes the archive at the end and fails unless both its canonical Presolve release digest and encoded archive SHA-256 are unchanged.
+
+```text
+release digest unchanged: yes
+archive sha256 unchanged: yes
+
+PASS — one .presolved release, three plans,
+two provider realizations, zero application rebuilds.
+```
+
+The exact public entry point above is also executed by CI.
+
+- **Run/read the proof:** https://presolve.dev/proof/
+- [Demo source and prerequisites](demo/portability/README.md)
+- [Concise technical walkthrough](docs/proofs/flagship-portability-walkthrough.md)
 
 ## Why Presolve?
 
@@ -511,12 +531,15 @@ Public documentation lives in [`docs/`](docs/README.md).
 
 Start with:
 
+- [Flagship portability walkthrough](docs/proofs/flagship-portability-walkthrough.md)
 - [Application portability](docs/concepts/application-portability.md)
 - [Application Contract reference](docs/reference/application-contract.md)
 - [Environment Specification reference](docs/reference/environment-specification.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [TypeScript authoring](docs/architecture/typescript-authoring.md)
 - [Project status](docs/development/project-status.md)
+
+For the current external-validation phase, see [First developer-validation outreach](docs/validation/first-developer-validation.md).
 
 ## Project direction
 

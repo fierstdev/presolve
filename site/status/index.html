@@ -14,7 +14,7 @@
   <header class="site-header">
     <div class="shell nav-shell">
       <a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a>
-      <nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav>
+      <nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav>
     </div>
   </header>
 
@@ -48,6 +48,7 @@
           <li class="yes">Docker local executor</li>
           <li class="yes">KV + object-storage capability contracts</li>
           <li class="yes">In-memory KV/object providers</li>
+          <li class="yes">Redis KV adapter over RESP/TCP</li>
           <li class="yes">Cloudflare Workers KV adapter</li>
         </ul>
       </article>
@@ -66,6 +67,20 @@
       </article>
 
       <article class="status-card">
+        <span class="kicker">Public proof</span>
+        <h2>Same-release portability</h2>
+        <ul class="status-list">
+          <li class="yes">One detached <code>.presolved</code> release built once</li>
+          <li class="yes">Memory, Redis, and Cloudflare environment resolution</li>
+          <li class="yes">Memory and real Redis execution from the same release bytes</li>
+          <li class="yes">Optional live Cloudflare Workers KV execution</li>
+          <li class="yes">Release digest and archive SHA verification</li>
+          <li class="yes">Exact public demo command verified by CI</li>
+        </ul>
+        <div class="hero-actions"><a class="button secondary" href="/proof/">Inspect the proof</a></div>
+      </article>
+
+      <article class="status-card">
         <span class="kicker">Not a guarantee</span>
         <h2>Not stable yet</h2>
         <ul class="status-list">
@@ -78,12 +93,12 @@
         </ul>
       </article>
 
-      <article class="status-card full">
+      <article class="status-card">
         <span class="kicker">Next</span>
-        <h2>Product proof before broader architecture.</h2>
-        <p>The next phase focuses on public CI evidence, versioned CLI releases, a same-<code>.presolved</code>-digest portability demo across genuinely different environments, another materially different provider, and feedback from external developers.</p>
-        <p>Control-plane, scheduler, service-mesh, registry, and lifecycle-management work stays deferred until the core portability model has outside validation.</p>
-        <div class="hero-actions"><a class="button secondary" href="https://github.com/fierstdev/presolve/blob/main/docs/development/roadmap.md">Read the roadmap ↗</a></div>
+        <h2>External validation before broader architecture.</h2>
+        <p>The immediate phase is to put the runnable proof in front of platform, runtime, backend, and distributed-systems engineers and collect concrete objections, missing semantics, and real deployment cases.</p>
+        <p>Control-plane, scheduler, service-mesh, registry, and lifecycle-management work stays deferred until the core portability model survives outside scrutiny.</p>
+        <div class="hero-actions"><a class="button secondary" href="https://github.com/fierstdev/presolve/blob/main/docs/validation/first-developer-validation.md">Validation plan ↗</a></div>
       </article>
     </div>
   </main>
