@@ -23,7 +23,7 @@
       </a>
       <nav class="nav-links" aria-label="Primary navigation">
         <a href="#model">How it works</a>
-        <a href="#proof">Current proof</a>
+        <a href="/proof/">Proof</a>
         <a href="/docs/">Docs</a>
         <a href="/status/">Status</a>
         <a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a>
@@ -37,8 +37,8 @@
       <h1>Build software once.<br>Decide where it runs later.</h1>
       <p class="hero-copy">Presolve packages an application and its requirements into an immutable release. Environments declare what they can provide. Presolve resolves the two and produces an inspectable deployment plan.</p>
       <div class="hero-actions">
-        <a class="button primary" href="/docs/">Read the docs</a>
-        <a class="button secondary" href="https://github.com/fierstdev/presolve">View source ↗</a>
+        <a class="button primary" href="/proof/">Run the portability proof</a>
+        <a class="button secondary" href="/docs/">Read the docs</a>
       </div>
       <div class="hero-terminal" aria-label="Presolve command line workflow">
         <div class="terminal-top"><span></span><span></span><span></span><strong>presolve</strong></div>
@@ -112,25 +112,36 @@
         <div class="release-lines" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="environment-stack">
           <div><strong>Local</strong><span>memory KV · Component runtime</span></div>
-          <div><strong>Container host</strong><span>Docker · capability bridge</span></div>
-          <div><strong>Managed infrastructure</strong><span>provider-specific realization</span></div>
+          <div><strong>Network service</strong><span>Redis · RESP/TCP provider</span></div>
+          <div><strong>Managed infrastructure</strong><span>Cloudflare Workers KV</span></div>
         </div>
       </div>
     </section>
 
     <section id="proof" class="section section-rule shell">
       <div class="section-heading compact">
-        <span class="kicker">Current proof</span>
-        <h2>Implemented today.</h2>
-        <p>Presolve is pre-stable, but the core portability path is working and covered by checkpoints.</p>
+        <span class="kicker">Flagship proof</span>
+        <h2>One release. Three environments. Zero application rebuilds.</h2>
+        <p>The repository includes a public, reproducible demonstration of Presolve's central invariant. It builds one detached release once, resolves those exact bytes against three environments, executes it through materially different providers, and verifies that its identity never changes.</p>
       </div>
-      <div class="proof-grid">
-        <article><span>01</span><strong>Workloads</strong><p>WebAssembly Components and OCI/container workload identity and execution paths.</p></article>
-        <article><span>02</span><strong>Capabilities</strong><p>Versioned KV and object-storage capability contracts with feature negotiation.</p></article>
-        <article><span>03</span><strong>Providers</strong><p>In-memory implementations plus a real Cloudflare Workers KV adapter.</p></article>
-        <article><span>04</span><strong>Builds</strong><p>Deterministic <code>.presolved</code> packaging across Component, OCI, mixed, and TypeScript paths.</p></article>
-        <article><span>05</span><strong>Resolution</strong><p>Deterministic compatibility checks and inspectable symbolic deployment plans.</p></article>
-        <article><span>06</span><strong>Authoring</strong><p>Rust and TypeScript paths, with <code>presolve.toml</code> remaining the language-neutral contract.</p></article>
+
+      <div class="workflow-list">
+        <div><code>portability-local</code><span><strong>memory-kv</strong> · resolved + executed</span></div>
+        <div><code>portability-redis</code><span><strong>redis-kv</strong> · resolved + executed over TCP</span></div>
+        <div><code>portability-cloudflare</code><span><strong>cloudflare-kv</strong> · resolved; live execution with credentials</span></div>
+      </div>
+
+      <div class="code-block"><pre><code>$ bash ./demo/portability/run.sh
+
+release digest unchanged: yes
+archive sha256 unchanged: yes
+
+PASS — one .presolved release, three plans,
+two provider realizations, zero application rebuilds.</code></pre></div>
+
+      <div class="hero-actions">
+        <a class="button primary" href="/proof/">See the proof</a>
+        <a class="button secondary" href="https://github.com/fierstdev/presolve/tree/main/demo/portability">Inspect the demo source ↗</a>
       </div>
     </section>
 
@@ -144,6 +155,22 @@
         <div><code>presolve build</code><span>What immutable release are we distributing?</span></div>
         <div><code>presolve check</code><span>Can this environment satisfy it?</span></div>
         <div><code>presolve plan</code><span>What exactly did the resolver select?</span></div>
+      </div>
+    </section>
+
+    <section class="section section-rule shell">
+      <div class="section-heading compact">
+        <span class="kicker">Implemented today</span>
+        <h2>The proof rests on working architecture, not a mock.</h2>
+        <p>Presolve is pre-stable, but the portability path is implemented and covered by public checkpoints.</p>
+      </div>
+      <div class="proof-grid">
+        <article><span>01</span><strong>Workloads</strong><p>WebAssembly Components and OCI/container workload identity and execution paths.</p></article>
+        <article><span>02</span><strong>Capabilities</strong><p>Versioned KV and object-storage capability contracts with feature negotiation.</p></article>
+        <article><span>03</span><strong>Providers</strong><p>Memory, Redis, object storage, and a real Cloudflare Workers KV adapter.</p></article>
+        <article><span>04</span><strong>Builds</strong><p>Deterministic <code>.presolved</code> packaging across Component, OCI, mixed, and TypeScript paths.</p></article>
+        <article><span>05</span><strong>Resolution</strong><p>Deterministic compatibility checks and inspectable symbolic deployment plans.</p></article>
+        <article><span>06</span><strong>Authoring</strong><p>Rust and TypeScript paths, with <code>presolve.toml</code> remaining the language-neutral contract.</p></article>
       </div>
     </section>
 
@@ -162,10 +189,10 @@
 
     <section class="cta shell">
       <span class="kicker">Developer Preview</span>
-      <h2>Read the model. Run the checkpoints. Break the assumptions.</h2>
-      <p>Presolve is being developed in public under Apache-2.0.</p>
+      <h2>Run the proof. Break the assumptions.</h2>
+      <p>Presolve is being developed in public under Apache-2.0. The most useful feedback right now is where the Application / Environment boundary fails under real infrastructure.</p>
       <div class="hero-actions">
-        <a class="button primary" href="/docs/">Get started</a>
+        <a class="button primary" href="/proof/">Run the proof</a>
         <a class="button secondary" href="https://github.com/fierstdev/presolve">github.com/fierstdev/presolve ↗</a>
       </div>
     </section>
