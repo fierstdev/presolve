@@ -1,0 +1,36 @@
+name: Temporary object formatting
+
+on:
+  push:
+    branches:
+      - tmp/object-fmt
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: tmp/object-fmt
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt
+
+      - name: Apply rustfmt
+        run: cargo fmt --all
+
+      - name: Commit formatting if changed
+        run: |
+          if git diff --quiet; then
+            echo "Already formatted"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add providers/objects-s3/src/lib.rs providers/objects-s3/src/list.rs providers/objects-s3/src/signing.rs crates/presolve-node/examples/object_release_realization_checkpoint.rs
+          git commit -m "style: apply rustfmt to object portability slice"
+          git push origin HEAD:tmp/object-fmt
