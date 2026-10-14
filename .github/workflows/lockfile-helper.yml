@@ -1,0 +1,38 @@
+name: Lockfile helper
+
+on:
+  push:
+    branches:
+      - tmp/redis-lockfile-gen
+
+permissions:
+  contents: write
+
+jobs:
+  update-lock:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout helper branch
+        uses: actions/checkout@v4
+        with:
+          ref: tmp/redis-lockfile-gen
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Update lockfile through Cargo
+        run: cargo check -p presolve-provider-kv-redis
+
+      - name: Commit generated lockfile
+        run: |
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "chore: update Cargo.lock for Redis provider"
+          git push origin HEAD:tmp/redis-lockfile-gen
