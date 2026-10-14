@@ -252,7 +252,10 @@ fn read_verified_tar_entry(release_bytes: &[u8], target_path: &str) -> Result<Ve
 }
 
 fn tar_text(field: &[u8]) -> Result<&str> {
-    let end = field.iter().position(|byte| *byte == 0).unwrap_or(field.len());
+    let end = field
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(field.len());
     std::str::from_utf8(&field[..end]).context("tar field is not UTF-8")
 }
 
