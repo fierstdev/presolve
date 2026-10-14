@@ -420,10 +420,10 @@ mod tests {
 
     #[test]
     fn rejects_empty_address() {
-        assert_eq!(
+        assert!(matches!(
             RedisKvProvider::new(""),
             Err(RedisKvConfigError::EmptyAddress)
-        );
+        ));
     }
 
     #[test]
