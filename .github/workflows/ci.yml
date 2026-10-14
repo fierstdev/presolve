@@ -124,7 +124,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Check cloud-provider boundary
+      - name: Check external-provider boundary
         run: ./scripts/check-cloud-provider.sh
 
       - name: Check deterministic build and package workflow
@@ -176,6 +176,38 @@ jobs:
 
       - name: Run flagship portability demonstration
         run: bash ./demo/portability/run.sh
+
+  object-portability:
+    name: Object portability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: >-
+          rustup toolchain install stable
+          --profile minimal
+          --target wasm32-wasip2
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Verify Docker
+        run: docker version
+
+      - name: Run object-storage portability checkpoint
+        run: bash ./scripts/check-object-portability.sh
 
   docker-portability:
     name: Docker portability
