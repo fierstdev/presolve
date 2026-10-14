@@ -42,9 +42,7 @@ impl RealizationMode {
             "local" => Ok(Self::Local),
             "cloudflare" => Ok(Self::Cloudflare),
             "redis" => Ok(Self::Redis),
-            _ => bail!(
-                "realization mode must be `local`, `cloudflare`, or `redis`, got `{value}`"
-            ),
+            _ => bail!("realization mode must be `local`, `cloudflare`, or `redis`, got `{value}`"),
         }
     }
 
