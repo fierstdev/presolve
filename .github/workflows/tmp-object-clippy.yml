@@ -33,7 +33,7 @@ jobs:
               "    /// Region is empty or cannot safely enter a SigV4 credential scope.": "    /// Region is empty or cannot safely enter a `SigV4` credential scope.",
               "        let xml = br#\"<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>false</IsTruncated><Contents><Key>demo%2Fa.bin</Key><Size>2</Size></Contents></ListBucketResult>\"#;": "        let xml = br\"<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>false</IsTruncated><Contents><Key>demo%2Fa.bin</Key><Size>2</Size></Contents></ListBucketResult>\";",
               "                    response.push_str(&format!(\"{name}: {value}\\r\\n\"));": "                    use std::fmt::Write as _;\n                    write!(&mut response, \"{name}: {value}\\r\\n\")\n                        .expect(\"writing response header to String should succeed\");",
-              "        assert!(requests[0].header(\"x-amz-content-sha256\").is_some());": "        assert!(requests[0].header(\"x-amz-content-sha256\").is_some());\n        assert!(requests[0].body.is_empty());",
+              "        assert!(requests[0].header(\"x-amz-content-sha256\").is_some());": "        assert!(requests[0].header(\"x-amz-content-sha256\").is_some());\n        assert_eq!(requests[0].body, Vec::<u8>::new());",
           }
           for old, new in replacements.items():
               if old not in text:
