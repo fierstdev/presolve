@@ -1,0 +1,107 @@
+name: Flagship edit helper
+
+on:
+  push:
+    branches:
+      - tmp/flagship-demo-edits
+
+permissions:
+  contents: write
+
+jobs:
+  edit:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout helper branch
+        uses: actions/checkout@v4
+        with:
+          ref: tmp/flagship-demo-edits
+
+      - name: Apply focused documentation and CI edits
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"expected text not found in {path}: {old[:80]!r}")
+              if text.count(old) != 1:
+                  raise SystemExit(f"expected exactly one match in {path}")
+              file.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "README.md",
+              "> **An application release has immutable identity independent of the environment used to realize it.**\n\n## Why Presolve?",
+              "> **An application release has immutable identity independent of the environment used to realize it.**\n\n## Flagship portability demo\n\nThe repository includes a single-command demonstration of that invariant:\n\n```bash\nbash ./demo/portability/run.sh\n```\n\nIt builds one immutable `.presolved` release exactly once, resolves those exact bytes against local memory, network Redis, and managed Cloudflare environments, executes the same release through memory and Redis, and verifies that both the Presolve release digest and encoded archive SHA-256 remain unchanged. With realization credentials supplied, `--cloudflare` executes that same release through live Cloudflare Workers KV as well.\n\nSee the [flagship portability demo](demo/portability/README.md) for the proof shape, prerequisites, expected output, and scope of the claim.\n\n## Why Presolve?",
+          )
+
+          replace_once(
+              "README.md",
+              "- Cloudflare Workers KV adapter\n- live external cloud-provider portability checkpoint",
+              "- Cloudflare Workers KV adapter\n- Redis KV adapter over RESP/TCP\n- live external cloud-provider portability checkpoint\n- flagship same-release portability demo across memory, Redis, and Cloudflare environments",
+          )
+
+          replace_once(
+              "README.md",
+              "  kv-memory/              In-memory key-value provider\n  objects-memory/         In-memory object-storage provider",
+              "  kv-memory/              In-memory key-value provider\n  kv-redis/               Redis key-value provider\n  objects-memory/         In-memory object-storage provider",
+          )
+
+          replace_once(
+              ".github/workflows/ci.yml",
+              "  redis-provider-proof:\n    name: Redis provider proof",
+              "  flagship-portability-demo:\n    name: Flagship portability demo",
+          )
+
+          replace_once(
+              ".github/workflows/ci.yml",
+              "      - name: Execute same detached release through memory and Redis\n        run: bash ./scripts/check-release-realization.sh --redis",
+              "      - name: Run flagship portability demonstration\n        run: bash ./demo/portability/run.sh",
+          )
+
+          replace_once(
+              "docs/development/roadmap.md",
+              "- create a flagship portability demo in which the exact same `.presolved` release digest is realized in two or three genuinely different environments with different provider implementations\n- add another real provider with materially different semantics, such as Redis, DynamoDB, PostgreSQL, or S3, to sharpen semantic negotiation and portability boundaries",
+              "- **complete:** flagship portability demo in which the exact same `.presolved` release resolves across memory, Redis, and Cloudflare environments and executes unchanged through memory and Redis by default, with live Cloudflare execution available opt-in\n- **complete:** Redis provider over RESP/TCP as a materially different real implementation of the existing KV capability, sharpening the realization and semantic-portability boundary",
+          )
+
+          replace_once(
+              "docs/development/project-status.md",
+              "| Cloudflare Workers KV provider adapter | Implemented |\n| Plan-scoped provider adapter materialization | Implemented |",
+              "| Cloudflare Workers KV provider adapter | Implemented |\n| Redis KV provider adapter | Implemented |\n| Plan-scoped provider adapter materialization | Implemented |",
+          )
+
+          replace_once(
+              "docs/development/project-status.md",
+              "| Inspection/planning UX checkpoint | Implemented |",
+              "| Inspection/planning UX checkpoint | Implemented |\n| Flagship same-release portability demo | Implemented |",
+          )
+
+          replace_once(
+              "docs/development/project-status.md",
+              "Chunk 20 inspection/planning UX is complete. `presolve inspect` covers both source Application Contract semantics and verified immutable `.presolved` releases; `presolve check` explains compatibility; `presolve plan` exposes exact symbolic resolver selections; and all inspection/planning surfaces have explicit versioned JSON projections where appropriate. The isolated Chunk 20 checkpoint also verifies structured non-zero failure behavior.\n\n## Planned next",
+              "Chunk 20 inspection/planning UX is complete. `presolve inspect` covers both source Application Contract semantics and verified immutable `.presolved` releases; `presolve check` explains compatibility; `presolve plan` exposes exact symbolic resolver selections; and all inspection/planning surfaces have explicit versioned JSON projections where appropriate. The isolated Chunk 20 checkpoint also verifies structured non-zero failure behavior.\n\nChunk 21 product proof is now externally reproducible. The flagship demo builds one `.presolved` release once, resolves it against memory, Redis, and Cloudflare Environment Specifications, executes the same release through memory and network Redis in public CI, and can opt into live Cloudflare execution with realization-time credentials. Redis adds a materially different networked provider while preserving the existing baseline KV application contract.\n\n## Planned next",
+          )
+
+          replace_once(
+              "docs/development/project-status.md",
+              "- visible public CI for the existing architectural checkpoints and conformance evidence\n- versioned Presolve CLI binaries/releases\n- a flagship same-`.presolved`-digest portability demo across genuinely different environments/providers\n- another materially different real provider to sharpen semantic negotiation\n- external developer validation before control-plane or lifecycle expansion",
+              "- continue keeping architectural checkpoints, determinism, portability, and provider evidence visible in public CI\n- versioned Presolve CLI binaries/releases\n- use the flagship demo and public releases for external developer validation\n- sharpen semantic negotiation from observed provider differences before adding broader capability vocabulary\n- defer control-plane or lifecycle expansion until external validation identifies a concrete need",
+          )
+          PY
+
+      - name: Validate edited files
+        run: |
+          bash -n demo/portability/run.sh
+          python3 scripts/check-docs.py
+          git diff --check
+
+      - name: Commit generated edits
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md .github/workflows/ci.yml docs/development/roadmap.md docs/development/project-status.md
+          git commit -m "demo: surface flagship portability proof"
+          git push origin HEAD:tmp/flagship-demo-edits
