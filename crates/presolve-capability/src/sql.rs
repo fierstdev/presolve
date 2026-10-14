@@ -34,8 +34,7 @@ pub const SQL_DATABASE_GUARANTEE_BOUND_PARAMETERS: &str = "bound-parameters";
 pub const SQL_DATABASE_GUARANTEE_PORTABLE_SCALAR_VALUES: &str = "portable-scalar-values";
 
 /// One capability invocation executes exactly one SQL statement.
-pub const SQL_DATABASE_GUARANTEE_SINGLE_STATEMENT_EXECUTION: &str =
-    "single-statement-execution";
+pub const SQL_DATABASE_GUARANTEE_SINGLE_STATEMENT_EXECUTION: &str = "single-statement-execution";
 
 /// Query result columns preserve the order produced by the database.
 ///
@@ -44,8 +43,7 @@ pub const SQL_DATABASE_GUARANTEE_SINGLE_STATEMENT_EXECUTION: &str =
 pub const SQL_DATABASE_GUARANTEE_ORDERED_RESULT_COLUMNS: &str = "ordered-result-columns";
 
 /// SQL null remains distinct from empty text, empty bytes, and numeric zero.
-pub const SQL_DATABASE_GUARANTEE_NULL_DISTINCT_FROM_EMPTY: &str =
-    "null-distinct-from-empty";
+pub const SQL_DATABASE_GUARANTEE_NULL_DISTINCT_FROM_EMPTY: &str = "null-distinct-from-empty";
 
 /// Presolve does not add an ordering guarantee to query rows.
 ///
@@ -86,8 +84,7 @@ pub const SQL_DATABASE_FEATURE_RETURNING: &str = "returning";
 pub const SQL_DATABASE_FEATURE_SAVEPOINTS: &str = "savepoints";
 
 /// Provider can satisfy an explicitly requested serializable transaction mode.
-pub const SQL_DATABASE_FEATURE_SERIALIZABLE_TRANSACTIONS: &str =
-    "serializable-transactions";
+pub const SQL_DATABASE_FEATURE_SERIALIZABLE_TRANSACTIONS: &str = "serializable-transactions";
 
 /// Returns the canonical relational SQL capability contract.
 ///
