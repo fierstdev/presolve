@@ -52,9 +52,7 @@ pub(crate) fn parse_list_page(xml: &str) -> Result<ListPage, ObjectStoreError> {
 
 fn required_text<'a>(xml: &'a str, tag: &str) -> Result<&'a str, ObjectStoreError> {
     optional_text(xml, tag).ok_or_else(|| {
-        ObjectStoreError::internal(format!(
-            "S3 response is missing required `{tag}` element"
-        ))
+        ObjectStoreError::internal(format!("S3 response is missing required `{tag}` element"))
     })
 }
 
@@ -128,10 +126,7 @@ mod tests {
                 ObjectInfo::new("images/zero", 0),
             ]
         );
-        assert_eq!(
-            page.next_continuation_token.as_deref(),
-            Some("next&token")
-        );
+        assert_eq!(page.next_continuation_token.as_deref(), Some("next&token"));
     }
 
     #[test]
