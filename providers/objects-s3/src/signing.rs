@@ -174,8 +174,7 @@ fn civil_from_days(days_since_epoch: i64) -> (i64, u64, u64) {
     };
     let day_of_era = shifted - era * 146_097;
     let year_of_era =
-        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096)
-            / 365;
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
     let mut year = year_of_era + era * 400;
     let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
     let month_prime = (5 * day_of_year + 2) / 153;
@@ -215,7 +214,9 @@ mod tests {
         // 2024-02-29T12:34:56Z
         let instant = UNIX_EPOCH + Duration::from_secs(1_709_210_096);
         assert_eq!(
-            format_timestamp(instant).expect("timestamp should format").full,
+            format_timestamp(instant)
+                .expect("timestamp should format")
+                .full,
             "20240229T123456Z"
         );
     }
@@ -235,7 +236,11 @@ mod tests {
     #[test]
     fn query_is_encoded_and_sorted() {
         assert_eq!(
-            canonical_query([("prefix", "b/"), ("list-type", "2"), ("encoding-type", "url")]),
+            canonical_query([
+                ("prefix", "b/"),
+                ("list-type", "2"),
+                ("encoding-type", "url")
+            ]),
             "encoding-type=url&list-type=2&prefix=b%2F"
         );
     }
