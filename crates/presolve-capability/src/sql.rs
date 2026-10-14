@@ -72,8 +72,7 @@ pub const SQL_DATABASE_GUARANTEE_ORDERED_TRANSACTION_STATEMENTS: &str =
 ///
 /// This guarantee makes transaction-resource destruction safe across language
 /// and transport bindings where explicit cleanup is not always observable.
-pub const SQL_DATABASE_GUARANTEE_UNCOMMITTED_DROP_ROLLS_BACK: &str =
-    "uncommitted-drop-rolls-back";
+pub const SQL_DATABASE_GUARANTEE_UNCOMMITTED_DROP_ROLLS_BACK: &str = "uncommitted-drop-rolls-back";
 
 /// Provider accepts PostgreSQL-family SQL syntax and semantics.
 pub const SQL_DATABASE_FEATURE_DIALECT_POSTGRESQL: &str = "dialect-postgresql";
