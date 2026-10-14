@@ -1,0 +1,77 @@
+name: Temporary object clippy fixes
+
+on:
+  push:
+    branches:
+      - tmp/object-clippy
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: tmp/object-clippy
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+
+      - name: Apply object-provider lint fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          lib = Path("providers/objects-s3/src/lib.rs")
+          text = lib.read_text()
+          replacements = {
+              "//! implementation suitable for local MinIO and compatible managed endpoints": "//! implementation suitable for local `MinIO` and compatible managed endpoints",
+              "/// Provider-realization setting containing the SigV4 region.": "/// Provider-realization setting containing the `SigV4` region.",
+              "    /// Region is empty or cannot safely enter a SigV4 credential scope.": "    /// Region is empty or cannot safely enter a `SigV4` credential scope.",
+              "        let xml = br#\"<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>false</IsTruncated><Contents><Key>demo%2Fa.bin</Key><Size>2</Size></Contents></ListBucketResult>\"#;": "        let xml = br\"<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>false</IsTruncated><Contents><Key>demo%2Fa.bin</Key><Size>2</Size></Contents></ListBucketResult>\";",
+              "                    response.push_str(&format!(\"{name}: {value}\\r\\n\"));": "                    use std::fmt::Write as _;\n                    write!(&mut response, \"{name}: {value}\\r\\n\")\n                        .expect(\"writing response header to String should succeed\");",
+              "        assert!(requests[0].header(\"x-amz-content-sha256\").is_some());": "        assert!(requests[0].header(\"x-amz-content-sha256\").is_some());\n        assert!(requests[0].body.is_empty());",
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f"expected lib.rs text not found: {old}")
+              text = text.replace(old, new, 1)
+
+          marker = "    struct RecordedRequest {\n"
+          alias = "    type TestResponse = (\n        &'static str,\n        Vec<(&'static str, &'static str)>,\n        &'static [u8],\n    );\n\n"
+          if marker not in text:
+              raise SystemExit("RecordedRequest marker not found")
+          text = text.replace(marker, alias + marker, 1)
+
+          old_signature = "    fn serve(\n        responses: Vec<(\n            &'static str,\n            Vec<(&'static str, &'static str)>,\n            &'static [u8],\n        )>,\n"
+          new_signature = "    fn serve(\n        responses: Vec<TestResponse>,\n"
+          if old_signature not in text:
+              raise SystemExit("serve signature not found")
+          text = text.replace(old_signature, new_signature, 1)
+          lib.write_text(text)
+
+          listing = Path("providers/objects-s3/src/list.rs")
+          text = listing.read_text()
+          old = "        assert!(page.objects.is_empty());"
+          new = "        assert_eq!(page.objects, Vec::<ObjectInfo>::new());"
+          if old not in text:
+              raise SystemExit("list empty assertion not found")
+          listing.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Apply rustfmt
+        run: cargo fmt --all
+
+      - name: Check S3 provider with Clippy
+        run: cargo clippy -p presolve-provider-objects-s3 --all-targets -- -D warnings
+
+      - name: Commit validated fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add providers/objects-s3/src/lib.rs providers/objects-s3/src/list.rs
+          git commit -m "style: satisfy object-provider clippy gates"
+          git push origin HEAD:tmp/object-clippy
