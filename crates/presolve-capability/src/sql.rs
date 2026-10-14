@@ -67,6 +67,14 @@ pub const SQL_DATABASE_GUARANTEE_TRANSACTION_SESSION_AFFINITY: &str =
 pub const SQL_DATABASE_GUARANTEE_ORDERED_TRANSACTION_STATEMENTS: &str =
     "ordered-transaction-statements";
 
+/// Dropping an open transaction without committing it rolls back all of its
+/// uncommitted baseline data mutations.
+///
+/// This guarantee makes transaction-resource destruction safe across language
+/// and transport bindings where explicit cleanup is not always observable.
+pub const SQL_DATABASE_GUARANTEE_UNCOMMITTED_DROP_ROLLS_BACK: &str =
+    "uncommitted-drop-rolls-back";
+
 /// Provider accepts PostgreSQL-family SQL syntax and semantics.
 pub const SQL_DATABASE_FEATURE_DIALECT_POSTGRESQL: &str = "dialect-postgresql";
 
@@ -118,6 +126,7 @@ pub fn sql_database_contract() -> Result<CapabilityContract, CapabilityContractE
             SQL_DATABASE_GUARANTEE_TRANSACTION_ATOMICITY,
             SQL_DATABASE_GUARANTEE_TRANSACTION_SESSION_AFFINITY,
             SQL_DATABASE_GUARANTEE_ORDERED_TRANSACTION_STATEMENTS,
+            SQL_DATABASE_GUARANTEE_UNCOMMITTED_DROP_ROLLS_BACK,
         ],
         [
             SQL_DATABASE_FEATURE_DIALECT_POSTGRESQL,
@@ -155,7 +164,8 @@ mod tests {
                 "query-defined-row-order",
                 "single-statement-execution",
                 "transaction-atomicity",
-                "transaction-session-affinity"
+                "transaction-session-affinity",
+                "uncommitted-drop-rolls-back"
             ]
         );
         assert_eq!(
