@@ -59,6 +59,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Provider realization configuration/secret boundary | Implemented |
 | Cloudflare Workers KV provider adapter | Implemented |
 | Redis KV provider adapter | Implemented |
+| S3-compatible object-storage provider adapter | Implemented |
 | Plan-scoped provider adapter materialization | Implemented |
 | Live Cloudflare Workers KV portability proof | Implemented |
 | Cloud-provider portability checkpoint | Implemented |
@@ -73,6 +74,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Immutable `.presolved` release inspection | Implemented |
 | Inspection/planning UX checkpoint | Implemented |
 | Flagship same-release portability demo | Implemented |
+| Same-release object-storage portability proof | Implemented |
 
 ## Next
 
@@ -90,13 +92,17 @@ Chunk 20 inspection/planning UX is complete. `presolve inspect` covers both sour
 
 Chunk 21 product proof is now externally reproducible. The flagship demo builds one `.presolved` release once, resolves it against memory, Redis, and Cloudflare Environment Specifications, executes the same release through memory and network Redis in public CI, and can opt into live Cloudflare execution with realization-time credentials. Redis adds a materially different networked provider while preserving the existing baseline KV application contract.
 
+Deployment-decision coverage now also includes object storage. A second detached release proof resolves one provider-neutral object capability against in-process memory and an S3-compatible environment, then executes the exact same `.presolved` bytes through both implementations. The proof exercises `put`, `head`, prefix `list`, streamed `get`, `delete`, and post-delete observation while keeping endpoint, bucket, region, and credentials at the realization boundary. See [Object-storage portability proof](../proofs/object-storage-portability.md).
+
 ## Planned next
 
 The next phase is product proof and external validation rather than another broad architecture chunk:
 
 - continue keeping architectural checkpoints, determinism, portability, and provider evidence visible in public CI
 - versioned Presolve CLI binaries/releases
-- use the flagship demo and public releases for external developer validation
+- use the flagship and object-storage proofs plus public releases for external developer validation
+- design the first SQL capability contract from explicit transaction/query/result semantics before committing to SQLite, PostgreSQL, or managed-SQL adapters
+- follow SQL with asynchronous queue semantics and materially different queue implementations
 - sharpen semantic negotiation from observed provider differences before adding broader capability vocabulary
 - defer control-plane or lifecycle expansion until external validation identifies a concrete need
 

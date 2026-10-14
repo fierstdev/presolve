@@ -199,6 +199,9 @@ Immediate priorities:
 - begin publishing versioned Presolve CLI binaries/releases
 - **complete:** flagship portability demo in which the exact same `.presolved` release resolves across memory, Redis, and Cloudflare environments and executes unchanged through memory and Redis by default, with live Cloudflare execution available opt-in
 - **complete:** Redis provider over RESP/TCP as a materially different real implementation of the existing KV capability, sharpening the realization and semantic-portability boundary
+- **complete:** S3-compatible object-storage adapter plus a same-release proof across in-process memory and a networked S3-compatible service, exercising metadata, prefix listing, streamed reads, and delete semantics without leaking bucket/endpoint/credentials into application identity
+- **next:** design a SQL capability contract around explicit portable semantics before selecting concrete SQLite, PostgreSQL, and managed-SQL provider implementations; do not treat generic SQL syntax alone as sufficient portability
+- **after SQL:** design asynchronous queue semantics around delivery guarantees, ordering, retries, visibility/lease behavior, message limits, and dead-letter handling before adding queue adapters
 - use external developer feedback to decide what deserves stabilization before adding a control plane, scheduler, service mesh, registry, or lifecycle-management surface
 
 The product message remains:

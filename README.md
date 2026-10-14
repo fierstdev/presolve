@@ -375,8 +375,10 @@ Implemented foundations include:
 - installed provider-adapter registry with plan-scoped materialization
 - Cloudflare Workers KV adapter
 - Redis KV adapter over RESP/TCP
+- S3-compatible object-storage adapter with SigV4 realization
 - live external cloud-provider portability checkpoint
 - flagship same-release portability demo across memory, Redis, and Cloudflare environments
+- same-release object-storage portability proof across memory and S3-compatible environments
 - environment-independent `presolve build` for Component, OCI, mixed, Rust-source, and TypeScript-source `.presolved` releases
 - `presolve dev` local Component execution for the current single-workload Rust path
 
@@ -515,6 +517,7 @@ providers/
   kv-memory/              In-memory key-value provider
   kv-redis/               Redis key-value provider
   objects-memory/         In-memory object-storage provider
+  objects-s3/             S3-compatible object-storage provider
 
 packages/
   sdk/                    TypeScript authoring SDK and execution adapters
@@ -532,6 +535,7 @@ Public documentation lives in [`docs/`](docs/README.md).
 Start with:
 
 - [Flagship portability walkthrough](docs/proofs/flagship-portability-walkthrough.md)
+- [Object-storage portability proof](docs/proofs/object-storage-portability.md)
 - [Application portability](docs/concepts/application-portability.md)
 - [Application Contract reference](docs/reference/application-contract.md)
 - [Environment Specification reference](docs/reference/environment-specification.md)
