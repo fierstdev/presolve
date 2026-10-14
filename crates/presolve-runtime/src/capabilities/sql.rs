@@ -12,7 +12,10 @@ impl database::Host for RuntimeState {
         statement: String,
         parameters: Vec<database::Value>,
     ) -> Result<database::ExecuteResult, database::Error> {
-        let parameters = parameters.into_iter().map(map_value_from_wit).collect::<Vec<_>>();
+        let parameters = parameters
+            .into_iter()
+            .map(map_value_from_wit)
+            .collect::<Vec<_>>();
         self.sql_database_provider()
             .execute(&statement, &parameters)
             .map(map_execute_result)
@@ -30,7 +33,10 @@ impl database::Host for RuntimeState {
             ));
         }
 
-        let parameters = parameters.into_iter().map(map_value_from_wit).collect::<Vec<_>>();
+        let parameters = parameters
+            .into_iter()
+            .map(map_value_from_wit)
+            .collect::<Vec<_>>();
         let result = self
             .sql_database_provider()
             .query(&statement, &parameters)
@@ -97,12 +103,13 @@ impl database::HostTransaction for RuntimeState {
         statement: String,
         parameters: Vec<database::Value>,
     ) -> Result<database::ExecuteResult, database::Error> {
-        let parameters = parameters.into_iter().map(map_value_from_wit).collect::<Vec<_>>();
-        let transaction = self
-            .sql_transaction_mut(transaction.rep())
-            .ok_or_else(|| {
-                database::Error::TransactionState("unknown SQL transaction resource".to_owned())
-            })?;
+        let parameters = parameters
+            .into_iter()
+            .map(map_value_from_wit)
+            .collect::<Vec<_>>();
+        let transaction = self.sql_transaction_mut(transaction.rep()).ok_or_else(|| {
+            database::Error::TransactionState("unknown SQL transaction resource".to_owned())
+        })?;
 
         transaction
             .execute(&statement, &parameters)
@@ -122,15 +129,14 @@ impl database::HostTransaction for RuntimeState {
             ));
         }
 
-        let parameters = parameters.into_iter().map(map_value_from_wit).collect::<Vec<_>>();
+        let parameters = parameters
+            .into_iter()
+            .map(map_value_from_wit)
+            .collect::<Vec<_>>();
         let result = {
-            let transaction = self
-                .sql_transaction_mut(transaction.rep())
-                .ok_or_else(|| {
-                    database::Error::TransactionState(
-                        "unknown SQL transaction resource".to_owned(),
-                    )
-                })?;
+            let transaction = self.sql_transaction_mut(transaction.rep()).ok_or_else(|| {
+                database::Error::TransactionState("unknown SQL transaction resource".to_owned())
+            })?;
 
             transaction
                 .query(&statement, &parameters)
@@ -216,7 +222,11 @@ fn map_value_to_wit(value: SqlValue) -> database::Value {
 
 fn map_row(row: SqlRow) -> database::Row {
     database::Row {
-        values: row.into_values().into_iter().map(map_value_to_wit).collect(),
+        values: row
+            .into_values()
+            .into_iter()
+            .map(map_value_to_wit)
+            .collect(),
     }
 }
 
