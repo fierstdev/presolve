@@ -136,7 +136,7 @@ mod tests {
         )
         .expect("empty listing should parse");
 
-        assert!(page.objects.is_empty());
+        assert_eq!(page.objects, Vec::<ObjectInfo>::new());
         assert!(page.next_continuation_token.is_none());
     }
 
