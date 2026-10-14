@@ -13,6 +13,7 @@ use presolve_provider_kv_cloudflare::{
     CLOUDFLARE_ACCOUNT_ID_SETTING, CLOUDFLARE_API_TOKEN_SECRET, CLOUDFLARE_KV_ADAPTER_ID,
     CLOUDFLARE_NAMESPACE_ID_SETTING, CloudflareKvAdapter,
 };
+use presolve_provider_kv_redis::{REDIS_ADDRESS_SETTING, REDIS_KV_ADAPTER_ID, RedisKvAdapter};
 use presolve_provider_realization::{
     EnvironmentSecretResolver, ProviderAdapterId, ProviderAdapterRegistry,
     ProviderRealizationCatalog, ProviderRealizationProfile, SecretReference,
@@ -23,6 +24,7 @@ use presolve_resolver::{DeploymentPlan, resolve};
 const ACCOUNT_ID_ENV: &str = "PRESOLVE_CLOUDFLARE_ACCOUNT_ID";
 const NAMESPACE_ID_ENV: &str = "PRESOLVE_CLOUDFLARE_KV_NAMESPACE_ID";
 const API_TOKEN_ENV: &str = "PRESOLVE_CLOUDFLARE_API_TOKEN";
+const REDIS_ADDRESS_ENV: &str = "PRESOLVE_REDIS_ADDRESS";
 const CLOUD_VISIBILITY_TIMEOUT: Duration = Duration::from_secs(75);
 const CLOUD_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const TAR_BLOCK_BYTES: usize = 512;
@@ -31,6 +33,7 @@ const TAR_BLOCK_BYTES: usize = 512;
 enum RealizationMode {
     Local,
     Cloudflare,
+    Redis,
 }
 
 impl RealizationMode {
@@ -38,7 +41,10 @@ impl RealizationMode {
         match value {
             "local" => Ok(Self::Local),
             "cloudflare" => Ok(Self::Cloudflare),
-            _ => bail!("realization mode must be `local` or `cloudflare`, got `{value}`"),
+            "redis" => Ok(Self::Redis),
+            _ => bail!(
+                "realization mode must be `local`, `cloudflare`, or `redis`, got `{value}`"
+            ),
         }
     }
 
@@ -46,7 +52,12 @@ impl RealizationMode {
         match self {
             Self::Local => "local",
             Self::Cloudflare => "cloudflare",
+            Self::Redis => "redis",
         }
+    }
+
+    const fn requires_visibility_polling(self) -> bool {
+        matches!(self, Self::Cloudflare)
     }
 }
 
@@ -55,7 +66,7 @@ fn main() -> Result<()> {
     let mode = RealizationMode::parse(
         &args
             .next()
-            .context("missing realization mode (`local` or `cloudflare`)")?,
+            .context("missing realization mode (`local`, `cloudflare`, or `redis`)")?,
     )?;
     let release_path = args
         .next()
@@ -67,7 +78,7 @@ fn main() -> Result<()> {
 
     if args.next().is_some() {
         bail!(
-            "usage: release_realization_checkpoint <local|cloudflare> <release.presolved> <presolve.env.toml> <input>"
+            "usage: release_realization_checkpoint <local|cloudflare|redis> <release.presolved> <presolve.env.toml> <input>"
         );
     }
 
@@ -106,6 +117,7 @@ fn main() -> Result<()> {
         RealizationMode::Local => realize_local_providers(plan)
             .context("could not realize selected provider with local implementation")?,
         RealizationMode::Cloudflare => realize_cloudflare_provider(plan, provider_id)?,
+        RealizationMode::Redis => realize_redis_provider(plan, provider_id)?,
     };
 
     let component = component_bytes_from_release(&release_bytes, &bundle)?;
@@ -169,6 +181,36 @@ fn realize_cloudflare_provider(
 
     realize_plan_providers(plan, &profiles, &adapters, &EnvironmentSecretResolver)
         .context("could not realize plan-selected Cloudflare KV provider")
+}
+
+fn realize_redis_provider(
+    plan: &DeploymentPlan,
+    provider_id: presolve_core::ProviderId,
+) -> Result<presolve_node::ProviderRegistry> {
+    let address = required_env(REDIS_ADDRESS_ENV)?;
+    let profile = ProviderRealizationProfile::new(
+        provider_id,
+        ProviderAdapterId::new(REDIS_KV_ADAPTER_ID).context("Redis adapter ID should be valid")?,
+    )
+    .with_setting(REDIS_ADDRESS_SETTING, address)
+    .context("Redis address realization setting should be valid")?;
+
+    let mut profiles = ProviderRealizationCatalog::new();
+    profiles
+        .register(profile)
+        .context("Redis realization profile should register")?;
+
+    let mut adapters = ProviderAdapterRegistry::new();
+    adapters
+        .register(
+            ProviderAdapterId::new(REDIS_KV_ADAPTER_ID)
+                .context("Redis adapter ID should be valid")?,
+            Arc::new(RedisKvAdapter),
+        )
+        .context("Redis adapter should register")?;
+
+    realize_plan_providers(plan, &profiles, &adapters, &EnvironmentSecretResolver)
+        .context("could not realize plan-selected Redis KV provider")
 }
 
 fn component_bytes_from_release(release_bytes: &[u8], bundle: &PresolveBundle) -> Result<Vec<u8>> {
@@ -297,8 +339,11 @@ fn execute_kv_proof(
             break output;
         }
 
-        if mode == RealizationMode::Local {
-            bail!("local detached-release read returned `{output}`, expected `{expected}`");
+        if !mode.requires_visibility_polling() {
+            bail!(
+                "{} detached-release read returned `{output}`, expected `{expected}`",
+                mode.label()
+            );
         }
 
         if Instant::now() >= deadline {
