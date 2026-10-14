@@ -1391,6 +1391,7 @@ dependencies = [
  "presolve-executor-sdk",
  "presolve-provider-kv-cloudflare",
  "presolve-provider-kv-memory",
+ "presolve-provider-kv-redis",
  "presolve-provider-objects-memory",
  "presolve-provider-realization",
  "presolve-provider-sdk",
@@ -1436,6 +1437,17 @@ version = "0.1.0-alpha.1"
 dependencies = [
  "presolve-provider-conformance",
  "presolve-provider-sdk",
+]
+
+[[package]]
+name = "presolve-provider-kv-redis"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "presolve-core",
+ "presolve-provider-realization",
+ "presolve-provider-sdk",
+ "semver",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
