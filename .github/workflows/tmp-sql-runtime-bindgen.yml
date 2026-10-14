@@ -1,0 +1,15 @@
+name: Temporary SQL runtime bindgen check
+
+on:
+  push:
+    branches:
+      - tmp/sql-runtime-bindgen
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal
+      - name: Compile SQL runtime binding
+        run: cargo check -p presolve-runtime
