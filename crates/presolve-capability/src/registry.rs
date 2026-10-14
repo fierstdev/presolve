@@ -2,14 +2,17 @@ use semver::Version;
 
 use crate::{
     CapabilityContract, CapabilityContractError, KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE,
-    key_value_contract, object_store_contract,
+    SQL_DATABASE_INTERFACE, key_value_contract, object_store_contract, sql_database_contract,
 };
 
 /// Returns whether `interface` is a built-in capability interface understood by
 /// this Presolve release.
 #[must_use]
 pub fn is_known_capability_interface(interface: &str) -> bool {
-    matches!(interface, KEY_VALUE_INTERFACE | OBJECT_STORE_INTERFACE)
+    matches!(
+        interface,
+        KEY_VALUE_INTERFACE | OBJECT_STORE_INTERFACE | SQL_DATABASE_INTERFACE
+    )
 }
 
 /// Returns the canonical semantic contract for an exact built-in capability
@@ -30,6 +33,7 @@ pub fn canonical_contract_for(
     let contract = match interface {
         KEY_VALUE_INTERFACE => key_value_contract()?,
         OBJECT_STORE_INTERFACE => object_store_contract()?,
+        SQL_DATABASE_INTERFACE => sql_database_contract()?,
         _ => return Ok(None),
     };
 
@@ -48,6 +52,7 @@ mod tests {
     fn built_in_interfaces_are_recognized() {
         assert!(is_known_capability_interface(KEY_VALUE_INTERFACE));
         assert!(is_known_capability_interface(OBJECT_STORE_INTERFACE));
+        assert!(is_known_capability_interface(SQL_DATABASE_INTERFACE));
         assert!(!is_known_capability_interface("example:custom/service"));
     }
 
@@ -57,6 +62,17 @@ mod tests {
 
         assert_eq!(
             canonical_contract_for(OBJECT_STORE_INTERFACE, contract.version())
+                .expect("lookup should succeed"),
+            Some(contract)
+        );
+    }
+
+    #[test]
+    fn sql_builtin_version_returns_contract() {
+        let contract = sql_database_contract().expect("SQL contract should be valid");
+
+        assert_eq!(
+            canonical_contract_for(SQL_DATABASE_INTERFACE, contract.version())
                 .expect("lookup should succeed"),
             Some(contract)
         );
