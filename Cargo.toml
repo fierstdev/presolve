@@ -20,6 +20,7 @@ members = [
     "providers/kv-cloudflare",
     "providers/kv-redis",
     "providers/objects-memory",
+    "providers/objects-s3",
     "executors/docker",
 ]
 exclude = [
@@ -81,6 +82,7 @@ presolve-provider-kv-memory = { path = "providers/kv-memory" }
 presolve-provider-kv-cloudflare = { path = "providers/kv-cloudflare" }
 presolve-provider-kv-redis = { path = "providers/kv-redis" }
 presolve-provider-objects-memory = { path = "providers/objects-memory" }
+presolve-provider-objects-s3 = { path = "providers/objects-s3" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
