@@ -1,4 +1,4 @@
-name: Temporary object clippy fixes
+name: Temporary object status update
 
 on:
   push:
@@ -9,69 +9,86 @@ permissions:
   contents: write
 
 jobs:
-  fix:
+  update:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
+      - name: Checkout feature branch
         uses: actions/checkout@v4
         with:
-          ref: tmp/object-clippy
+          ref: coverage/object-storage-portability
+          fetch-depth: 0
 
-      - name: Install Rust toolchain
-        run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
-
-      - name: Apply object-provider lint fixes
+      - name: Update status documentation
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          lib = Path("providers/objects-s3/src/lib.rs")
-          text = lib.read_text()
-          replacements = {
-              "//! implementation suitable for local MinIO and compatible managed endpoints": "//! implementation suitable for local `MinIO` and compatible managed endpoints",
-              "/// Provider-realization setting containing the SigV4 region.": "/// Provider-realization setting containing the `SigV4` region.",
-              "    /// Region is empty or cannot safely enter a SigV4 credential scope.": "    /// Region is empty or cannot safely enter a `SigV4` credential scope.",
-              "        let xml = br#\"<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>false</IsTruncated><Contents><Key>demo%2Fa.bin</Key><Size>2</Size></Contents></ListBucketResult>\"#;": "        let xml = br\"<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>false</IsTruncated><Contents><Key>demo%2Fa.bin</Key><Size>2</Size></Contents></ListBucketResult>\";",
-              "                    response.push_str(&format!(\"{name}: {value}\\r\\n\"));": "                    use std::fmt::Write as _;\n                    write!(&mut response, \"{name}: {value}\\r\\n\")\n                        .expect(\"writing response header to String should succeed\");",
-              "        assert!(requests[0].header(\"x-amz-content-sha256\").is_some());": "        assert!(requests[0].header(\"x-amz-content-sha256\").is_some());\n        assert_eq!(requests[0].body, Vec::<u8>::new());",
-          }
-          for old, new in replacements.items():
-              if old not in text:
-                  raise SystemExit(f"expected lib.rs text not found: {old}")
-              text = text.replace(old, new, 1)
+          readme = Path("README.md")
+          text = readme.read_text()
+          text = text.replace(
+              "- Cloudflare Workers KV adapter\n- Redis KV adapter over RESP/TCP\n- live external cloud-provider portability checkpoint\n- flagship same-release portability demo across memory, Redis, and Cloudflare environments\n",
+              "- Cloudflare Workers KV adapter\n- Redis KV adapter over RESP/TCP\n- S3-compatible object-storage adapter with SigV4 realization\n- live external cloud-provider portability checkpoint\n- flagship same-release portability demo across memory, Redis, and Cloudflare environments\n- same-release object-storage portability proof across memory and S3-compatible environments\n",
+              1,
+          )
+          text = text.replace(
+              "  kv-memory/              In-memory key-value provider\n  kv-redis/               Redis key-value provider\n  objects-memory/         In-memory object-storage provider\n",
+              "  kv-memory/              In-memory key-value provider\n  kv-redis/               Redis key-value provider\n  objects-memory/         In-memory object-storage provider\n  objects-s3/             S3-compatible object-storage provider\n",
+              1,
+          )
+          text = text.replace(
+              "- [Flagship portability walkthrough](docs/proofs/flagship-portability-walkthrough.md)\n- [Application portability](docs/concepts/application-portability.md)\n",
+              "- [Flagship portability walkthrough](docs/proofs/flagship-portability-walkthrough.md)\n- [Object-storage portability proof](docs/proofs/object-storage-portability.md)\n- [Application portability](docs/concepts/application-portability.md)\n",
+              1,
+          )
+          readme.write_text(text)
 
-          marker = "    struct RecordedRequest {\n"
-          alias = "    type TestResponse = (\n        &'static str,\n        Vec<(&'static str, &'static str)>,\n        &'static [u8],\n    );\n\n"
+          status = Path("docs/development/project-status.md")
+          text = status.read_text()
+          text = text.replace(
+              "| Cloudflare Workers KV provider adapter | Implemented |\n| Redis KV provider adapter | Implemented |\n| Plan-scoped provider adapter materialization | Implemented |\n",
+              "| Cloudflare Workers KV provider adapter | Implemented |\n| Redis KV provider adapter | Implemented |\n| S3-compatible object-storage provider adapter | Implemented |\n| Plan-scoped provider adapter materialization | Implemented |\n",
+              1,
+          )
+          text = text.replace(
+              "| Inspection/planning UX checkpoint | Implemented |\n| Flagship same-release portability demo | Implemented |\n",
+              "| Inspection/planning UX checkpoint | Implemented |\n| Flagship same-release portability demo | Implemented |\n| Same-release object-storage portability proof | Implemented |\n",
+              1,
+          )
+          marker = "Chunk 21 product proof is now externally reproducible. The flagship demo builds one `.presolved` release once, resolves it against memory, Redis, and Cloudflare Environment Specifications, executes the same release through memory and network Redis in public CI, and can opt into live Cloudflare execution with realization-time credentials. Redis adds a materially different networked provider while preserving the existing baseline KV application contract.\n"
+          addition = marker + "\nDeployment-decision coverage now also includes object storage. A second detached release proof resolves one provider-neutral object capability against in-process memory and an S3-compatible environment, then executes the exact same `.presolved` bytes through both implementations. The proof exercises `put`, `head`, prefix `list`, streamed `get`, `delete`, and post-delete observation while keeping endpoint, bucket, region, and credentials at the realization boundary. See [Object-storage portability proof](../proofs/object-storage-portability.md).\n"
           if marker not in text:
-              raise SystemExit("RecordedRequest marker not found")
-          text = text.replace(marker, alias + marker, 1)
+              raise SystemExit("project-status Chunk 21 marker not found")
+          text = text.replace(marker, addition, 1)
+          text = text.replace(
+              "- use the flagship demo and public releases for external developer validation\n- sharpen semantic negotiation from observed provider differences before adding broader capability vocabulary\n- defer control-plane or lifecycle expansion until external validation identifies a concrete need\n",
+              "- use the flagship and object-storage proofs plus public releases for external developer validation\n- design the first SQL capability contract from explicit transaction/query/result semantics before committing to SQLite, PostgreSQL, or managed-SQL adapters\n- follow SQL with asynchronous queue semantics and materially different queue implementations\n- sharpen semantic negotiation from observed provider differences before adding broader capability vocabulary\n- defer control-plane or lifecycle expansion until external validation identifies a concrete need\n",
+              1,
+          )
+          status.write_text(text)
 
-          old_signature = "    fn serve(\n        responses: Vec<(\n            &'static str,\n            Vec<(&'static str, &'static str)>,\n            &'static [u8],\n        )>,\n"
-          new_signature = "    fn serve(\n        responses: Vec<TestResponse>,\n"
-          if old_signature not in text:
-              raise SystemExit("serve signature not found")
-          text = text.replace(old_signature, new_signature, 1)
-          lib.write_text(text)
-
-          listing = Path("providers/objects-s3/src/list.rs")
-          text = listing.read_text()
-          old = "        assert!(page.objects.is_empty());"
-          new = "        assert_eq!(page.objects, Vec::<ObjectInfo>::new());"
+          roadmap = Path("docs/development/roadmap.md")
+          text = roadmap.read_text()
+          old = "- **complete:** Redis provider over RESP/TCP as a materially different real implementation of the existing KV capability, sharpening the realization and semantic-portability boundary\n- use external developer feedback to decide what deserves stabilization before adding a control plane, scheduler, service mesh, registry, or lifecycle-management surface\n"
+          new = "- **complete:** Redis provider over RESP/TCP as a materially different real implementation of the existing KV capability, sharpening the realization and semantic-portability boundary\n- **complete:** S3-compatible object-storage adapter plus a same-release proof across in-process memory and a networked S3-compatible service, exercising metadata, prefix listing, streamed reads, and delete semantics without leaking bucket/endpoint/credentials into application identity\n- **next:** design a SQL capability contract around explicit portable semantics before selecting concrete SQLite, PostgreSQL, and managed-SQL provider implementations; do not treat generic SQL syntax alone as sufficient portability\n- **after SQL:** design asynchronous queue semantics around delivery guarantees, ordering, retries, visibility/lease behavior, message limits, and dead-letter handling before adding queue adapters\n- use external developer feedback to decide what deserves stabilization before adding a control plane, scheduler, service mesh, registry, or lifecycle-management surface\n"
           if old not in text:
-              raise SystemExit("list empty assertion not found")
-          listing.write_text(text.replace(old, new, 1))
+              raise SystemExit("roadmap product-proof marker not found")
+          roadmap.write_text(text.replace(old, new, 1))
           PY
 
-      - name: Apply rustfmt
-        run: cargo fmt --all
+      - name: Validate documentation
+        run: python3 scripts/check-docs.py
 
-      - name: Check S3 provider with Clippy
-        run: cargo clippy -p presolve-provider-objects-s3 --all-targets -- -D warnings
+      - name: Check diff hygiene
+        run: git diff --check
 
-      - name: Commit validated fixes
+      - name: Commit to feature branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add providers/objects-s3/src/lib.rs providers/objects-s3/src/list.rs
-          git commit -m "style: satisfy object-provider clippy gates"
-          git push origin HEAD:tmp/object-clippy
+          git add README.md docs/development/project-status.md docs/development/roadmap.md
+          if git diff --cached --quiet; then
+            echo "No status changes"
+            exit 0
+          fi
+          git commit -m "docs: mark object portability coverage complete"
+          git push origin HEAD:coverage/object-storage-portability
