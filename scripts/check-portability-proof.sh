@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$ROOT/examples/kv-demo"
 LOCAL_ENV="$ROOT/examples/portability-proof/local-memory"
 CLOUDFLARE_ENV="$ROOT/examples/portability-proof/managed-cloudflare"
+REDIS_ENV="$ROOT/examples/portability-proof/network-redis"
 PRESOLVE="$ROOT/target/debug/presolve"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/presolve-portability-proof.XXXXXX")"
 RELEASE="$TMP/kv-demo.presolved"
@@ -73,6 +74,19 @@ if [[ "$ARCHIVE_SHA_AFTER_LOCAL" != "$ARCHIVE_SHA_BEFORE" ]]; then
   exit 1
 fi
 
+echo "== resolve exact release in network-redis environment =="
+(
+  cd "$REDIS_ENV"
+  "$PRESOLVE" check "$RELEASE" --json > "$TMP/redis-check.json"
+  "$PRESOLVE" plan "$RELEASE" --json > "$TMP/redis-plan.json"
+)
+
+ARCHIVE_SHA_AFTER_REDIS="$(archive_sha256 "$RELEASE")"
+if [[ "$ARCHIVE_SHA_AFTER_REDIS" != "$ARCHIVE_SHA_BEFORE" ]]; then
+  echo "immutable release bytes changed after Redis resolution" >&2
+  exit 1
+fi
+
 echo "== resolve exact release in managed-cloudflare environment =="
 (
   cd "$CLOUDFLARE_ENV"
@@ -86,11 +100,13 @@ if [[ "$ARCHIVE_SHA_AFTER_CLOUDFLARE" != "$ARCHIVE_SHA_BEFORE" ]]; then
   exit 1
 fi
 
-echo "== verify one release produced two environment-specific plans =="
+echo "== verify one release produced three environment-specific plans =="
 python3 - \
   "$TMP/inspect.json" \
   "$TMP/local-check.json" \
   "$TMP/local-plan.json" \
+  "$TMP/redis-check.json" \
+  "$TMP/redis-plan.json" \
   "$TMP/cloudflare-check.json" \
   "$TMP/cloudflare-plan.json" \
   "$RELEASE" \
@@ -103,6 +119,8 @@ import sys
     inspect_path,
     local_check_path,
     local_plan_path,
+    redis_check_path,
+    redis_plan_path,
     cloudflare_check_path,
     cloudflare_plan_path,
     release_path,
@@ -117,13 +135,15 @@ def load(path: str) -> dict:
 inspect = load(inspect_path)
 local_check = load(local_check_path)
 local_plan = load(local_plan_path)
+redis_check = load(redis_check_path)
+redis_plan = load(redis_plan_path)
 cloudflare_check = load(cloudflare_check_path)
 cloudflare_plan = load(cloudflare_plan_path)
 release = str(Path(release_path).resolve())
 
 assert inspect["release"]["digest"] == expected_digest
 
-for check in (local_check, cloudflare_check):
+for check in (local_check, redis_check, cloudflare_check):
     assert check["kind"] == "compatibility_check"
     assert check["status"] == "compatible"
     assert check["problems"] == []
@@ -132,7 +152,7 @@ for check in (local_check, cloudflare_check):
     assert check["application"]["release"] == release
     assert check["application"]["release_digest"] == expected_digest
 
-for plan in (local_plan, cloudflare_plan):
+for plan in (local_plan, redis_plan, cloudflare_plan):
     assert plan["kind"] == "deployment_plan"
     assert plan["status"] == "resolved"
     assert plan["problems"] == []
@@ -150,23 +170,41 @@ assert local_plan["plan"]["environment_id"] == "env_00000000-0000-4000-8000-0000
 assert local_plan["plan"]["bindings"][0]["provider_id"] == "prv_00000000-0000-4000-8000-000000000311"
 assert local_plan["plan"]["bindings"][0]["provider_name"] == "memory-kv"
 
+assert redis_check["environment"]["id"] == "env_00000000-0000-4000-8000-000000000303"
+assert redis_check["environment"]["name"] == "portability-redis"
+assert redis_plan["plan"]["environment_id"] == "env_00000000-0000-4000-8000-000000000303"
+assert redis_plan["plan"]["bindings"][0]["provider_id"] == "prv_00000000-0000-4000-8000-000000000313"
+assert redis_plan["plan"]["bindings"][0]["provider_name"] == "redis-kv"
+
 assert cloudflare_check["environment"]["id"] == "env_00000000-0000-4000-8000-000000000302"
 assert cloudflare_check["environment"]["name"] == "portability-cloudflare"
 assert cloudflare_plan["plan"]["environment_id"] == "env_00000000-0000-4000-8000-000000000302"
 assert cloudflare_plan["plan"]["bindings"][0]["provider_id"] == "prv_00000000-0000-4000-8000-000000000312"
 assert cloudflare_plan["plan"]["bindings"][0]["provider_name"] == "cloudflare-kv"
 
-assert local_plan["plan"]["environment_id"] != cloudflare_plan["plan"]["environment_id"]
-assert (
-    local_plan["plan"]["bindings"][0]["provider_id"]
-    != cloudflare_plan["plan"]["bindings"][0]["provider_id"]
-)
+environment_ids = {
+    local_plan["plan"]["environment_id"],
+    redis_plan["plan"]["environment_id"],
+    cloudflare_plan["plan"]["environment_id"],
+}
+provider_ids = {
+    local_plan["plan"]["bindings"][0]["provider_id"],
+    redis_plan["plan"]["bindings"][0]["provider_id"],
+    cloudflare_plan["plan"]["bindings"][0]["provider_id"],
+}
+assert len(environment_ids) == 3
+assert len(provider_ids) == 3
 
 print(f"immutable release: {expected_digest}")
 print(
     "local plan:       "
     f"{local_plan['plan']['environment_id']} -> "
     f"{local_plan['plan']['bindings'][0]['provider_name']}"
+)
+print(
+    "network plan:     "
+    f"{redis_plan['plan']['environment_id']} -> "
+    f"{redis_plan['plan']['bindings'][0]['provider_name']}"
 )
 print(
     "managed plan:     "
@@ -176,4 +214,4 @@ print(
 PY
 
 echo "archive sha256 unchanged: $ARCHIVE_SHA_BEFORE"
-echo "portability proof checkpoint passed"
+echo "three-environment portability proof checkpoint passed"

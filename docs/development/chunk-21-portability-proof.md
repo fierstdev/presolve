@@ -42,13 +42,13 @@ The checkpoint:
 2. records both the canonical Presolve release digest and the SHA-256 of the encoded archive bytes;
 3. inspects the detached release;
 4. resolves those exact release bytes against `examples/portability-proof/local-memory/presolve.env.toml`;
-5. resolves the same release bytes against `examples/portability-proof/managed-cloudflare/presolve.env.toml`;
-6. requires both compatibility checks and DeploymentPlans to identify the detached release rather than a source contract;
-7. requires the local plan to select `memory-kv` with its fixed EnvironmentId and ProviderId;
-8. requires the managed plan to select `cloudflare-kv` with a different fixed EnvironmentId and ProviderId; and
+5. resolves the same release bytes against `examples/portability-proof/network-redis/presolve.env.toml`;
+6. resolves the same release bytes against `examples/portability-proof/managed-cloudflare/presolve.env.toml`;
+7. requires all compatibility checks and DeploymentPlans to identify the detached release rather than a source contract;
+8. requires each plan to select its fixed EnvironmentId and a distinct ProviderId (`memory-kv`, `redis-kv`, and `cloudflare-kv`); and
 9. recomputes the archive SHA-256 after each resolution and requires it to remain unchanged.
 
-There is no second application build between the two plans.
+There is no second application build between the plans.
 
 The expected shape is:
 
@@ -61,12 +61,16 @@ archive SHA-256: <one byte identity>
         |     env_...0301
         |     -> memory-kv / prv_...0311
         |
+        +-- portability-redis
+        |     env_...0303
+        |     -> redis-kv / prv_...0313
+        |
         +-- portability-cloudflare
               env_...0302
               -> cloudflare-kv / prv_...0312
 ```
 
-The two Environment Specifications are intentionally checked into the repository with fixed IDs so public CI can prove that environment/provider selection changes while application release identity does not.
+The Environment Specifications are intentionally checked into the repository with fixed IDs so public CI can prove that environment/provider selection changes while application release identity does not.
 
 ## What 21.3a proves
 
@@ -230,3 +234,66 @@ The runtime checkpoint now accepts only:
 It decodes and verifies the release, identifies the single Component artifact from the verified manifest, reopens the same in-memory release bytes, reads that embedded artifact, resolves the release, realizes the selected provider, assembles the runtime, and executes the Component.
 
 The shell checkpoint no longer extracts or passes a `.wasm` sidecar. The `.presolved` file is therefore the sole application release input across the complete proof path.
+
+## 21.4 — third-provider Redis proof
+
+21.4 adds a third concrete realization without changing the application capability contract.
+
+`presolve-provider-kv-redis` implements the existing `presolve:kv/store@0.1.0` contract over Redis RESP/TCP. Its network address is node-side realization data supplied through `PRESOLVE_REDIS_ADDRESS`; the address does not enter the Environment Specification, DeploymentPlan, or `.presolved` release.
+
+This gives the flagship proof three materially different execution shapes:
+
+```text
+same kv-demo.presolved bytes
+        |
+        +-- memory-kv
+        |     in-process, immediate visibility
+        |
+        +-- redis-kv
+        |     network TCP provider, immediate sequential visibility
+        |
+        +-- cloudflare-kv
+              managed HTTP provider, eventual visibility
+```
+
+Redis is deliberately used before introducing another capability class. It tests whether Presolve's existing capability/realization boundary can substitute a network service with different transport and operational behavior while leaving application semantics unchanged.
+
+### Public Redis runtime proof
+
+Run:
+
+```bash
+bash ./scripts/check-release-realization.sh --redis
+```
+
+The checkpoint starts a pinned `redis:7.4-alpine` container on an ephemeral loopback port and then:
+
+1. builds `kv-demo.presolved` exactly once;
+2. executes that exact release through the local-memory provider;
+3. resolves the same release against `portability-redis`;
+4. realizes the plan-selected Redis ProviderId through `RedisKvAdapter`;
+5. executes the same embedded Component through the networked Redis provider;
+6. verifies the expected guest write/read/delete behavior; and
+7. requires the release digest and archive SHA-256 to remain unchanged.
+
+A dedicated `Redis provider proof` GitHub Actions job runs this path publicly with no credentials.
+
+When Cloudflare credentials are available, all three realizations can be exercised in one invocation:
+
+```bash
+bash ./scripts/check-release-realization.sh --redis --cloudflare
+```
+
+### Redis semantic boundary
+
+The Redis adapter maps baseline Presolve operations directly:
+
+```text
+Presolve get     → Redis GET
+Presolve set     → Redis SET
+Presolve delete  → Redis DEL
+```
+
+Unlike the Cloudflare adapter, Redis `DEL` directly reports whether the key existed, so no read-before-delete emulation is required. The proof implementation uses a fresh TCP connection per operation and intentionally does not yet claim production features such as connection pooling, TLS, authentication, clustering, or failover.
+
+Those are provider-operational concerns. Their absence does not change the purpose of 21.4: prove a third concrete provider can satisfy the same portable capability contract and execute the same immutable application release.
