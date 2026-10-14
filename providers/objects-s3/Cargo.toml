@@ -1,0 +1,25 @@
+[package]
+name = "presolve-provider-objects-s3"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+hex.workspace = true
+percent-encoding.workspace = true
+presolve-provider-realization.workspace = true
+presolve-provider-sdk.workspace = true
+reqwest.workspace = true
+semver.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+presolve-core.workspace = true
+presolve-provider-conformance.workspace = true
+
+[lints]
+workspace = true
