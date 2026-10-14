@@ -110,7 +110,7 @@ impl KeyValueProvider for RedisKvProvider {
                     "Redis value is not valid UTF-8 for Presolve string KV semantics",
                 )
             }),
-            RedisResponse::Error(message) => Err(redis_server_error(message)),
+            RedisResponse::Error(message) => Err(redis_server_error(&message)),
             response => Err(unexpected_response("GET", &response)),
         }
     }
@@ -120,7 +120,7 @@ impl KeyValueProvider for RedisKvProvider {
 
         match self.execute(&["SET", key, value])? {
             RedisResponse::Simple(message) if message == "OK" => Ok(()),
-            RedisResponse::Error(message) => Err(redis_server_error(message)),
+            RedisResponse::Error(message) => Err(redis_server_error(&message)),
             response => Err(unexpected_response("SET", &response)),
         }
     }
@@ -134,7 +134,7 @@ impl KeyValueProvider for RedisKvProvider {
             RedisResponse::Integer(count) => Err(KeyValueError::internal(format!(
                 "Redis DEL for one key returned unexpected deletion count {count}"
             ))),
-            RedisResponse::Error(message) => Err(redis_server_error(message)),
+            RedisResponse::Error(message) => Err(redis_server_error(&message)),
             response => Err(unexpected_response("DEL", &response)),
         }
     }
@@ -250,7 +250,7 @@ fn transport_error(operation: &str, error: &std::io::Error) -> KeyValueError {
     KeyValueError::unavailable(format!("Redis {operation} failed: {error}"))
 }
 
-fn redis_server_error(message: String) -> KeyValueError {
+fn redis_server_error(message: &str) -> KeyValueError {
     KeyValueError::unavailable(format!("Redis returned an error: {message}"))
 }
 
@@ -305,17 +305,16 @@ impl presolve_provider_realization::ProviderAdapter for RedisKvAdapter {
             }
         }
 
-        let address = profile
-            .setting(REDIS_ADDRESS_SETTING)
-            .ok_or_else(|| ProviderAdapterError::MissingSetting {
+        let address = profile.setting(REDIS_ADDRESS_SETTING).ok_or_else(|| {
+            ProviderAdapterError::MissingSetting {
                 key: REDIS_ADDRESS_SETTING.to_owned(),
-            })?;
-
-        let provider = RedisKvProvider::new(address).map_err(|error| {
-            ProviderAdapterError::Configuration {
-                message: error.to_string(),
             }
         })?;
+
+        let provider =
+            RedisKvProvider::new(address).map_err(|error| ProviderAdapterError::Configuration {
+                message: error.to_string(),
+            })?;
 
         Ok(
             presolve_provider_realization::RealizedProvider::new(*profile.provider_id())
@@ -359,9 +358,7 @@ mod tests {
             for response in responses {
                 let (mut stream, _) = listener.accept().expect("test request should arrive");
                 commands.push(read_command(&mut stream));
-                stream
-                    .write_all(response)
-                    .expect("response should write");
+                stream.write_all(response).expect("response should write");
             }
 
             sender.send(commands).expect("commands should be recorded");
@@ -374,7 +371,9 @@ mod tests {
         let clone = stream.try_clone().expect("stream should clone");
         let mut reader = BufReader::new(clone);
         let mut line = String::new();
-        reader.read_line(&mut line).expect("array header should read");
+        reader
+            .read_line(&mut line)
+            .expect("array header should read");
         let count = line
             .trim_end()
             .strip_prefix('*')
