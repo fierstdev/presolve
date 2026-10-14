@@ -18,7 +18,7 @@ jobs:
       - run: rustup toolchain install stable --profile minimal --component rustfmt
       - name: Apply rustfmt
         run: cargo fmt --all
-      - name: Commit formatted source to feature branch
+      - name: Commit formatted source to helper branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -29,4 +29,4 @@ jobs:
                   crates/presolve-runtime/src/runtime.rs \
                   crates/presolve-runtime/src/state.rs
           git commit -m "style: format SQL runtime slice"
-          git push origin HEAD:runtime/sql-capability-binding
+          git push origin HEAD:tmp/sql-runtime-format
