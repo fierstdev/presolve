@@ -18,6 +18,7 @@ members = [
     "crates/presolve-cli",
     "providers/kv-memory",
     "providers/kv-cloudflare",
+    "providers/kv-redis",
     "providers/objects-memory",
     "executors/docker",
 ]
@@ -78,6 +79,7 @@ presolve-executor-docker = { path = "executors/docker" }
 
 presolve-provider-kv-memory = { path = "providers/kv-memory" }
 presolve-provider-kv-cloudflare = { path = "providers/kv-cloudflare" }
+presolve-provider-kv-redis = { path = "providers/kv-redis" }
 presolve-provider-objects-memory = { path = "providers/objects-memory" }
 
 [workspace.lints.rust]
