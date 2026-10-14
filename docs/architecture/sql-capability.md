@@ -37,6 +37,16 @@ Version `0.1.0` defines five mandatory operations:
 
 The application-facing binding should not expose connection objects, pools, hostnames, driver handles, or vendor client types.
 
+## Host provider SDK projection
+
+The Rust provider SDK projects the semantic contract without making Rust or its trait layout canonical.
+
+`SqlDatabaseProvider` exposes non-transactional `execute` and `query` operations plus `begin`. `begin` returns a boxed `SqlTransaction` object that owns the provider-specific logical transactional session. That ownership makes transaction-session affinity structural at the host boundary rather than an adapter convention.
+
+A later Component Model binding can represent the same semantic object with an opaque resource handle. Neither binding requires application code to observe database connections or pool identities.
+
+`SqlQueryResult` preserves ordered column metadata and a row iterator. Providers may buffer internally, but the provider SDK does not require complete result sets to be materialized before consumption. Rows remain positional so duplicate SQL column labels survive the boundary.
+
 ## Portable scalar value model
 
 The baseline parameter/result domain is intentionally small:
