@@ -7,7 +7,7 @@ world application {
     export run: func(input: string) -> string;
 }
 
-/// An Presolve application that requires key/value storage.
+/// A Presolve application that requires key/value storage.
 ///
 /// This is currently an explicit world used to prove capability binding.
 /// Later the Presolve build pipeline will derive and validate capability
@@ -18,10 +18,16 @@ world kv-application {
     export run: func(input: string) -> string;
 }
 
-
 /// A Presolve application that requires object storage.
 world objects-application {
     import presolve:objects/store@0.1.0;
+
+    export run: func(input: string) -> string;
+}
+
+/// A Presolve application that requires relational SQL.
+world sql-application {
+    import presolve:sql/database@0.1.0;
 
     export run: func(input: string) -> string;
 }
