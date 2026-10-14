@@ -33,6 +33,7 @@ uuid.workspace = true
 presolve-environment.workspace = true
 presolve-executor-docker.workspace = true
 presolve-provider-kv-cloudflare.workspace = true
+presolve-provider-kv-redis.workspace = true
 anyhow.workspace = true
 semver.workspace = true
 
