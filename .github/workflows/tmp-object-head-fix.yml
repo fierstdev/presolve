@@ -1,0 +1,55 @@
+name: Temporary object HEAD fix
+
+on:
+  push:
+    branches:
+      - tmp/object-head-fix
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: tmp/object-head-fix
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt
+
+      - name: Fix HEAD metadata handling
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("providers/objects-s3/src/lib.rs")
+          text = path.read_text()
+          text = text.replace(
+              "    header::AUTHORIZATION,\n",
+              "    header::{AUTHORIZATION, CONTENT_LENGTH},\n",
+              1,
+          )
+          old = '''        let response = require_success(response, "head")?;\n        let size = response.content_length().ok_or_else(|| {\n            ObjectStoreError::internal("S3 HEAD response did not include Content-Length")\n        })?;\n'''
+          new = '''        let response = require_success(response, "head")?;\n        let size = response\n            .headers()\n            .get(CONTENT_LENGTH)\n            .and_then(|value| value.to_str().ok())\n            .and_then(|value| value.parse::<u64>().ok())\n            .ok_or_else(|| {\n                ObjectStoreError::internal(\n                    "S3 HEAD response did not include a valid Content-Length header",\n                )\n            })?;\n'''
+          if old not in text:
+              raise SystemExit("expected HEAD metadata block not found")
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Apply rustfmt
+        run: cargo fmt --all
+
+      - name: Commit fix if changed
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add providers/objects-s3/src/lib.rs providers/objects-s3/src/list.rs providers/objects-s3/src/signing.rs crates/presolve-node/examples/object_release_realization_checkpoint.rs
+          git commit -m "fix: read S3 HEAD object size from metadata"
+          git push origin HEAD:tmp/object-head-fix
