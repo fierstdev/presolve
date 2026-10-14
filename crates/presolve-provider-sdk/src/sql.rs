@@ -234,7 +234,6 @@ impl SqlQueryResult {
     }
 
     /// Splits the result into column metadata and its row stream.
-    #[must_use]
     pub fn into_parts(
         self,
     ) -> (
@@ -445,7 +444,7 @@ mod tests {
 
     #[test]
     fn scalar_values_preserve_baseline_domain() {
-        let values = vec![
+        let values = [
             SqlValue::Null,
             SqlValue::Integer(-7),
             SqlValue::Real(3.5),
@@ -478,10 +477,7 @@ mod tests {
             .next()
             .expect("one row should exist")
             .expect("row should succeed");
-        assert_eq!(
-            row.values(),
-            [SqlValue::Integer(1), SqlValue::Integer(2)]
-        );
+        assert_eq!(row.values(), [SqlValue::Integer(1), SqlValue::Integer(2)]);
     }
 
     #[test]

@@ -79,7 +79,7 @@ version = "0.0.1"
 
     [[capabilities]]
     interface = "presolve:sql/database"
-    version = "^1.0"
+    version = "^0.1"
 
     [[capabilities]]
     interface = "presolve:secrets/store"
