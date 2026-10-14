@@ -35,7 +35,6 @@ presolve-executor-docker.workspace = true
 presolve-provider-kv-cloudflare.workspace = true
 anyhow.workspace = true
 semver.workspace = true
-tar = "0.4"
 
 [lints]
 workspace = true
