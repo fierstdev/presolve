@@ -147,10 +147,7 @@ fn assert_null_is_distinct_from_empty(
     );
 
     assert_eq!(null_rows[0].values()[2], SqlValue::Null);
-    assert_eq!(
-        empty_rows[0].values()[2],
-        SqlValue::Text(String::new())
-    );
+    assert_eq!(empty_rows[0].values()[2], SqlValue::Text(String::new()));
 }
 
 fn assert_explicit_rollback(
@@ -202,10 +199,7 @@ fn assert_ordered_transaction_commit(
     transaction
         .execute(
             fixture.update_label,
-            &[
-                SqlValue::Text("second".to_owned()),
-                SqlValue::Integer(id),
-            ],
+            &[SqlValue::Text("second".to_owned()), SqlValue::Integer(id)],
         )
         .expect("ordered transactional update should succeed");
 
