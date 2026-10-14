@@ -17,17 +17,17 @@ impl bindings::Guest for KeyValueComponent {
         match command(&input) {
             Ok(Command::Set { key, value }) => match store::set(key, value) {
                 Ok(()) => "stored".to_owned(),
-                Err(error) => format!("error:{}", error_code(error)),
+                Err(error) => format!("error:{}", error_text(error)),
             },
             Ok(Command::Get { key }) => match store::get(key) {
                 Ok(Some(value)) => format!("value:{value}"),
                 Ok(None) => "missing".to_owned(),
-                Err(error) => format!("error:{}", error_code(error)),
+                Err(error) => format!("error:{}", error_text(error)),
             },
             Ok(Command::Delete { key }) => match store::delete(key) {
                 Ok(true) => "deleted".to_owned(),
                 Ok(false) => "missing".to_owned(),
-                Err(error) => format!("error:{}", error_code(error)),
+                Err(error) => format!("error:{}", error_text(error)),
             },
             Err(message) => format!("error:{message}"),
         }
@@ -66,11 +66,11 @@ fn command(input: &str) -> Result<Command<'_>, &'static str> {
     Err("invalid-command")
 }
 
-fn error_code(error: store::Error) -> &'static str {
+fn error_text(error: store::Error) -> String {
     match error {
-        store::Error::Unavailable(_) => "unavailable",
-        store::Error::InvalidKey(_) => "invalid-key",
-        store::Error::Internal(_) => "internal",
+        store::Error::Unavailable(message) => format!("unavailable:{message}"),
+        store::Error::InvalidKey(message) => format!("invalid-key:{message}"),
+        store::Error::Internal(message) => format!("internal:{message}"),
     }
 }
 
