@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use presolve_bundle::{PresolveBundle, WorkloadKind, application_contract_for_resolution};
-use presolve_core::ArtifactDigest;
 use presolve_environment::{inventory_from_specification, parse_environment};
 use presolve_node::{assemble_runtime, realize_local_providers, realize_plan_providers};
 use presolve_provider_kv_cloudflare::{
@@ -26,6 +25,7 @@ const NAMESPACE_ID_ENV: &str = "PRESOLVE_CLOUDFLARE_KV_NAMESPACE_ID";
 const API_TOKEN_ENV: &str = "PRESOLVE_CLOUDFLARE_API_TOKEN";
 const CLOUD_VISIBILITY_TIMEOUT: Duration = Duration::from_secs(75);
 const CLOUD_POLL_INTERVAL: Duration = Duration::from_secs(1);
+const TAR_BLOCK_BYTES: usize = 512;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RealizationMode {
@@ -63,14 +63,11 @@ fn main() -> Result<()> {
     let environment_path = args
         .next()
         .context("missing Environment Specification path")?;
-    let component_path = args
-        .next()
-        .context("missing Component artifact extracted from the detached release")?;
     let input = args.next().context("missing application input")?;
 
     if args.next().is_some() {
         bail!(
-            "usage: release_realization_checkpoint <local|cloudflare> <release.presolved> <presolve.env.toml> <component.wasm> <input>"
+            "usage: release_realization_checkpoint <local|cloudflare> <release.presolved> <presolve.env.toml> <input>"
         );
     }
 
@@ -111,7 +108,7 @@ fn main() -> Result<()> {
         RealizationMode::Cloudflare => realize_cloudflare_provider(plan, provider_id)?,
     };
 
-    let component = verified_component_bytes(&component_path, &bundle)?;
+    let component = component_bytes_from_release(&release_bytes, &bundle)?;
     let runtime = assemble_runtime(plan, &registry)
         .context("could not assemble runtime for detached release")?;
     let output = execute_kv_proof(mode, &runtime, &component, &input)?;
@@ -174,7 +171,7 @@ fn realize_cloudflare_provider(
         .context("could not realize plan-selected Cloudflare KV provider")
 }
 
-fn verified_component_bytes(component_path: &str, bundle: &PresolveBundle) -> Result<Vec<u8>> {
+fn component_bytes_from_release(release_bytes: &[u8], bundle: &PresolveBundle) -> Result<Vec<u8>> {
     let workload = match bundle.manifest().workloads() {
         [workload] => workload,
         workloads => bail!(
@@ -199,26 +196,76 @@ fn verified_component_bytes(component_path: &str, bundle: &PresolveBundle) -> Re
         ),
     };
 
-    let bytes = fs::read(component_path)
-        .with_context(|| format!("could not read extracted Component `{component_path}`"))?;
-    let actual_size = u64::try_from(bytes.len()).context("Component size does not fit in u64")?;
+    // `PresolveBundle::decode` above has already validated the archive topology,
+    // artifact size, and artifact digest. This small reader only selects the
+    // manifest-named bytes from that same verified in-memory archive so the proof
+    // does not need an extracted `.wasm` sidecar or another crate dependency.
+    read_verified_tar_entry(release_bytes, artifact.path())
+}
 
-    if actual_size != artifact.size() {
-        bail!(
-            "extracted Component size mismatch: release manifest requires {} bytes, got {actual_size}",
-            artifact.size()
-        );
+fn read_verified_tar_entry(release_bytes: &[u8], target_path: &str) -> Result<Vec<u8>> {
+    let mut offset = 0_usize;
+
+    while offset
+        .checked_add(TAR_BLOCK_BYTES)
+        .is_some_and(|end| end <= release_bytes.len())
+    {
+        let header_end = offset + TAR_BLOCK_BYTES;
+        let header = &release_bytes[offset..header_end];
+
+        if header.iter().all(|byte| *byte == 0) {
+            break;
+        }
+
+        let name = tar_text(&header[..100]).context("invalid verified tar entry name")?;
+        let prefix = tar_text(&header[345..500]).context("invalid verified tar entry prefix")?;
+        let path = if prefix.is_empty() {
+            name.to_owned()
+        } else {
+            format!("{prefix}/{name}")
+        };
+        let size = tar_octal(&header[124..136]).context("invalid verified tar entry size")?;
+        let data_start = header_end;
+        let data_end = data_start
+            .checked_add(size)
+            .context("verified tar entry size overflow")?;
+
+        if data_end > release_bytes.len() {
+            bail!("verified tar entry `{path}` extends past release bytes");
+        }
+
+        if path == target_path {
+            return Ok(release_bytes[data_start..data_end].to_vec());
+        }
+
+        let padded_size = size
+            .checked_add(TAR_BLOCK_BYTES - 1)
+            .context("verified tar padding overflow")?
+            / TAR_BLOCK_BYTES
+            * TAR_BLOCK_BYTES;
+        offset = data_start
+            .checked_add(padded_size)
+            .context("verified tar offset overflow")?;
     }
 
-    let actual_digest = ArtifactDigest::from_content(&bytes);
-    if actual_digest != artifact.digest() {
-        bail!(
-            "extracted Component digest mismatch: release manifest requires {}, got {actual_digest}",
-            artifact.digest()
-        );
+    bail!("verified detached release does not expose embedded Component `{target_path}`")
+}
+
+fn tar_text(field: &[u8]) -> Result<&str> {
+    let end = field
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(field.len());
+    std::str::from_utf8(&field[..end]).context("tar field is not UTF-8")
+}
+
+fn tar_octal(field: &[u8]) -> Result<usize> {
+    let text = tar_text(field)?.trim();
+    if text.is_empty() {
+        return Ok(0);
     }
 
-    Ok(bytes)
+    usize::from_str_radix(text, 8).context("tar field is not an octal integer")
 }
 
 fn execute_kv_proof(

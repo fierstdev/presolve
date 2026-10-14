@@ -103,7 +103,7 @@ DeploymentPlan with exact ProviderId
         ↓
 realize that provider implementation
         ↓
-extract the Component bytes from the same release archive
+read the embedded Component from the same verified release bytes
         ↓
 assemble runtime from the DeploymentPlan + ProviderRegistry
         ↓
@@ -158,9 +158,11 @@ This path is suitable for public CI. It:
 2. records its canonical release digest and archive SHA-256;
 3. resolves the detached release against the fixed local-memory environment;
 4. realizes the exact plan-selected ProviderId with the in-memory KV implementation;
-5. extracts and executes the bundled Component bytes;
+5. reads and executes the embedded Component directly from the verified `.presolved` release bytes;
 6. proves guest KV write/read/delete behavior through the realized provider; and
 7. verifies that the `.presolved` archive bytes remain unchanged after execution.
+
+No extracted `.wasm` sidecar is passed into the runtime checkpoint. The detached `.presolved` release is the sole application artifact supplied to execution.
 
 ### Live same-release Cloudflare proof
 
@@ -203,4 +205,28 @@ Public CI exercises the credential-free local detached-release realization path.
 
 21.3b is complete when the live `--cloudflare` path has been run successfully with real Cloudflare credentials and both realizations report the same detached release identity while the archive hash remains unchanged.
 
-At that point Presolve has evidence for the stronger flagship claim: one immutable application release can be resolved **and actually executed** through materially different provider implementations without changing the release.
+That acceptance run completed successfully on 2026-10-13. The credential-free evidence record is stored in `docs/proofs/chunk-21-3b-live-cloudflare.md`.
+
+Presolve therefore has evidence for the stronger flagship claim: one immutable application release can be resolved **and actually executed** through materially different provider implementations without changing the release.
+
+## 21.3c — proof diagnostics
+
+The live acceptance run exposed a useful diagnostic weakness: the guest demo originally reduced provider errors to only `unavailable`, `invalid-key`, or `internal`, discarding the provider-supplied message carried by the WIT error payload.
+
+The demo now preserves that message in its textual proof protocol. This does not change capability semantics; it makes failures such as authorization, throttling, timeout, or provider-side status errors observable during a live proof without exposing credentials.
+
+## 21.3d — direct release execution
+
+The original 21.3b script extracted the Component to a temporary `.wasm` file before invoking the runtime checkpoint. The extracted bytes were verified against the release manifest, so the proof remained sound, but the sidecar weakened the shape of the demonstration: execution appeared to accept both the release and an additional application artifact.
+
+21.3d removes that ambiguity.
+
+The runtime checkpoint now accepts only:
+
+```text
+<realization mode> <release.presolved> <presolve.env.toml> <application input>
+```
+
+It decodes and verifies the release, identifies the single Component artifact from the verified manifest, reopens the same in-memory release bytes, reads that embedded artifact, resolves the release, realizes the selected provider, assembles the runtime, and executes the Component.
+
+The shell checkpoint no longer extracts or passes a `.wasm` sidecar. The `.presolved` file is therefore the sole application release input across the complete proof path.
