@@ -5,20 +5,35 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$ROOT/examples/kv-demo"
 LOCAL_ENV="$ROOT/examples/portability-proof/local-memory/presolve.env.toml"
 CLOUDFLARE_ENV="$ROOT/examples/portability-proof/managed-cloudflare/presolve.env.toml"
+REDIS_ENV="$ROOT/examples/portability-proof/network-redis/presolve.env.toml"
 PRESOLVE="$ROOT/target/debug/presolve"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/presolve-release-realization.XXXXXX")"
 RELEASE="$TMP/kv-demo.presolved"
 RUN_ID="proof-$$"
 LIVE_CLOUDFLARE=false
+LIVE_REDIS=false
+REDIS_CONTAINER=""
 
-if [[ "${1:-}" == "--cloudflare" ]]; then
-  LIVE_CLOUDFLARE=true
-elif [[ $# -ne 0 ]]; then
-  echo "usage: $0 [--cloudflare]" >&2
-  exit 2
-fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --cloudflare)
+      LIVE_CLOUDFLARE=true
+      ;;
+    --redis)
+      LIVE_REDIS=true
+      ;;
+    *)
+      echo "usage: $0 [--redis] [--cloudflare]" >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
 
 cleanup() {
+  if [[ -n "$REDIS_CONTAINER" ]]; then
+    docker rm -f "$REDIS_CONTAINER" >/dev/null 2>&1 || true
+  fi
   rm -rf "$TMP"
   rm -rf "$APP/.presolve" "$APP/dist"
 }
@@ -47,6 +62,43 @@ if [[ "$LIVE_CLOUDFLARE" == true ]]; then
       exit 1
     fi
   done
+fi
+
+start_redis() {
+  docker version >/dev/null
+  REDIS_CONTAINER="presolve-redis-proof-$$"
+
+  docker run \
+    --detach \
+    --rm \
+    --name "$REDIS_CONTAINER" \
+    --publish 127.0.0.1::6379 \
+    redis:7.4-alpine \
+    redis-server --save "" --appendonly no >/dev/null
+
+  local redis_address
+  redis_address="$(docker port "$REDIS_CONTAINER" 6379/tcp | head -n 1)"
+  if [[ -z "$redis_address" ]]; then
+    echo "could not determine Redis proof address" >&2
+    exit 1
+  fi
+
+  export PRESOLVE_REDIS_ADDRESS="$redis_address"
+
+  for _ in $(seq 1 30); do
+    if [[ "$(docker exec "$REDIS_CONTAINER" redis-cli ping 2>/dev/null || true)" == "PONG" ]]; then
+      return
+    fi
+    sleep 1
+  done
+
+  echo "Redis proof container did not become ready" >&2
+  docker logs "$REDIS_CONTAINER" >&2 || true
+  exit 1
+}
+
+if [[ "$LIVE_REDIS" == true ]]; then
+  start_redis
 fi
 
 echo "== build Presolve CLI =="
@@ -99,6 +151,31 @@ grep -F "provider: memory-kv (prv_00000000-0000-4000-8000-000000000311)" "$TMP/l
 grep -F "mode: local" "$TMP/local.txt" >/dev/null
 grep -F "output: value:$RUN_ID-local" "$TMP/local.txt" >/dev/null
 
+if [[ "$LIVE_REDIS" == true ]]; then
+  echo "== execute the same exact release through network Redis =="
+
+  cargo run \
+    --manifest-path "$ROOT/Cargo.toml" \
+    -p presolve-node \
+    --example release_realization_checkpoint \
+    -- \
+    redis \
+    "$RELEASE" \
+    "$REDIS_ENV" \
+    "$RUN_ID-redis" | tee "$TMP/redis.txt"
+
+  ARCHIVE_SHA_AFTER_REDIS="$(archive_sha256 "$RELEASE")"
+  if [[ "$ARCHIVE_SHA_AFTER_REDIS" != "$ARCHIVE_SHA_BEFORE" ]]; then
+    echo "immutable release bytes changed after Redis execution" >&2
+    exit 1
+  fi
+
+  grep -F "release digest: $RELEASE_DIGEST" "$TMP/redis.txt" >/dev/null
+  grep -F "provider: redis-kv (prv_00000000-0000-4000-8000-000000000313)" "$TMP/redis.txt" >/dev/null
+  grep -F "mode: redis" "$TMP/redis.txt" >/dev/null
+  grep -F "output: value:$RUN_ID-redis" "$TMP/redis.txt" >/dev/null
+fi
+
 if [[ "$LIVE_CLOUDFLARE" == true ]]; then
   echo "== execute the same exact release through live Cloudflare KV =="
   echo "Cloudflare credentials are read from the environment and are not printed."
@@ -126,7 +203,11 @@ if [[ "$LIVE_CLOUDFLARE" == true ]]; then
 fi
 
 echo "archive sha256 unchanged: $ARCHIVE_SHA_BEFORE"
-if [[ "$LIVE_CLOUDFLARE" == true ]]; then
+if [[ "$LIVE_REDIS" == true && "$LIVE_CLOUDFLARE" == true ]]; then
+  echo "same-release local + Redis + Cloudflare realization proof passed"
+elif [[ "$LIVE_REDIS" == true ]]; then
+  echo "same-release local + Redis realization proof passed"
+elif [[ "$LIVE_CLOUDFLARE" == true ]]; then
   echo "same-release local + Cloudflare realization proof passed"
 else
   echo "detached-release local realization checkpoint passed"
