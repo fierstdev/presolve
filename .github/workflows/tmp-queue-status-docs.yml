@@ -1,0 +1,87 @@
+name: Temporary queue status docs
+
+on:
+  push:
+    branches:
+      - tmp/queue-status-docs
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/queue-status-docs
+      - name: Update queue and SQL status docs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          status = Path('docs/development/project-status.md')
+          text = status.read_text()
+          text = text.replace(
+              '| Relational SQL semantic contract | Implemented |\n',
+              '| Relational SQL semantic contract | Implemented |\n| SQLite SQL provider | Implemented |\n| PostgreSQL SQL provider | Implemented |\n| Leased work-queue semantic contract | Implemented |\n| In-memory work-queue provider | Implemented |\n| Work-queue WIT/runtime resource binding | Implemented |\n| Detached work-queue runtime proof | Implemented |\n',
+              1,
+          )
+          text = text.replace(
+              'Relational SQL semantic design is now explicit. `presolve:sql/database@0.1.0` defines the baseline execution, parameter, scalar-value, result, and transaction semantics while deliberately refusing to claim that arbitrary SQL dialects are interchangeable. PostgreSQL- and SQLite-family dialect assumptions are negotiated as semantic features. See [SQL capability semantics](../architecture/sql-capability.md).\n',
+              'Relational SQL portability is now proven across two materially different engines. `presolve:sql/database@0.1.0` defines the baseline execution, parameter, scalar-value, result, and transaction semantics while deliberately refusing to claim that arbitrary SQL dialects are interchangeable. SQLite and PostgreSQL both pass the typed provider conformance suite and execute the same immutable SQL release with the same guest-visible result while preserving release identity. See [SQL capability semantics](../architecture/sql-capability.md).\n\nWork-queue semantics are now explicit and executable. `presolve:queue/work-queue@0.1.0` defines an at-least-once leased-delivery baseline with explicit `send`, `receive`, `ack`, and `retry` ownership. The in-memory reference provider passes reusable conformance, node realization preserves the plan-selected provider, and a detached `.presolved` guest proof exercises retry/redelivery/ack through the WIT/Wasmtime runtime without changing application identity. Workload-trigger topology remains a separate future concern.\n',
+              1,
+          )
+          old = '''- continue keeping architectural checkpoints, determinism, portability, and provider evidence visible in public CI
+- versioned Presolve CLI binaries/releases
+- use the flagship and object-storage proofs plus public releases for external developer validation
+- derive the SQL provider SDK/binding surface from the new semantic contract
+- implement SQLite and PostgreSQL providers and prove one immutable SQL release through both using a deliberately shared SQL subset
+- use those providers to decide whether SQL limits/isolation need typed semantic properties beyond boolean feature negotiation
+- follow SQL with asynchronous queue semantics and materially different queue implementations
+- sharpen semantic negotiation from observed provider differences before adding broader capability vocabulary
+- defer control-plane or lifecycle expansion until external validation identifies a concrete need
+'''
+          new = '''- continue keeping architectural checkpoints, determinism, portability, and provider evidence visible in public CI
+- versioned Presolve CLI binaries/releases
+- use the flagship, object-storage, SQL, and queue proofs plus public releases for external developer validation
+- add a materially different networked queue implementation, with Redis Streams/consumer groups as the first pressure test for leased-delivery semantics
+- follow with a managed queue implementation such as SQS or Cloudflare Queues before claiming cross-provider queue portability
+- use observed SQL and queue provider differences to decide when boolean feature negotiation must grow typed semantic properties such as limits, lease ranges, retention, and isolation characteristics
+- keep queue workload-trigger topology separate from queue capability semantics until a concrete deployment model requires it
+- sharpen semantic negotiation from observed provider differences before adding broader capability vocabulary
+- defer control-plane or lifecycle expansion until external validation identifies a concrete need
+'''
+          if old not in text:
+              raise SystemExit('project-status planned-next block not found')
+          status.write_text(text.replace(old, new, 1))
+
+          roadmap = Path('docs/development/roadmap.md')
+          text = roadmap.read_text()
+          old = '''- **next:** design a SQL capability contract around explicit portable semantics before selecting concrete SQLite, PostgreSQL, and managed-SQL provider implementations; do not treat generic SQL syntax alone as sufficient portability
+- **after SQL:** design asynchronous queue semantics around delivery guarantees, ordering, retries, visibility/lease behavior, message limits, and dead-letter handling before adding queue adapters
+- use external developer feedback to decide what deserves stabilization before adding a control plane, scheduler, service mesh, registry, or lifecycle-management surface
+'''
+          new = '''- **complete:** relational SQL semantic contract plus SQLite/PostgreSQL provider implementations and same-release proof using a deliberately shared typed subset; dialect assumptions remain explicit rather than pretending arbitrary SQL is portable
+- **complete:** baseline leased work-queue semantic contract, ownership-based provider SDK/conformance suite, in-memory provider, WIT/runtime delivery resource binding, node realization, and detached same-release runtime proof
+- **next:** add a materially different network queue implementation (Redis Streams/consumer groups) to pressure-test receipt ownership, redelivery, retry, and pending-delivery semantics without broadening the baseline prematurely
+- **after network queue:** add a managed queue implementation such as SQS or Cloudflare Queues, then use observed differences to decide which limits/lease/retention properties require typed semantic negotiation
+- keep workload-trigger topology separate from queue capability semantics until deployment evidence requires a trigger model
+- use external developer feedback to decide what deserves stabilization before adding a control plane, scheduler, service mesh, registry, or lifecycle-management surface
+'''
+          if old not in text:
+              raise SystemExit('roadmap product-proof block not found')
+          roadmap.write_text(text.replace(old, new, 1))
+          PY
+      - name: Validate documentation diff
+        run: |
+          git diff --check
+          grep -q 'Leased work-queue semantic contract | Implemented' docs/development/project-status.md
+          grep -q 'baseline leased work-queue semantic contract' docs/development/roadmap.md
+      - name: Commit docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/development/project-status.md docs/development/roadmap.md
+          git commit -m "docs: mark SQL and queue proof milestones"
+          git push origin HEAD:tmp/queue-status-docs
