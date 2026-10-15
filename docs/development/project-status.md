@@ -15,6 +15,7 @@ This page is a concise implementation-status view, not a compatibility guarantee
 | Wasmtime runtime controls | Implemented |
 | Key-value capability | Implemented |
 | Object-storage capability | Implemented |
+| Relational SQL semantic contract | Implemented |
 | Canonical capability semantic contracts | Implemented |
 | Provider SDK boundary | Implemented |
 | Provider conformance suites | Implemented |
@@ -94,14 +95,18 @@ Chunk 21 product proof is now externally reproducible. The flagship demo builds 
 
 Deployment-decision coverage now also includes object storage. A second detached release proof resolves one provider-neutral object capability against in-process memory and an S3-compatible environment, then executes the exact same `.presolved` bytes through both implementations. The proof exercises `put`, `head`, prefix `list`, streamed `get`, `delete`, and post-delete observation while keeping endpoint, bucket, region, and credentials at the realization boundary. See [Object-storage portability proof](../proofs/object-storage-portability.md).
 
+Relational SQL semantic design is now explicit. `presolve:sql/database@0.1.0` defines the baseline execution, parameter, scalar-value, result, and transaction semantics while deliberately refusing to claim that arbitrary SQL dialects are interchangeable. PostgreSQL- and SQLite-family dialect assumptions are negotiated as semantic features. See [SQL capability semantics](../architecture/sql-capability.md).
+
 ## Planned next
 
-The next phase is product proof and external validation rather than another broad architecture chunk:
+The next phase remains product proof and external validation rather than another broad architecture chunk:
 
 - continue keeping architectural checkpoints, determinism, portability, and provider evidence visible in public CI
 - versioned Presolve CLI binaries/releases
 - use the flagship and object-storage proofs plus public releases for external developer validation
-- design the first SQL capability contract from explicit transaction/query/result semantics before committing to SQLite, PostgreSQL, or managed-SQL adapters
+- derive the SQL provider SDK/binding surface from the new semantic contract
+- implement SQLite and PostgreSQL providers and prove one immutable SQL release through both using a deliberately shared SQL subset
+- use those providers to decide whether SQL limits/isolation need typed semantic properties beyond boolean feature negotiation
 - follow SQL with asynchronous queue semantics and materially different queue implementations
 - sharpen semantic negotiation from observed provider differences before adding broader capability vocabulary
 - defer control-plane or lifecycle expansion until external validation identifies a concrete need

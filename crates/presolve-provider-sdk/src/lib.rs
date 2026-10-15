@@ -8,6 +8,7 @@
 
 mod kv;
 mod objects;
+mod sql;
 
 pub use kv::{
     KEY_VALUE_INTERFACE, KeyValueError, KeyValueErrorCode, KeyValueProvider,
@@ -16,4 +17,9 @@ pub use kv::{
 pub use objects::{
     OBJECT_STORE_INTERFACE, ObjectInfo, ObjectRead, ObjectStoreError, ObjectStoreErrorCode,
     ObjectStoreProvider, UnavailableObjectStoreProvider,
+};
+pub use sql::{
+    SQL_DATABASE_INTERFACE, SqlColumn, SqlDatabaseError, SqlDatabaseErrorCode, SqlDatabaseProvider,
+    SqlExecuteResult, SqlQueryResult, SqlRow, SqlTransaction, SqlTransactionIsolation,
+    SqlTransactionOptions, SqlValue, UnavailableSqlDatabaseProvider,
 };
