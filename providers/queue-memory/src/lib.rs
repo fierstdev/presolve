@@ -26,15 +26,13 @@ const DEFAULT_LEASE_DURATION: Duration = Duration::from_secs(30);
 struct Message {
     id: u64,
     body: Vec<u8>,
-    available_at: Instant,
     lease_until: Option<Instant>,
     generation: u64,
-    delivery_attempts: u32,
 }
 
 impl Message {
     fn is_available(&self, now: Instant) -> bool {
-        self.available_at <= now && self.lease_until.is_none_or(|deadline| deadline <= now)
+        self.lease_until.is_none_or(|deadline| deadline <= now)
     }
 }
 
@@ -44,7 +42,12 @@ struct QueueState {
     messages: VecDeque<Message>,
 }
 
-/// Process-local leased work queue.
+/// Process-local leased work queue implementing only the mandatory 0.1
+/// semantics.
+///
+/// Optional operation parameters are rejected unless a future realization
+/// explicitly negotiates and configures those features. This keeps runtime
+/// behavior aligned with the resolver-selected capability contract.
 #[derive(Debug, Clone)]
 pub struct InMemoryWorkQueueProvider {
     state: Arc<Mutex<QueueState>>,
@@ -64,11 +67,12 @@ impl InMemoryWorkQueueProvider {
         Self::default()
     }
 
-    /// Creates an empty queue with an explicit baseline delivery lease.
+    /// Creates an empty queue with an environment-selected baseline lease.
     ///
     /// A zero-duration lease is useful for deterministic semantic tests because
     /// an abandoned delivery becomes eligible on the next receive without a
-    /// wall-clock sleep.
+    /// wall-clock sleep. This is provider/environment configuration, not the
+    /// application-facing `configurable-lease-duration` feature.
     #[must_use]
     pub fn with_default_lease(default_lease_duration: Duration) -> Self {
         Self {
@@ -86,9 +90,12 @@ impl InMemoryWorkQueueProvider {
 
 impl WorkQueueProvider for InMemoryWorkQueueProvider {
     fn send(&self, body: &[u8], options: WorkQueueSendOptions) -> Result<(), WorkQueueError> {
-        let now = Instant::now();
-        let delay = options.delay().unwrap_or(Duration::ZERO);
-        let available_at = checked_add(now, delay, "send delay")?;
+        if options.delay().is_some() {
+            return Err(WorkQueueError::unsupported(
+                "memory queue realization did not negotiate `delayed-send`",
+            ));
+        }
+
         let mut state = self.lock_state()?;
         let id = state.next_id;
         state.next_id = state
@@ -98,10 +105,8 @@ impl WorkQueueProvider for InMemoryWorkQueueProvider {
         state.messages.push_back(Message {
             id,
             body: body.to_vec(),
-            available_at,
             lease_until: None,
             generation: 0,
-            delivery_attempts: 0,
         });
         Ok(())
     }
@@ -110,11 +115,16 @@ impl WorkQueueProvider for InMemoryWorkQueueProvider {
         &self,
         options: WorkQueueReceiveOptions,
     ) -> Result<Option<Box<dyn WorkQueueDelivery>>, WorkQueueError> {
+        if options.lease_duration().is_some() {
+            return Err(WorkQueueError::unsupported(
+                "memory queue realization did not negotiate `configurable-lease-duration`",
+            ));
+        }
+
         let now = Instant::now();
-        let lease_duration = options
-            .lease_duration()
-            .unwrap_or(self.default_lease_duration);
-        let lease_until = checked_add(now, lease_duration, "delivery lease")?;
+        let lease_until = now.checked_add(self.default_lease_duration).ok_or_else(|| {
+            WorkQueueError::invalid_request("default delivery lease exceeds the supported time range")
+        })?;
         let mut state = self.lock_state()?;
         let Some(index) = state
             .messages
@@ -131,10 +141,6 @@ impl WorkQueueProvider for InMemoryWorkQueueProvider {
             .generation
             .checked_add(1)
             .ok_or_else(|| WorkQueueError::internal("queue delivery generation overflow"))?;
-        message.delivery_attempts = message
-            .delivery_attempts
-            .checked_add(1)
-            .ok_or_else(|| WorkQueueError::internal("queue delivery-attempt count overflow"))?;
         message.lease_until = Some(lease_until);
 
         Ok(Some(Box::new(InMemoryDelivery {
@@ -142,7 +148,6 @@ impl WorkQueueProvider for InMemoryWorkQueueProvider {
             message_id: message.id,
             generation: message.generation,
             body: message.body.clone(),
-            delivery_attempt: message.delivery_attempts,
         })))
     }
 }
@@ -153,7 +158,6 @@ struct InMemoryDelivery {
     message_id: u64,
     generation: u64,
     body: Vec<u8>,
-    delivery_attempt: u32,
 }
 
 impl InMemoryDelivery {
@@ -193,10 +197,6 @@ impl WorkQueueDelivery for InMemoryDelivery {
         &self.body
     }
 
-    fn delivery_attempt(&self) -> Option<u32> {
-        Some(self.delivery_attempt)
-    }
-
     fn ack(self: Box<Self>) -> Result<(), WorkQueueError> {
         let mut state = self.lock_state()?;
         let index = Self::message_index(&state, self.message_id)
@@ -207,9 +207,12 @@ impl WorkQueueDelivery for InMemoryDelivery {
     }
 
     fn retry(self: Box<Self>, options: WorkQueueRetryOptions) -> Result<(), WorkQueueError> {
-        let now = Instant::now();
-        let delay = options.delay().unwrap_or(Duration::ZERO);
-        let available_at = checked_add(now, delay, "retry delay")?;
+        if options.delay().is_some() {
+            return Err(WorkQueueError::unsupported(
+                "memory queue realization did not negotiate `delayed-retry`",
+            ));
+        }
+
         let mut state = self.lock_state()?;
         let index = Self::message_index(&state, self.message_id)
             .ok_or_else(|| WorkQueueError::invalid_delivery("queue delivery no longer exists"))?;
@@ -218,16 +221,9 @@ impl WorkQueueDelivery for InMemoryDelivery {
             .messages
             .get_mut(index)
             .ok_or_else(|| WorkQueueError::invalid_delivery("queue delivery no longer exists"))?;
-        message.available_at = available_at;
         message.lease_until = None;
         Ok(())
     }
-}
-
-fn checked_add(now: Instant, duration: Duration, field: &str) -> Result<Instant, WorkQueueError> {
-    now.checked_add(duration).ok_or_else(|| {
-        WorkQueueError::invalid_request(format!("{field} exceeds the supported time range"))
-    })
 }
 
 /// Provider-realization adapter for the local in-memory work queue.
@@ -291,7 +287,7 @@ mod tests {
     };
     use presolve_provider_sdk::{
         WORK_QUEUE_INTERFACE, WorkQueueErrorCode, WorkQueueProvider, WorkQueueReceiveOptions,
-        WorkQueueSendOptions,
+        WorkQueueRetryOptions, WorkQueueSendOptions,
     };
     use semver::Version;
 
@@ -349,24 +345,49 @@ mod tests {
     }
 
     #[test]
-    fn delivery_attempt_increments_on_redelivery() {
+    fn baseline_hides_delivery_attempt_metadata() {
         let provider = InMemoryWorkQueueProvider::with_default_lease(Duration::ZERO);
         provider
             .send(b"attempt", WorkQueueSendOptions::default())
             .expect("send should succeed");
-        let first = provider
+        let delivery = provider
             .receive(WorkQueueReceiveOptions::default())
-            .expect("first receive should succeed")
-            .expect("first delivery should exist");
-        assert_eq!(first.delivery_attempt(), Some(1));
-        drop(first);
+            .expect("receive should succeed")
+            .expect("delivery should exist");
 
-        let second = provider
+        assert_eq!(delivery.delivery_attempt(), None);
+        delivery.ack().expect("ack should succeed");
+    }
+
+    #[test]
+    fn baseline_rejects_unnegotiated_optional_parameters() {
+        let provider = InMemoryWorkQueueProvider::new();
+        let delayed_send = provider
+            .send(
+                b"delayed",
+                WorkQueueSendOptions::new().with_delay(Duration::from_secs(1)),
+            )
+            .expect_err("delayed send should require negotiation");
+        assert_eq!(delayed_send.code(), WorkQueueErrorCode::Unsupported);
+
+        let custom_lease = provider
+            .receive(
+                WorkQueueReceiveOptions::new().with_lease_duration(Duration::from_secs(1)),
+            )
+            .expect_err("custom lease should require negotiation");
+        assert_eq!(custom_lease.code(), WorkQueueErrorCode::Unsupported);
+
+        provider
+            .send(b"retry", WorkQueueSendOptions::default())
+            .expect("baseline send should succeed");
+        let delivery = provider
             .receive(WorkQueueReceiveOptions::default())
-            .expect("second receive should succeed")
-            .expect("second delivery should exist");
-        assert_eq!(second.delivery_attempt(), Some(2));
-        second.ack().expect("ack should succeed");
+            .expect("baseline receive should succeed")
+            .expect("delivery should exist");
+        let delayed_retry = delivery
+            .retry(WorkQueueRetryOptions::new().with_delay(Duration::from_secs(1)))
+            .expect_err("delayed retry should require negotiation");
+        assert_eq!(delayed_retry.code(), WorkQueueErrorCode::Unsupported);
     }
 
     #[test]
