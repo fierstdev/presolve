@@ -9,29 +9,32 @@
   <meta name="theme-color" content="#0a0a0a">
   <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/navigation.css">
   <link rel="stylesheet" href="/docs/mobile.css">
   <link rel="stylesheet" href="/docs/docs.css">
+  <script src="/site.js" defer></script>
 </head>
 <body>
-  <header class="site-header"><div class="shell nav-shell"><a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+  <header class="site-header"><div class="shell nav-shell"><a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#how">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
 
   <main>
     <section class="page-hero shell">
-      <span class="kicker">Capability contracts</span>
-      <h1>Request semantics, not vendors.</h1>
-      <p>Capabilities describe what an application needs and what a provider guarantees, independently of cloud, protocol, runtime, or implementation language.</p>
+      <span class="kicker">Capabilities</span>
+      <h1>Request behavior, not vendors.</h1>
+      <p>A capability describes what an application needs and what a provider guarantees, independently of cloud vendor, protocol, runtime, or implementation language.</p>
     </section>
 
     <div class="docs-layout shell">
       <aside class="docs-nav">
         <strong>Documentation</strong>
         <a href="/docs/">Overview</a>
-        <a href="/docs/model/">The model</a>
-        <a href="/docs/application/">Application Contract</a>
-        <a href="/docs/environment/">Environment</a>
-        <a href="/docs/releases/">Immutable releases</a>
+        <a href="/docs/getting-started/">Getting started</a>
+        <a href="/docs/cli/">CLI & workflows</a>
+        <a href="/docs/application/">Define your application</a>
+        <a href="/docs/environment/">Define an environment</a>
+        <a href="/docs/releases/">Built releases</a>
         <a href="/docs/capabilities/" aria-current="page">Capabilities</a>
-        <a href="/docs/cli/">CLI + planning</a>
+        <a href="/docs/model/">Architecture</a>
         <a href="/docs/proofs/">Proofs</a>
       </aside>
 
@@ -40,7 +43,7 @@
         <p class="doc-lede">A Presolve capability contract has a stable semantic identity, a version, baseline operations, mandatory guarantees, and optional feature vocabulary. Providers advertise the exact version and features they really support; applications declare what they require or prefer.</p>
 
         <section id="negotiation">
-          <span class="kicker">Negotiation</span>
+          <span class="kicker">Matching</span>
           <h2>Required is a constraint. Preferred is a ranking signal.</h2>
           <div class="code-block"><pre><code>[[capabilities]]
 interface = "presolve:objects/store"
@@ -51,7 +54,7 @@ preferred_features = ["user-metadata"]</code></pre></div>
             <div class="doc-sequence-step"><span>01</span><div><strong>Match interface + version.</strong><p>The environment advertises concrete supply such as <code>presolve:objects/store@0.1.0</code>.</p></div></div>
             <div class="doc-sequence-step"><span>02</span><div><strong>Enforce required features.</strong><p>If a provider lacks <code>range-read</code>, it is not compatible for this application.</p></div></div>
             <div class="doc-sequence-step"><span>03</span><div><strong>Rank preferred features.</strong><p><code>user-metadata</code> may make one otherwise-compatible provider preferable without making the environment invalid.</p></div></div>
-            <div class="doc-sequence-step"><span>04</span><div><strong>Record what was negotiated.</strong><p>The DeploymentPlan exposes the selected ProviderId, version, and requested features actually satisfied.</p></div></div>
+            <div class="doc-sequence-step"><span>04</span><div><strong>Record what was matched.</strong><p>The deployment plan exposes the selected provider ID, version, and requested features actually satisfied.</p></div></div>
           </div>
         </section>
 
@@ -60,7 +63,7 @@ preferred_features = ["user-metadata"]</code></pre></div>
           <h2>The current capability surface.</h2>
           <div class="doc-table-wrap">
             <table class="doc-table">
-              <thead><tr><th>Capability</th><th>Baseline operations</th><th>Current realizations</th><th>Evidence</th></tr></thead>
+              <thead><tr><th>Capability</th><th>Baseline operations</th><th>Current providers</th><th>Evidence</th></tr></thead>
               <tbody>
                 <tr><td><code>presolve:kv/store@0.1.0</code></td><td>get · set · delete</td><td>memory · Redis · Cloudflare Workers KV</td><td><span class="doc-pill proven">same-release proof</span></td></tr>
                 <tr><td><code>presolve:objects/store@0.1.0</code></td><td>get · put · head · list · delete</td><td>memory · S3-compatible</td><td><span class="doc-pill proven">same-release proof</span></td></tr>
@@ -77,7 +80,7 @@ preferred_features = ["user-metadata"]</code></pre></div>
           <p>The smallest built-in contract establishes exact-key state semantics without prescribing whether the implementation is an in-process map, Redis, or a managed cloud KV service.</p>
           <h3>Mandatory guarantees</h3>
           <div class="doc-pill-row"><span class="doc-pill">exact-key-identity</span><span class="doc-pill">missing-distinct-from-empty</span><span class="doc-pill">set-replaces-value</span></div>
-          <p>There are currently no optional KV features in the 0.1 contract. The flagship proof exercises memory, Redis, and Cloudflare resolution with the same immutable application release.</p>
+          <p>There are currently no optional KV features in the 0.1 contract. The flagship proof exercises memory, Redis, and Cloudflare resolution with the same application release.</p>
         </section>
 
         <section id="objects">
@@ -120,22 +123,22 @@ preferred_features = ["returning"]</code></pre></div>
 
         <section id="transport">
           <span class="kicker">Transport independence</span>
-          <h2>WIT is a binding target, not the semantic contract.</h2>
+          <h2>WIT is one binding target, not the semantic contract.</h2>
           <div class="doc-diagram">
             <div class="doc-flow compact">
-              <div class="doc-node accent"><small>Canonical</small><strong>Capability Contract</strong><span>operations · guarantees · features</span></div>
+              <div class="doc-node accent"><small>Canonical</small><strong>Capability contract</strong><span>operations · guarantees · features</span></div>
               <div class="doc-arrow">→</div>
               <div class="doc-node"><small>Projection</small><strong>WIT / Rust SDK</strong><span>typed binding surface</span></div>
               <div class="doc-arrow">→</div>
-              <div class="doc-node good"><small>Realization</small><strong>Provider implementation</strong><span>Redis · S3 · PostgreSQL · etc.</span></div>
+              <div class="doc-node good"><small>Implementation</small><strong>Provider</strong><span>Redis · S3 · PostgreSQL · etc.</span></div>
             </div>
           </div>
           <p>Capability semantics remain independent of ABI, protocol, deployment platform, or implementation language. A future non-Wasm workload can still request the same semantic capability.</p>
-          <a class="source-link" href="https://github.com/fierstdev/presolve/tree/main/crates/presolve-capability/src">View canonical contract definitions on GitHub ↗</a>
+          <a class="source-link" href="https://github.com/fierstdev/presolve/tree/main/crates/presolve-capability/src">Canonical contract definitions on GitHub ↗</a>
         </section>
 
         <section id="limits">
-          <span class="kicker">What comes next</span>
+          <span class="kicker">Current limits</span>
           <h2>Boolean features will not be enough forever.</h2>
           <p>Real providers have exposed semantic dimensions that are values rather than yes/no features: key-size limits, SQL limits, queue message-size limits, retention ranges, lease-duration ranges, and similar constraints. Presolve has not added a typed semantic-property system yet; provider evidence will determine what that model needs.</p>
           <a class="link-card" href="/docs/proofs/"><strong>See the proof evidence</strong><span>How real providers have already changed and sharpened the abstractions.</span></a>
