@@ -1,0 +1,19 @@
+name: Temporary queue runtime proof
+
+on:
+  push:
+    branches:
+      - tmp/queue-runtime-proof
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt --target wasm32-wasip2
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Clippy queue slice
+        run: cargo clippy -p presolve-capability -p presolve-provider-sdk -p presolve-provider-conformance -p presolve-provider-queue-memory -p presolve-runtime -p presolve-node --all-targets -- -D warnings
+      - name: Execute queue runtime proof
+        run: bash ./scripts/check-queue-portability.sh
