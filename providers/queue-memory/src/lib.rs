@@ -374,9 +374,11 @@ mod tests {
             .expect_err("delayed send should require negotiation");
         assert_eq!(delayed_send.code(), WorkQueueErrorCode::Unsupported);
 
-        let custom_lease = provider
+        let Err(custom_lease) = provider
             .receive(WorkQueueReceiveOptions::new().with_lease_duration(Duration::from_secs(1)))
-            .expect_err("custom lease should require negotiation");
+        else {
+            panic!("custom lease should require negotiation");
+        };
         assert_eq!(custom_lease.code(), WorkQueueErrorCode::Unsupported);
 
         provider
