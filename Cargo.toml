@@ -24,6 +24,7 @@ members = [
     "providers/sql-sqlite",
     "providers/sql-postgres",
     "providers/queue-memory",
+    "providers/queue-redis",
     "executors/docker",
 ]
 exclude = [
@@ -94,6 +95,7 @@ presolve-provider-objects-s3 = { path = "providers/objects-s3" }
 presolve-provider-sql-sqlite = { path = "providers/sql-sqlite" }
 presolve-provider-sql-postgres = { path = "providers/sql-postgres" }
 presolve-provider-queue-memory = { path = "providers/queue-memory" }
+presolve-provider-queue-redis = { path = "providers/queue-redis" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
