@@ -3,74 +3,80 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Documentation — Presolve</title>
-  <meta name="description" content="Presolve documentation: core model, Application Contracts, environments, immutable releases, capability contracts, CLI planning, and executable portability proofs.">
+  <meta name="description" content="Get started with Presolve: build an application once, check whether an environment can run it, inspect the deployment plan, and learn the architecture when you need it.">
   <link rel="canonical" href="https://presolve.dev/docs/">
   <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
 </head>
 <body>
-<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#how">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
 <main>
-<section class="page-hero shell"><span class="kicker">Documentation</span><h1>Understand the model.<br>Then run the proof.</h1><p>Presolve separates immutable application identity from deployment supply. These docs cover the model, the concrete files, semantic capability negotiation, planning, and the public evidence behind the portability claim.</p></section>
+<section class="page-hero shell"><span class="kicker">Documentation</span><h1>Get running first.<br>Learn the model as you need it.</h1><p>Start with the CLI workflow: inspect your app, build it, check whether an environment can run it, and see what Presolve selected. The architecture reference is here when you want to go deeper.</p></section>
 <div class="docs-layout shell">
-<aside class="docs-nav"><strong>Documentation</strong><a href="/docs/" aria-current="page">Overview</a><a href="/docs/model/">The model</a><a href="/docs/application/">Application Contract</a><a href="/docs/environment/">Environment</a><a href="/docs/releases/">Immutable releases</a><a href="/docs/capabilities/">Capabilities</a><a href="/docs/cli/">CLI + planning</a><a href="/docs/proofs/">Proofs</a></aside>
+<aside class="docs-nav"><strong>Documentation</strong><a href="/docs/" aria-current="page">Start here</a><a href="/docs/cli/">CLI + quickstart</a><a href="/docs/application/">Describe your app</a><a href="/docs/environment/">Describe an environment</a><a href="/docs/releases/">Built releases</a><a href="/docs/capabilities/">Services + capabilities</a><a href="/docs/model/">Architecture</a><a href="/docs/proofs/">Proofs</a></aside>
 <article class="docs-content">
-<p class="doc-lede">The website is the primary documentation reading surface. Repository Markdown remains available as the canonical implementation/audit trail, but you should not need to leave presolve.dev to understand how Presolve works.</p>
+<p class="doc-lede">You do not need to understand Presolve's internal terminology before using it. The shortest path is: install the CLI, run the core commands, then read the deeper reference only when a concept becomes relevant.</p>
 
-<section id="start"><span class="kicker">Start here</span><h2>Read in this order.</h2>
-<div class="docs-hub-grid">
-<a class="doc-card" href="/docs/model/"><span class="doc-card-index">01 · Concept</span><strong>The Presolve model</strong><p>Application demand, environment supply, deterministic resolution, symbolic plans, and provider realization.</p></a>
-<a class="doc-card" href="/docs/application/"><span class="doc-card-index">02 · Authoring</span><strong>Application Contract</strong><p>Write <code>presolve.toml</code> without selecting infrastructure.</p></a>
-<a class="doc-card" href="/docs/environment/"><span class="doc-card-index">03 · Supply</span><strong>Environment Specification</strong><p>Declare workload support, capacity, ProviderIds, versions, and semantic features.</p></a>
-<a class="doc-card" href="/docs/releases/"><span class="doc-card-index">04 · Distribution</span><strong>Immutable releases</strong><p>Understand <code>.presolved</code>, deterministic identity, and what deployment details are excluded.</p></a>
-<a class="doc-card" href="/docs/capabilities/"><span class="doc-card-index">05 · Semantics</span><strong>Capability contracts</strong><p>KV, object storage, SQL, and leased work-queue semantics with current provider coverage.</p></a>
-<a class="doc-card" href="/docs/cli/"><span class="doc-card-index">06 · Workflow</span><strong>CLI + planning</strong><p>Inspect, build, check, plan, manage environments, use JSON output, and run local development.</p></a>
-<a class="doc-card" href="/docs/proofs/"><span class="doc-card-index">07 · Evidence</span><strong>Proofs</strong><p>Exact digests, provider matrices, proof commands, semantic failures, and explicit non-claims.</p></a>
-<a class="doc-card" href="/status/"><span class="doc-card-index">08 · Reality</span><strong>Current status</strong><p>What is implemented today, what is still pre-stable, and what comes next.</p></a>
-</div></section>
-
-<section id="quickstart"><span class="kicker">Developer Preview</span><h2>Clone it and ask Presolve questions.</h2>
+<section id="quickstart"><span class="kicker">Quickstart</span><h2>Run Presolve from the repository.</h2>
 <div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
 cd presolve
 cargo build -p presolve-cli
 export PATH="$PWD/target/debug:$PATH"
 
-presolve env init
-presolve inspect
-presolve check
-presolve plan</code></pre></div>
-<p>The four core commands answer different questions: what does the app require, what immutable release are we distributing, can this environment satisfy it, and what exact provider/workload selections did the resolver make?</p>
-<div class="hero-actions"><a class="button primary" href="/docs/cli/">CLI guide</a><a class="button secondary" href="/docs/model/">Understand the model</a></div></section>
+presolve --help</code></pre></div>
+<p>Presolve is still in developer preview, so the current CLI is built from source. Once it is available on your path, the main workflow is deliberately small.</p>
+<div class="hero-actions"><a class="button primary" href="/docs/cli/">Open the CLI quickstart</a><a class="button secondary" href="/proof/">See a complete proof</a></div></section>
 
-<section id="proof"><span class="kicker">Executable evidence</span><h2>Current coverage spans four capability families.</h2>
-<div class="doc-proof-map">
-<div class="doc-proof-row"><strong>KV</strong><code>kv/store</code><span>memory · Redis · Cloudflare KV</span><span class="doc-pill proven">same-release</span></div>
-<div class="doc-proof-row"><strong>Objects</strong><code>objects/store</code><span>memory · S3-compatible</span><span class="doc-pill proven">same-release</span></div>
-<div class="doc-proof-row"><strong>SQL</strong><code>sql/database</code><span>SQLite · PostgreSQL</span><span class="doc-pill proven">same-release</span></div>
-<div class="doc-proof-row"><strong>Queue</strong><code>queue/work-queue</code><span>leased in-memory provider</span><span class="doc-pill next">capability proof</span></div>
+<section id="workflow"><span class="kicker">Core workflow</span><h2>Think in questions, not Presolve vocabulary.</h2>
+<div class="doc-sequence">
+<div class="doc-sequence-step"><span>01</span><div><strong><code>presolve inspect</code> — What does Presolve think my app needs?</strong><p>See the application definition without selecting any infrastructure.</p></div></div>
+<div class="doc-sequence-step"><span>02</span><div><strong><code>presolve build</code> — What exact build am I shipping?</strong><p>Create a <code>.presolved</code> package that does not contain environment-specific choices.</p></div></div>
+<div class="doc-sequence-step"><span>03</span><div><strong><code>presolve check</code> — Can this environment run it?</strong><p>Verify compatibility before execution. If it cannot run, Presolve explains what is missing.</p></div></div>
+<div class="doc-sequence-step"><span>04</span><div><strong><code>presolve plan</code> — What will it actually use?</strong><p>Inspect the runtime and provider selections Presolve made for this environment.</p></div></div>
 </div>
-<div class="code-block"><pre><code># flagship KV proof
-bash ./demo/portability/run.sh
+<p><a href="/docs/cli/">See commands, output, JSON automation, and local development →</a></p></section>
 
-# additional independent proof jobs
-bash ./scripts/check-object-portability.sh
-bash ./scripts/check-sql-portability.sh
-bash ./scripts/check-queue-portability.sh</code></pre></div>
-<p><a href="/docs/proofs/">Explore the evidence and provider differences →</a></p></section>
+<section id="files"><span class="kicker">The three files you'll meet</span><h2>The names are less important than what each one answers.</h2>
+<div class="docs-hub-grid">
+<a class="doc-card" href="/docs/application/"><span class="doc-card-index">Your app</span><strong><code>presolve.toml</code></strong><p>What is this application, and what does it need in order to run?</p></a>
+<a class="doc-card" href="/docs/environment/"><span class="doc-card-index">A place it can run</span><strong><code>presolve.env.toml</code></strong><p>What runtimes, services, and resources are available in this environment?</p></a>
+<a class="doc-card" href="/docs/releases/"><span class="doc-card-index">The thing you ship</span><strong><code>application.presolved</code></strong><p>The packaged application produced by <code>presolve build</code>. It stays the same when you evaluate another environment.</p></a>
+<a class="doc-card" href="/docs/cli/"><span class="doc-card-index">The answer</span><strong>Deployment plan</strong><p>What Presolve selected when it matched one application build to one environment.</p></a>
+</div></section>
 
-<section id="current-capabilities"><span class="kicker">Built-in semantics</span><h2>Applications can currently request these contracts.</h2>
-<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Interface</th><th>Version</th><th>Baseline focus</th></tr></thead><tbody>
-<tr><td><code>presolve:kv/store</code></td><td>0.1.0</td><td>exact-key get/set/delete</td></tr>
-<tr><td><code>presolve:objects/store</code></td><td>0.1.0</td><td>opaque objects, metadata, list, streamed read</td></tr>
-<tr><td><code>presolve:sql/database</code></td><td>0.1.0</td><td>bound parameters, portable scalar/results, transactions</td></tr>
-<tr><td><code>presolve:queue/work-queue</code></td><td>0.1.0</td><td>at-least-once leased delivery, ack, retry</td></tr>
-</tbody></table></div>
-<p><a href="/docs/capabilities/">Read the semantic guarantees and optional features →</a></p></section>
+<section id="learn"><span class="kicker">Learn when needed</span><h2>Choose the thing you are trying to do.</h2>
+<div class="docs-hub-grid">
+<a class="doc-card" href="/docs/cli/"><span class="doc-card-index">01 · Use it</span><strong>CLI + quickstart</strong><p>Build, inspect, check, plan, run locally, and use machine-readable output.</p></a>
+<a class="doc-card" href="/docs/application/"><span class="doc-card-index">02 · Define an app</span><strong>Application file</strong><p>Describe workloads, required services, resources, and network intent.</p></a>
+<a class="doc-card" href="/docs/environment/"><span class="doc-card-index">03 · Define a target</span><strong>Environment file</strong><p>Describe what an environment can execute and which providers it makes available.</p></a>
+<a class="doc-card" href="/docs/capabilities/"><span class="doc-card-index">04 · Add services</span><strong>Capabilities</strong><p>Understand Presolve's portable contracts for KV, objects, SQL, queues, and future services.</p></a>
+<a class="doc-card" href="/docs/releases/"><span class="doc-card-index">05 · Ship builds</span><strong>Built releases</strong><p>Understand what goes into <code>.presolved</code> and why environment configuration stays out.</p></a>
+<a class="doc-card" href="/docs/model/"><span class="doc-card-index">06 · Go deeper</span><strong>Architecture</strong><p>Read the formal application/environment/provider/resolution model after the workflow is familiar.</p></a>
+<a class="doc-card" href="/docs/proofs/"><span class="doc-card-index">07 · Verify it</span><strong>Proofs</strong><p>Run the same-build portability checks and inspect exact evidence.</p></a>
+<a class="doc-card" href="/status/"><span class="doc-card-index">08 · Check reality</span><strong>Current status</strong><p>See what works today, what is still pre-stable, and what remains unfinished.</p></a>
+</div></section>
 
-<section id="boundaries"><span class="kicker">Mental model</span><h2>Keep these boundaries visible.</h2>
-<div class="doc-boundary-grid"><div class="doc-boundary good"><strong>Application</strong><ul><li>requirements</li><li>workload identity</li><li>capability semantics</li><li>resource/network intent</li></ul></div><div class="doc-boundary no"><strong>Realization</strong><ul><li>provider endpoints</li><li>credentials/secrets</li><li>database paths</li><li>cloud account/bucket/namespace configuration</li></ul></div></div></section>
+<section id="proof"><span class="kicker">What works today</span><h2>Current proofs cover several kinds of infrastructure.</h2>
+<div class="doc-proof-map">
+<div class="doc-proof-row"><strong>Key-value storage</strong><code>kv/store</code><span>memory · Redis · Cloudflare KV</span><span class="doc-pill proven">same build</span></div>
+<div class="doc-proof-row"><strong>Object storage</strong><code>objects/store</code><span>memory · S3-compatible</span><span class="doc-pill proven">same build</span></div>
+<div class="doc-proof-row"><strong>SQL</strong><code>sql/database</code><span>SQLite · PostgreSQL</span><span class="doc-pill proven">same build</span></div>
+<div class="doc-proof-row"><strong>Queues</strong><code>queue/work-queue</code><span>leased in-memory provider</span><span class="doc-pill next">capability proof</span></div>
+</div>
+<p><a href="/docs/proofs/">Explore the proof commands and provider differences →</a></p></section>
 
-<section id="source"><span class="kicker">Auditability</span><h2>The website explains; the repository proves.</h2><p>Every page links back to the relevant implementation/reference source when deeper auditing is useful. The website intentionally summarizes and visualizes the current model rather than hiding the docs behind GitHub's Markdown renderer.</p>
+<section id="terminology"><span class="kicker">When the docs get technical</span><h2>Translate the jargon back to these simple ideas.</h2>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Technical term</th><th>Plain meaning</th></tr></thead><tbody>
+<tr><td>Application Contract</td><td>the file describing your app and what it needs</td></tr>
+<tr><td>Environment Specification</td><td>the file describing what a target environment can provide</td></tr>
+<tr><td>Capability</td><td>a service or behavior your app needs, such as key-value storage or SQL</td></tr>
+<tr><td>Provider</td><td>the concrete implementation that supplies a capability</td></tr>
+<tr><td>Resolution</td><td>checking compatibility and choosing matching providers</td></tr>
+<tr><td>DeploymentPlan</td><td>the recorded result of those choices</td></tr>
+<tr><td>Immutable release</td><td>the same packaged application build, unchanged between environments</td></tr>
+</tbody></table></div></section>
+
+<section id="source"><span class="kicker">Need the specification?</span><h2>The website teaches the workflow; the repository carries the full technical record.</h2><p>Deep implementation details, canonical schemas, diagnostics, and development checkpoints remain in the repository for auditing and contributor work.</p>
 <div class="hero-actions"><a class="button secondary" href="https://github.com/fierstdev/presolve/tree/main/docs">Repository documentation ↗</a><a class="button secondary" href="https://github.com/fierstdev/presolve">Source repository ↗</a></div></section>
 </article></div></main>
 <footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
