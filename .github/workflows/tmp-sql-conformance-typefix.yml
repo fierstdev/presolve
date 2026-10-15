@@ -1,0 +1,81 @@
+name: Temporary SQL conformance type fix
+
+on:
+  push:
+    branches:
+      - tmp/sql-conformance-typefix
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: proof/sqlite-postgres-portability
+          fetch-depth: 0
+      - run: rustup toolchain install stable --profile minimal --component rustfmt
+      - name: Apply type-safe conformance fixture
+        run: |
+          git fetch origin runtime/sql-capability-binding
+          git checkout origin/runtime/sql-capability-binding -- crates/presolve-provider-conformance/src/sql.rs
+          python - <<'PY'
+          from pathlib import Path
+
+          sqlite = Path('providers/sql-sqlite/src/lib.rs')
+          text = sqlite.read_text()
+          text = text.replace(
+              'CREATE TABLE presolve_conformance (id INTEGER PRIMARY KEY, label TEXT NOT NULL, optional_value BLOB)',
+              'CREATE TABLE presolve_conformance (id INTEGER PRIMARY KEY, label TEXT NOT NULL, optional_text TEXT, bytes_value BLOB)'
+          )
+          text = text.replace(
+              'INSERT INTO presolve_conformance (id, label, optional_value) VALUES ($1, $2, $3)',
+              'INSERT INTO presolve_conformance (id, label, optional_text, bytes_value) VALUES ($1, $2, $3, $4)'
+          )
+          text = text.replace(
+              'SELECT id, label, optional_value FROM presolve_conformance WHERE id = $1 ORDER BY id',
+              'SELECT id, label, optional_text, bytes_value FROM presolve_conformance WHERE id = $1 ORDER BY id'
+          )
+          sqlite.write_text(text)
+
+          checkpoint = Path('crates/presolve-node/examples/sql_provider_conformance_checkpoint.rs')
+          text = checkpoint.read_text()
+          text = text.replace(
+              'INSERT INTO presolve_conformance (id, label, optional_value) VALUES ($1, $2, $3)',
+              'INSERT INTO presolve_conformance (id, label, optional_text, bytes_value) VALUES ($1, $2, $3, $4)'
+          )
+          text = text.replace(
+              'SELECT id, label, optional_value FROM presolve_conformance WHERE id = $1 ORDER BY id',
+              'SELECT id, label, optional_text, bytes_value FROM presolve_conformance WHERE id = $1 ORDER BY id'
+          )
+          text = text.replace(
+              'CREATE TABLE IF NOT EXISTS presolve_conformance (id INTEGER PRIMARY KEY, label TEXT NOT NULL, optional_value BLOB)',
+              'CREATE TABLE IF NOT EXISTS presolve_conformance (id INTEGER PRIMARY KEY, label TEXT NOT NULL, optional_text TEXT, bytes_value BLOB)'
+          )
+          text = text.replace(
+              'CREATE TABLE IF NOT EXISTS presolve_conformance (id BIGINT PRIMARY KEY, label TEXT NOT NULL, optional_value BYTEA)',
+              'CREATE TABLE IF NOT EXISTS presolve_conformance (id BIGINT PRIMARY KEY, label TEXT NOT NULL, optional_text TEXT, bytes_value BYTEA)'
+          )
+          checkpoint.write_text(text)
+
+          postgres = Path('providers/sql-postgres/src/lib.rs')
+          text = postgres.read_text()
+          old = '''    let rows = client\n        .query(statement, &refs)\n        .map_err(|error| map_postgres_error(&error))?;\n    let columns = rows.first().map_or_else(Vec::new, |row| {\n        row.columns()\n            .iter()\n            .map(|column| SqlColumn::new(column.name()))\n            .collect()\n    });\n'''
+          new = '''    let prepared = client\n        .prepare(statement)\n        .map_err(|error| map_postgres_error(&error))?;\n    let columns = prepared\n        .columns()\n        .iter()\n        .map(|column| SqlColumn::new(column.name()))\n        .collect::<Vec<_>>();\n    let rows = client\n        .query(&prepared, &refs)\n        .map_err(|error| map_postgres_error(&error))?;\n'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('PostgreSQL query metadata block not found')
+          postgres.write_text(text)
+          PY
+          cargo fmt --all
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/presolve-provider-conformance/src/sql.rs \
+                  providers/sql-sqlite/src/lib.rs \
+                  providers/sql-postgres/src/lib.rs \
+                  crates/presolve-node/examples/sql_provider_conformance_checkpoint.rs
+          git commit -m "fix: make SQL conformance typed-schema portable"
+          git push origin HEAD:proof/sqlite-postgres-portability
