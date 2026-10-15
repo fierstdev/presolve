@@ -11,10 +11,10 @@ use presolve_provider_sdk::{
 /// execution, value, result, and transaction semantics.
 #[derive(Debug, Clone, Copy)]
 pub struct SqlConformanceFixture {
-    /// Inserts `(id, label, optional_value)` into the conformance table.
+    /// Inserts `(id, label, optional_text, bytes_value)` into the conformance table.
     pub insert: &'static str,
 
-    /// Selects exactly `id, label, optional_value` for one bound `id`.
+    /// Selects exactly `id, label, optional_text, bytes_value` for one bound `id`.
     pub select_by_id: &'static str,
 
     /// Updates `label` for one bound `id`.
@@ -42,6 +42,7 @@ pub fn assert_sql_database_conformance(
         cleanup(provider, fixture, BASE_ID + offset);
     }
 
+    assert_empty_result_preserves_columns(provider, fixture, BASE_ID + 7);
     assert_scalar_round_trip(provider, fixture, BASE_ID);
     assert_bound_values_remain_data(provider, fixture, BASE_ID + 1);
     assert_null_is_distinct_from_empty(provider, fixture, BASE_ID + 2, BASE_ID + 3);
@@ -52,6 +53,16 @@ pub fn assert_sql_database_conformance(
     for offset in 0..8 {
         cleanup(provider, fixture, BASE_ID + offset);
     }
+}
+
+fn assert_empty_result_preserves_columns(
+    provider: &dyn SqlDatabaseProvider,
+    fixture: SqlConformanceFixture,
+    id: i64,
+) {
+    let (columns, rows) = query_rows(provider, fixture.select_by_id, &[SqlValue::Integer(id)]);
+    assert_columns(&columns);
+    assert!(rows.is_empty(), "absent row query should remain empty");
 }
 
 fn assert_scalar_round_trip(
@@ -65,6 +76,7 @@ fn assert_scalar_round_trip(
             &[
                 SqlValue::Integer(id),
                 SqlValue::Text("baseline".to_owned()),
+                SqlValue::Text("present".to_owned()),
                 SqlValue::Bytes(vec![0, 1, 2, 255]),
             ],
         )
@@ -79,6 +91,7 @@ fn assert_scalar_round_trip(
         [
             SqlValue::Integer(id),
             SqlValue::Text("baseline".to_owned()),
+            SqlValue::Text("present".to_owned()),
             SqlValue::Bytes(vec![0, 1, 2, 255]),
         ]
     );
@@ -97,6 +110,7 @@ fn assert_bound_values_remain_data(
             &[
                 SqlValue::Integer(id),
                 SqlValue::Text(hostile.to_owned()),
+                SqlValue::Null,
                 SqlValue::Null,
             ],
         )
@@ -120,6 +134,7 @@ fn assert_null_is_distinct_from_empty(
                 SqlValue::Integer(null_id),
                 SqlValue::Text("null".to_owned()),
                 SqlValue::Null,
+                SqlValue::Null,
             ],
         )
         .expect("null insert should succeed");
@@ -131,9 +146,10 @@ fn assert_null_is_distinct_from_empty(
                 SqlValue::Integer(empty_id),
                 SqlValue::Text("empty".to_owned()),
                 SqlValue::Text(String::new()),
+                SqlValue::Bytes(Vec::new()),
             ],
         )
-        .expect("empty-text insert should succeed");
+        .expect("empty scalar insert should succeed");
 
     let (_, null_rows) = query_rows(
         provider,
@@ -147,7 +163,9 @@ fn assert_null_is_distinct_from_empty(
     );
 
     assert_eq!(null_rows[0].values()[2], SqlValue::Null);
+    assert_eq!(null_rows[0].values()[3], SqlValue::Null);
     assert_eq!(empty_rows[0].values()[2], SqlValue::Text(String::new()));
+    assert_eq!(empty_rows[0].values()[3], SqlValue::Bytes(Vec::new()));
 }
 
 fn assert_explicit_rollback(
@@ -165,6 +183,7 @@ fn assert_explicit_rollback(
             &[
                 SqlValue::Integer(id),
                 SqlValue::Text("rollback".to_owned()),
+                SqlValue::Null,
                 SqlValue::Null,
             ],
         )
@@ -191,6 +210,7 @@ fn assert_ordered_transaction_commit(
             &[
                 SqlValue::Integer(id),
                 SqlValue::Text("first".to_owned()),
+                SqlValue::Null,
                 SqlValue::Null,
             ],
         )
@@ -230,6 +250,7 @@ fn assert_dropped_transaction_rolls_back(
                 SqlValue::Integer(id),
                 SqlValue::Text("drop".to_owned()),
                 SqlValue::Null,
+                SqlValue::Null,
             ],
         )
         .expect("transactional insert should succeed");
@@ -266,8 +287,9 @@ fn query_rows(
 }
 
 fn assert_columns(columns: &[SqlColumn]) {
-    assert_eq!(columns.len(), 3);
+    assert_eq!(columns.len(), 4);
     assert_eq!(columns[0].name(), "id");
     assert_eq!(columns[1].name(), "label");
-    assert_eq!(columns[2].name(), "optional_value");
+    assert_eq!(columns[2].name(), "optional_text");
+    assert_eq!(columns[3].name(), "bytes_value");
 }
