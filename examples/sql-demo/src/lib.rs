@@ -145,14 +145,16 @@ fn verify_result(
         Err(error) => return Err(format!("error:row:{}", error_code(error))),
     };
 
-    if row.values
-        != [
-            database::Value::Integer(id),
-            database::Value::Text(label.to_owned()),
-            database::Value::Bytes(payload.to_vec()),
-        ]
-    {
+    let [actual_id, actual_label, actual_payload] = row.values.as_slice() else {
         return Err("error:row-values".to_owned());
+    };
+    match (actual_id, actual_label, actual_payload) {
+        (
+            database::Value::Integer(actual_id),
+            database::Value::Text(actual_label),
+            database::Value::Bytes(actual_payload),
+        ) if *actual_id == id && actual_label == label && actual_payload.as_slice() == payload => {}
+        _ => return Err("error:row-values".to_owned()),
     }
 
     match result.next_row() {
