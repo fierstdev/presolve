@@ -241,6 +241,35 @@ jobs:
       - name: Run relational SQL portability checkpoint
         run: bash ./scripts/check-sql-portability.sh
 
+  work-queue-capability:
+    name: Work queue capability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: >-
+          rustup toolchain install stable
+          --profile minimal
+          --target wasm32-wasip2
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run detached-release work-queue checkpoint
+        run: bash ./scripts/check-queue-realization.sh
+
   docker-portability:
     name: Docker portability
     runs-on: ubuntu-24.04
