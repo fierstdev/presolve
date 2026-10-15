@@ -1,0 +1,108 @@
+name: Temporary queue realization validation
+
+on:
+  push:
+    branches:
+      - tmp/queue-realization-validate
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: capability/queue-semantics
+          fetch-depth: 0
+
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+
+      - name: Wire queue realization
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('crates/presolve-node/src/realization.rs')
+          text = path.read_text()
+
+          old_import = 'use presolve_provider_sdk::{KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE, SQL_DATABASE_INTERFACE};'
+          new_import = '''use presolve_provider_sdk::{
+              KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE, SQL_DATABASE_INTERFACE, WORK_QUEUE_INTERFACE,
+          };'''
+          if old_import not in text:
+              raise SystemExit('expected provider SDK import not found')
+          text = text.replace(old_import, new_import, 1)
+
+          marker = '''            interface => {
+                return Err(
+                    ProviderMaterializationError::UnsupportedRegistryCapability {
+                        interface: interface.to_owned(),
+                    },
+                );
+            }'''
+          replacement = '''            WORK_QUEUE_INTERFACE => {
+                if registry.work_queue(provider_id).is_some() {
+                    continue;
+                }
+
+                let provider = realized.work_queue().ok_or_else(|| {
+                    ProviderMaterializationError::MissingCapabilityImplementation {
+                        provider_id,
+                        interface: request.interface().to_owned(),
+                    }
+                })?;
+
+                registry.register_work_queue(provider_id, provider)?;
+            }
+
+            interface => {
+                return Err(
+                    ProviderMaterializationError::UnsupportedRegistryCapability {
+                        interface: interface.to_owned(),
+                    },
+                );
+            }'''
+          if marker not in text:
+              raise SystemExit('expected realization match marker not found')
+          text = text.replace(marker, replacement, 1)
+          path.write_text(text)
+          PY
+
+      - name: Format
+        run: cargo fmt --all
+
+      - name: Test queue/runtime/node slice
+        run: >-
+          cargo test
+          -p presolve-capability
+          -p presolve-provider-sdk
+          -p presolve-provider-conformance
+          -p presolve-provider-realization
+          -p presolve-provider-queue-memory
+          -p presolve-runtime
+          -p presolve-node
+
+      - name: Clippy queue/runtime/node slice
+        run: >-
+          cargo clippy
+          -p presolve-capability
+          -p presolve-provider-sdk
+          -p presolve-provider-conformance
+          -p presolve-provider-realization
+          -p presolve-provider-queue-memory
+          -p presolve-runtime
+          -p presolve-node
+          --all-targets -- -D warnings
+
+      - name: Commit validated changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock crates/presolve-node/src/realization.rs crates/presolve-runtime providers/queue-memory
+          if git diff --cached --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git commit -m 'queue: complete realization and runtime validation'
+          git push origin HEAD:capability/queue-semantics
