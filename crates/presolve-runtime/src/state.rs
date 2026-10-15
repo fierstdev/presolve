@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-#[cfg(test)]
-use presolve_provider_sdk::{UnavailableSqlDatabaseProvider, UnavailableWorkQueueProvider};
 use presolve_provider_sdk::{
     KeyValueProvider, ObjectRead, ObjectStoreProvider, SqlDatabaseProvider, SqlQueryResult,
     SqlTransaction, WorkQueueDelivery, WorkQueueProvider,
 };
+#[cfg(test)]
+use presolve_provider_sdk::{UnavailableSqlDatabaseProvider, UnavailableWorkQueueProvider};
 use wasmtime::{ResourceLimiter, StoreLimits, component::ResourceTable};
 use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
 
@@ -57,23 +57,6 @@ impl RuntimeState {
             key_value_provider,
             object_store_provider,
             Arc::new(UnavailableSqlDatabaseProvider),
-            Arc::new(UnavailableWorkQueueProvider),
-        )
-    }
-
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn new_with_sql(
-        runtime_limits: RuntimeLimits,
-        key_value_provider: Arc<dyn KeyValueProvider>,
-        object_store_provider: Arc<dyn ObjectStoreProvider>,
-        sql_database_provider: Arc<dyn SqlDatabaseProvider>,
-    ) -> Self {
-        Self::new_with_capabilities(
-            runtime_limits,
-            key_value_provider,
-            object_store_provider,
-            sql_database_provider,
             Arc::new(UnavailableWorkQueueProvider),
         )
     }
