@@ -4,7 +4,7 @@
 //!
 //! Redis connection, stream, consumer-group, and lease configuration remain
 //! node-side realization concerns. Provider-native stream IDs and consumer
-//! ownership never enter the Application Contract, DeploymentPlan, or release
+//! ownership never enter the Application Contract, `DeploymentPlan`, or release
 //! identity.
 
 use std::{
@@ -330,10 +330,7 @@ enum RedisResponse {
     Array(Option<Vec<Self>>),
 }
 
-fn require_setting(
-    value: String,
-    field: &'static str,
-) -> Result<String, RedisQueueConfigError> {
+fn require_setting(value: String, field: &'static str) -> Result<String, RedisQueueConfigError> {
     if value.trim().is_empty() {
         return Err(RedisQueueConfigError::EmptySetting { field });
     }
@@ -475,7 +472,9 @@ fn parse_xreadgroup(response: RedisResponse) -> Result<Option<RedisStreamEntry>,
     }
 }
 
-fn first_stream_entry(response: &RedisResponse) -> Result<Option<RedisStreamEntry>, WorkQueueError> {
+fn first_stream_entry(
+    response: &RedisResponse,
+) -> Result<Option<RedisStreamEntry>, WorkQueueError> {
     let RedisResponse::Array(Some(entries)) = response else {
         return Err(unexpected_response("stream entries", response));
     };
@@ -592,18 +591,21 @@ impl presolve_provider_realization::ProviderAdapter for RedisWorkQueueAdapter {
         let stream = required_profile_setting(profile, REDIS_QUEUE_STREAM_SETTING)?;
         let group = required_profile_setting(profile, REDIS_QUEUE_GROUP_SETTING)?;
         let lease_ms = match profile.setting(REDIS_QUEUE_LEASE_MS_SETTING) {
-            Some(value) => value.parse::<u64>().map_err(|error| {
-                ProviderAdapterError::Configuration {
-                    message: format!("Redis queue lease_ms is invalid: {error}"),
-                }
-            })?,
+            Some(value) => {
+                value
+                    .parse::<u64>()
+                    .map_err(|error| ProviderAdapterError::Configuration {
+                        message: format!("Redis queue lease_ms is invalid: {error}"),
+                    })?
+            }
             None => DEFAULT_LEASE_MS,
         };
-        let provider = RedisWorkQueueProvider::new(address, stream, group, lease_ms).map_err(
-            |error| ProviderAdapterError::Configuration {
-                message: error.to_string(),
-            },
-        )?;
+        let provider =
+            RedisWorkQueueProvider::new(address, stream, group, lease_ms).map_err(|error| {
+                ProviderAdapterError::Configuration {
+                    message: error.to_string(),
+                }
+            })?;
 
         Ok(
             presolve_provider_realization::RealizedProvider::new(*profile.provider_id())
