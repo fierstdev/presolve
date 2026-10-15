@@ -1,199 +1,54 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Portability proof — Presolve</title>
-  <meta name="description" content="Run Presolve's flagship portability proof: one immutable application release, three environments, multiple provider realizations, zero application rebuilds.">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portability proofs — Presolve</title>
+  <meta name="description" content="Run Presolve's public portability proofs across KV, object storage, SQL, and leased queues while verifying immutable application identity.">
   <link rel="canonical" href="https://presolve.dev/proof/">
-  <meta property="og:title" content="Presolve portability proof">
-  <meta property="og:description" content="One immutable release. Three environments. Multiple provider realizations. Zero application rebuilds.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://presolve.dev/proof/">
-  <meta name="theme-color" content="#0a0a0a">
-  <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css">
+  <meta property="og:title" content="Presolve portability proofs"><meta property="og:description" content="One immutable release. Different environments and providers. Identity verified before and after execution."><meta property="og:type" content="website"><meta property="og:url" content="https://presolve.dev/proof/">
+  <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/docs/docs.css">
 </head>
 <body>
-  <header class="site-header">
-    <div class="shell nav-shell">
-      <a class="brand" href="/" aria-label="Presolve home">
-        <img src="/assets/presolve-mark.svg" alt="" width="26" height="31">
-        <span>Presolve</span>
-      </a>
-      <nav class="nav-links" aria-label="Primary navigation">
-        <a href="/#model">How it works</a>
-        <a href="/proof/">Proof</a>
-        <a href="/docs/">Docs</a>
-        <a href="/status/">Status</a>
-        <a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a>
-      </nav>
-    </div>
-  </header>
+<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+<main>
+<section class="page-hero shell"><span class="kicker">Executable portability evidence</span><h1>One release.<br>Different environments.</h1><p>Presolve builds immutable application identity before deployment selection. The public proofs then resolve and realize those exact release bytes through materially different providers and fail if the application identity changes.</p><div class="hero-actions"><a class="button primary" href="https://github.com/fierstdev/presolve/tree/main/demo/portability">Run the flagship proof ↗</a><a class="button secondary" href="/docs/proofs/">Technical walkthroughs</a></div></section>
 
-  <main>
-    <section class="page-hero shell">
-      <span class="kicker">Flagship portability proof</span>
-      <h1>One release.<br>Different environments.</h1>
-      <p>Presolve builds one immutable application release, resolves those exact bytes against different environments, realizes different providers, and verifies that the application identity never changes.</p>
-      <div class="hero-actions">
-        <a class="button primary" href="https://github.com/fierstdev/presolve/tree/main/demo/portability">Run the proof ↗</a>
-        <a class="button secondary" href="https://github.com/fierstdev/presolve/blob/main/docs/proofs/flagship-portability-walkthrough.md">Technical walkthrough ↗</a>
-      </div>
-    </section>
+<section class="section shell"><div class="section-heading compact"><span class="kicker">The invariant</span><h2>Deployment selection must not mutate the application.</h2><p>Every same-release proof records both the canonical Presolve release digest and the raw <code>.presolved</code> archive SHA-256 before environment selection, then verifies both after planning and execution.</p></div>
+<div class="model-grid"><article class="model-card"><div class="model-label">Build once</div><code>application.presolved</code><ul><li>application requirements</li><li>workload artifact identity</li><li>canonical release digest</li><li>no selected provider/environment</li></ul></article><div class="resolver-card"><div class="resolver-mark">P</div><strong>Resolver</strong><span>same release bytes</span></div><article class="model-card"><div class="model-label">Decide later</div><code>presolve.env.toml</code><ul><li>execution support</li><li>provider supply</li><li>semantic features</li><li>stable ProviderIds</li></ul></article></div></section>
 
-    <section class="section shell">
-      <div class="section-heading compact">
-        <span class="kicker">The claim</span>
-        <h2>Build software once. Decide where it runs later.</h2>
-        <p>The proof is intentionally small. It tests Presolve's central architectural invariant directly rather than hiding it inside a larger application.</p>
-      </div>
+<section class="section section-rule shell"><div class="section-heading compact"><span class="kicker">Coverage</span><h2>The proof suite is no longer just KV.</h2><p>Each slice isolates a different kind of deployment decision and provider-semantic pressure.</p></div>
+<div class="proof-grid">
+<article><span>01 · same-release</span><strong>KV</strong><p>Memory, Redis, and Cloudflare Workers KV planning; memory and Redis execution by default; optional live Cloudflare execution.</p></article>
+<article><span>02 · same-release</span><strong>Object storage</strong><p>Memory and S3-compatible storage through put/head/list/streamed-get/delete semantics.</p></article>
+<article><span>03 · same-release</span><strong>Relational SQL</strong><p>One SQL Component plus one conformance suite executed through SQLite and PostgreSQL.</p></article>
+<article><span>04 · capability proof</span><strong>Work queue</strong><p>Leased delivery, retry, redelivery, ack, stale receipt invalidation, and immutable release execution through the WIT/runtime path.</p></article>
+<article><span>05 · workload path</span><strong>Components + OCI</strong><p>Immutable workload identity and execution/materialization paths are tested separately from provider selection.</p></article>
+<article><span>06 · negative evidence</span><strong>Compatibility rejection</strong><p>The resolver reports structured problems when workload, resource, version, or semantic requirements cannot be satisfied.</p></article>
+</div></section>
 
-      <div class="model-grid">
-        <article class="model-card">
-          <div class="model-label">Build once</div>
-          <code>kv-demo.presolved</code>
-          <ul>
-            <li>one application build</li>
-            <li>one canonical release digest</li>
-            <li>one encoded archive SHA-256</li>
-            <li>no environment embedded in identity</li>
-          </ul>
-        </article>
-        <div class="resolver-card">
-          <div class="resolver-mark">P</div>
-          <strong>Resolver</strong>
-          <span>same release bytes</span>
-        </div>
-        <article class="model-card">
-          <div class="model-label">Decide later</div>
-          <code>presolve.env.toml</code>
-          <ul>
-            <li>local memory provider</li>
-            <li>network Redis provider</li>
-            <li>managed Cloudflare provider</li>
-            <li>realization details stay external</li>
-          </ul>
-        </article>
-      </div>
-    </section>
+<section class="section section-rule shell"><div class="section-heading compact"><span class="kicker">Run it</span><h2>Four public commands.</h2></div>
+<div class="workflow-list"><div><code>bash ./demo/portability/run.sh</code><span><strong>KV flagship</strong> · memory · Redis · Cloudflare plan</span></div><div><code>bash ./scripts/check-object-portability.sh</code><span><strong>Objects</strong> · memory ↔ S3-compatible</span></div><div><code>bash ./scripts/check-sql-portability.sh</code><span><strong>SQL</strong> · SQLite ↔ PostgreSQL + shared conformance</span></div><div><code>bash ./scripts/check-queue-portability.sh</code><span><strong>Queue</strong> · current leased-delivery capability proof</span></div></div>
+<div class="note">The default KV proof requires no cloud credentials. Live Cloudflare execution is opt-in via <code>--cloudflare</code>. The queue command currently proves one provider/runtime path; cross-provider queue substitution is the next queue milestone.</div></section>
 
-    <section class="section section-rule shell">
-      <div class="section-heading compact">
-        <span class="kicker">Reproduce it</span>
-        <h2>One public command.</h2>
-        <p>The command below is the same entry point exercised by Presolve's public CI.</p>
-      </div>
-      <div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
-cd presolve
-bash ./demo/portability/run.sh</code></pre></div>
-      <div class="note">Prerequisites: Rust with the <code>wasm32-wasip2</code> target, Docker, Bash, and Python 3. The default proof requires no cloud credentials.</div>
-    </section>
+<section class="section section-rule shell"><div class="section-heading compact"><span class="kicker">Flagship KV result</span><h2>Three plans, two default executions, unchanged identity.</h2></div>
+<div class="workflow-list"><div><code>portability-local</code><span><strong>memory-kv</strong> · in-process · resolved + executed</span></div><div><code>portability-redis</code><span><strong>redis-kv</strong> · RESP/TCP · resolved + executed</span></div><div><code>portability-cloudflare</code><span><strong>cloudflare-kv</strong> · managed service · resolved; optional live execution</span></div></div>
+<div class="code-block"><pre><code>release digest: sha256:fa8cb59cf09dd5ed507d865fd4b739f6229e1422367bfe1f9afdfba6adc57c5e
+archive sha256: 45e6f9dca20dce54337f34f403e772e510a1f6b6a333a44112d82c09af014344
 
-    <section class="section section-rule shell">
-      <div class="section-heading compact">
-        <span class="kicker">Resolution</span>
-        <h2>The exact same release resolves three ways.</h2>
-      </div>
-      <div class="workflow-list">
-        <div><code>portability-local</code><span><strong>memory-kv</strong> · in-process provider · resolved</span></div>
-        <div><code>portability-redis</code><span><strong>redis-kv</strong> · RESP/TCP network provider · resolved</span></div>
-        <div><code>portability-cloudflare</code><span><strong>cloudflare-kv</strong> · managed cloud provider · resolved</span></div>
-      </div>
-    </section>
-
-    <section class="section section-rule shell">
-      <div class="section-heading compact">
-        <span class="kicker">Realization</span>
-        <h2>Different provider implementations execute without rebuilding the application.</h2>
-        <p>The credential-free path executes the release through memory and a real Redis process. Cloudflare execution is an explicit opt-in because it requires account credentials.</p>
-      </div>
-      <div class="proof-grid">
-        <article><span>01</span><strong>Memory</strong><p>The provider is realized in-process. The release executes successfully without changing its application identity.</p></article>
-        <article><span>02</span><strong>Redis</strong><p>A pinned Redis container is started and Presolve realizes a networked RESP/TCP provider against the same release.</p></article>
-        <article><span>03</span><strong>Cloudflare</strong><p>The same release resolves to Workers KV. Passing <code>--cloudflare</code> promotes the plan to live execution with realization-time credentials.</p></article>
-      </div>
-    </section>
-
-    <section class="section section-rule shell">
-      <div class="split-heading">
-        <div>
-          <span class="kicker">Identity check</span>
-          <h2>The application never changes.</h2>
-        </div>
-        <div>
-          <p>Before any environment is selected, the script records both the canonical Presolve release digest and the encoded archive SHA-256.</p>
-          <p>After resolution and execution, it computes both values again and fails unless they are identical.</p>
-        </div>
-      </div>
-      <div class="code-block"><pre><code>release digest unchanged: yes
+release digest unchanged: yes
 archive sha256 unchanged: yes
 
 PASS — one .presolved release, three plans,
-two provider realizations, zero application rebuilds.</code></pre></div>
-    </section>
+two provider realizations, zero application rebuilds.</code></pre></div></section>
 
-    <section class="section section-rule shell">
-      <div class="section-heading compact">
-        <span class="kicker">What this proves</span>
-        <h2>A deliberately narrow result.</h2>
-      </div>
-      <div class="status-grid">
-        <article class="status-card">
-          <span class="kicker">Proven</span>
-          <h2>Core invariant</h2>
-          <ul class="status-list">
-            <li class="yes">Application release identity is independent of environment selection.</li>
-            <li class="yes">A detached release can reconstruct the resolver input it needs.</li>
-            <li class="yes">Different ProviderIds can satisfy the same provider-neutral KV requirement.</li>
-            <li class="yes">The same release bytes execute through in-process and networked provider implementations.</li>
-            <li class="yes">Cloud-specific credentials and endpoints remain outside the application release.</li>
-          </ul>
-        </article>
-        <article class="status-card">
-          <span class="kicker">Not claimed</span>
-          <h2>Still outside this proof</h2>
-          <ul class="status-list">
-            <li class="no">Production readiness or stable public APIs.</li>
-            <li class="no">Every workload or capability can run everywhere.</li>
-            <li class="no">Automatic infrastructure provisioning.</li>
-            <li class="no">A scheduler, service mesh, registry, or hosted control plane.</li>
-            <li class="no">That all providers have identical semantics beyond negotiated contracts.</li>
-          </ul>
-        </article>
-      </div>
-    </section>
+<section class="section section-rule shell"><div class="section-heading compact"><span class="kicker">Why breadth matters</span><h2>Real providers expose different abstraction failures.</h2></div>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Provider family</th><th>Difference exposed</th><th>What Presolve learned</th></tr></thead><tbody><tr><td>Redis / Cloudflare KV</td><td>in-process vs TCP vs managed HTTP/eventual operational behavior</td><td>capability semantics must stay independent from transport/realization</td></tr><tr><td>S3-compatible objects</td><td>idempotent delete, key-size limits, signed streaming constraints</td><td>provider limits and stronger mutation semantics cannot be hidden</td></tr><tr><td>SQLite / PostgreSQL</td><td>dynamic vs strict typing, SQL dialects, zero-row metadata</td><td>portable result/transaction semantics are separate from SQL syntax portability</td></tr><tr><td>Leased work queue</td><td>receipts, leases, retries, duplicate delivery</td><td>at-least-once settlement semantics must be explicit; triggering is separate topology</td></tr></tbody></table></div></section>
 
-    <section class="section section-rule shell workflow-section">
-      <div class="section-heading compact">
-        <span class="kicker">Inspect it</span>
-        <h2>Do not take the claim on faith.</h2>
-        <p>The proof is meant to be inspected, challenged, and reproduced.</p>
-      </div>
-      <div class="link-row">
-        <a class="link-card" href="https://github.com/fierstdev/presolve/tree/main/demo/portability"><strong>Demo source ↗</strong><span>The exact public runner and proof documentation.</span></a>
-        <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/proofs/flagship-portability-walkthrough.md"><strong>Technical walkthrough ↗</strong><span>What happens at each stage and why it matters.</span></a>
-        <a class="link-card" href="https://github.com/fierstdev/presolve/actions"><strong>Public CI ↗</strong><span>The same demo entry point is continuously verified.</span></a>
-        <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/architecture/overview.md"><strong>Architecture ↗</strong><span>How Application, Environment, Deployment, resolver, and realization fit together.</span></a>
-      </div>
-    </section>
+<section class="section section-rule shell"><div class="split-heading"><div><span class="kicker">What is proven</span><h2>Specific claims, not universal portability.</h2></div><div><p>Application release identity is independent from environment selection. Detached releases can reconstruct their requirements. Different ProviderIds can satisfy the same semantic requirement. Concrete realization settings stay outside application identity.</p><p>The proofs do <strong>not</strong> claim every application runs everywhere, all provider semantics are identical, or Presolve is a scheduler/control plane.</p></div></div>
+<div class="hero-actions"><a class="button primary" href="/docs/proofs/">Read the detailed evidence</a><a class="button secondary" href="/docs/capabilities/">Inspect capability semantics</a></div></section>
 
-    <section class="cta shell">
-      <span class="kicker">Developer validation</span>
-      <h2>Run it. Try to break the model.</h2>
-      <p>The highest-value feedback right now is architectural: where does the application/environment boundary leak, which semantics are underspecified, and what real deployment would invalidate the portability claim?</p>
-      <div class="hero-actions">
-        <a class="button primary" href="https://github.com/fierstdev/presolve/issues">Open an issue ↗</a>
-        <a class="button secondary" href="https://github.com/fierstdev/presolve">Inspect the repository ↗</a>
-      </div>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <div class="shell footer-inner">
-      <a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a>
-      <p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p>
-    </div>
-  </footer>
-</body>
-</html>
+<section class="cta shell"><span class="kicker">Developer validation</span><h2>Reproduce it, then challenge the boundary.</h2><p>The most useful feedback is where a real deployment requirement cannot be represented honestly: missing semantic properties, invalid provider equivalence, workload constraints, or realization details that leak into application identity.</p><div class="hero-actions"><a class="button primary" href="https://github.com/fierstdev/presolve/issues">Open an issue ↗</a><a class="button secondary" href="/docs/">Read the docs</a></div></section>
+</main>
+<footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
+</body></html>
