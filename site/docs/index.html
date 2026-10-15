@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Documentation — Presolve</title>
-  <meta name="description" content="Get started with Presolve: build an application once, check whether an environment can run it, inspect the deployment plan, and learn the architecture when you need it.">
+  <meta name="description" content="Get started with Presolve: install the CLI, build an application once, check whether an environment can run it, inspect the deployment plan, and learn the architecture when you need it.">
   <link rel="canonical" href="https://presolve.dev/docs/">
   <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/navigation.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
@@ -12,16 +12,16 @@
 <body>
 <header class="site-header"><div class="shell nav-shell"><a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#how">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
 <main>
-<section class="page-hero shell"><span class="kicker">Documentation</span><h1>Get running first.<br>Learn the model as you need it.</h1><p>Start with the guided workflow: inspect an app, build it once, describe a local environment, check compatibility, inspect the plan, and run it. The reference material is here when you want to go deeper.</p></section>
+<section class="page-hero shell"><span class="kicker">Documentation</span><h1>Get running first.<br>Learn the model as you need it.</h1><p>Start with the guided workflow: install Presolve, inspect an app, build it once, describe a local environment, check compatibility, inspect the plan, and run it. The reference material is here when you want to go deeper.</p></section>
 <div class="docs-layout shell">
 <aside class="docs-nav"><strong>Documentation</strong><a href="/docs/" aria-current="page">Start here</a><a href="/docs/getting-started/">Getting started</a><a href="/docs/cli/">CLI + workflows</a><a href="/docs/application/">Describe your app</a><a href="/docs/environment/">Describe an environment</a><a href="/docs/releases/">Built releases</a><a href="/docs/capabilities/">Services + capabilities</a><a href="/docs/model/">Architecture</a><a href="/docs/proofs/">Proofs</a></aside>
 <article class="docs-content">
-<p class="doc-lede">You do not need to understand Presolve's internal terminology before using it. The shortest path is: follow the first-run tutorial, learn the core commands, then read deeper reference material only when a concept becomes relevant.</p>
+<p class="doc-lede">You do not need to understand Presolve's internal terminology before using it. The shortest path is: install the released CLI, follow the first-run tutorial, learn the core commands, then read deeper reference material only when a concept becomes relevant.</p>
 
 <section id="quickstart"><span class="kicker">Start here</span><h2>Run one complete workflow.</h2>
-<p>The getting-started tutorial uses the repository's KV example and takes you through the entire local developer loop without requiring Redis, PostgreSQL, S3, Cloudflare credentials, or Docker.</p>
+<p>The getting-started tutorial uses the repository's KV example and takes you through the entire local developer loop without requiring Redis, PostgreSQL, S3, Cloudflare credentials, Docker, or a source build of Presolve itself.</p>
 <div class="doc-sequence">
-<div class="doc-sequence-step"><span>01</span><div><strong>Build the CLI.</strong><p>Get the current developer-preview tooling onto your path.</p></div></div>
+<div class="doc-sequence-step"><span>01</span><div><strong>Install Presolve.</strong><p>Use the published native CLI for your platform. Building Presolve from source is a contributor path, not a prerequisite.</p></div></div>
 <div class="doc-sequence-step"><span>02</span><div><strong>Inspect the app.</strong><p>See what Presolve thinks the application needs before choosing infrastructure.</p></div></div>
 <div class="doc-sequence-step"><span>03</span><div><strong>Create a local environment.</strong><p>Declare the runtime and services available on your machine.</p></div></div>
 <div class="doc-sequence-step"><span>04</span><div><strong>Build once, then check and plan.</strong><p>Create the <code>.presolved</code> release and evaluate that application against the environment.</p></div></div>
@@ -36,7 +36,7 @@
 <div class="doc-sequence-step"><span>03</span><div><strong><code>presolve check</code> — Can this environment run it?</strong><p>Verify compatibility before execution. If it cannot run, Presolve explains what is missing.</p></div></div>
 <div class="doc-sequence-step"><span>04</span><div><strong><code>presolve plan</code> — What will it actually use?</strong><p>Inspect the runtime and provider selections Presolve made for this environment.</p></div></div>
 </div>
-<p><a href="/docs/cli/">See commands, output, JSON automation, diagnostics, and local development →</a></p></section>
+<p><a href="/docs/cli/">See installation, commands, output, JSON automation, diagnostics, and local development →</a></p></section>
 
 <section id="files"><span class="kicker">The three files you'll meet</span><h2>The names are less important than what each one answers.</h2>
 <div class="docs-hub-grid">
@@ -48,8 +48,8 @@
 
 <section id="learn"><span class="kicker">Documentation map</span><h2>Choose the task you are trying to complete.</h2>
 <div class="docs-hub-grid">
-<a class="doc-card" href="/docs/getting-started/"><span class="doc-card-index">01 · Start</span><strong>Getting started</strong><p>Follow one complete local workflow with explanations and troubleshooting.</p></a>
-<a class="doc-card" href="/docs/cli/"><span class="doc-card-index">02 · Operate</span><strong>CLI & workflows</strong><p>Build, inspect, check, plan, run locally, manage environments, and use machine-readable output.</p></a>
+<a class="doc-card" href="/docs/getting-started/"><span class="doc-card-index">01 · Start</span><strong>Getting started</strong><p>Install Presolve, then follow one complete local workflow with explanations and troubleshooting.</p></a>
+<a class="doc-card" href="/docs/cli/"><span class="doc-card-index">02 · Operate</span><strong>CLI & workflows</strong><p>Install, build, inspect, check, plan, run locally, manage environments, and use machine-readable output.</p></a>
 <a class="doc-card" href="/docs/application/"><span class="doc-card-index">03 · Author</span><strong>Define your application</strong><p>Describe workloads, required services, resources, topology, and network intent.</p></a>
 <a class="doc-card" href="/docs/environment/"><span class="doc-card-index">04 · Target</span><strong>Define an environment</strong><p>Describe what an environment can execute and which providers it makes available.</p></a>
 <a class="doc-card" href="/docs/releases/"><span class="doc-card-index">05 · Distribute</span><strong>Built releases</strong><p>Understand what goes into <code>.presolved</code> and why environment configuration stays out.</p></a>
