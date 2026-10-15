@@ -1,0 +1,17 @@
+name: Temporary SQL provider validation 2
+
+on:
+  push:
+    branches:
+      - tmp/sql-provider-validate2
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+      - run: cargo fmt --all --check
+      - run: cargo check -p presolve-provider-sql-sqlite -p presolve-provider-sql-postgres
+      - run: cargo test -p presolve-provider-sql-sqlite -p presolve-provider-sql-postgres
+      - run: cargo clippy -p presolve-provider-sql-sqlite -p presolve-provider-sql-postgres --all-targets -- -D warnings
