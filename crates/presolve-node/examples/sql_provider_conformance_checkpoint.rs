@@ -3,7 +3,7 @@ use std::env;
 use anyhow::{Context, Result, bail};
 use presolve_provider_conformance::{SqlConformanceFixture, assert_sql_database_conformance};
 use presolve_provider_realization::SecretValue;
-use presolve_provider_sdk::SqlDatabaseProvider;
+use presolve_provider_sdk::{SqlDatabaseProvider, SqlValue};
 use presolve_provider_sql_postgres::PostgresSqlProvider;
 use presolve_provider_sql_sqlite::SqliteSqlProvider;
 
@@ -23,6 +23,7 @@ const DELETE_BY_ID: &str = "DELETE FROM presolve_conformance WHERE id = $1";
 enum Mode {
     Sqlite,
     Postgres,
+    PostgresReady,
 }
 
 impl Mode {
@@ -30,14 +31,17 @@ impl Mode {
         match value {
             "sqlite" => Ok(Self::Sqlite),
             "postgres" => Ok(Self::Postgres),
-            _ => bail!("mode must be `sqlite` or `postgres`, got `{value}`"),
+            "postgres-ready" => Ok(Self::PostgresReady),
+            _ => bail!(
+                "mode must be `sqlite`, `postgres`, or `postgres-ready`, got `{value}`"
+            ),
         }
     }
 
     const fn label(self) -> &'static str {
         match self {
             Self::Sqlite => "sqlite",
-            Self::Postgres => "postgres",
+            Self::Postgres | Self::PostgresReady => "postgres",
         }
     }
 }
@@ -46,7 +50,7 @@ fn main() -> Result<()> {
     let mut args = env::args().skip(1);
     let mode = Mode::parse(&args.next().context("missing SQL provider mode")?)?;
     if args.next().is_some() {
-        bail!("usage: sql_provider_conformance_checkpoint <sqlite|postgres>");
+        bail!("usage: sql_provider_conformance_checkpoint <sqlite|postgres|postgres-ready>");
     }
 
     match mode {
@@ -58,27 +62,58 @@ fn main() -> Result<()> {
                 "CREATE TABLE IF NOT EXISTS presolve_conformance (id INTEGER PRIMARY KEY, label TEXT NOT NULL, optional_text TEXT, bytes_value BLOB)",
             )?;
             run_conformance(&provider);
+            println!("SQL provider conformance passed: {}", mode.label());
         }
         Mode::Postgres => {
-            let host = required_env(POSTGRES_HOST_ENV)?;
-            let port = env::var(POSTGRES_PORT_ENV)
-                .unwrap_or_else(|_| "5432".to_owned())
-                .parse::<u16>()
-                .context("PRESOLVE_POSTGRES_PORT must be a valid TCP port")?;
-            let database = required_env(POSTGRES_DATABASE_ENV)?;
-            let user = required_env(POSTGRES_USER_ENV)?;
-            let password = SecretValue::new(required_env(POSTGRES_PASSWORD_ENV)?);
-            let provider = PostgresSqlProvider::new(host, port, database, user, password)
-                .context("invalid PostgreSQL configuration")?;
+            let provider = postgres_provider_from_env()?;
             provision_schema(
                 &provider,
                 "CREATE TABLE IF NOT EXISTS presolve_conformance (id BIGINT PRIMARY KEY, label TEXT NOT NULL, optional_text TEXT, bytes_value BYTEA)",
             )?;
             run_conformance(&provider);
+            println!("SQL provider conformance passed: {}", mode.label());
+        }
+        Mode::PostgresReady => {
+            let provider = postgres_provider_from_env()?;
+            assert_postgres_ready(&provider)?;
+            println!("SQL provider ready: postgres");
         }
     }
 
-    println!("SQL provider conformance passed: {}", mode.label());
+    Ok(())
+}
+
+fn postgres_provider_from_env() -> Result<PostgresSqlProvider> {
+    let host = required_env(POSTGRES_HOST_ENV)?;
+    let port = env::var(POSTGRES_PORT_ENV)
+        .unwrap_or_else(|_| "5432".to_owned())
+        .parse::<u16>()
+        .context("PRESOLVE_POSTGRES_PORT must be a valid TCP port")?;
+    let database = required_env(POSTGRES_DATABASE_ENV)?;
+    let user = required_env(POSTGRES_USER_ENV)?;
+    let password = SecretValue::new(required_env(POSTGRES_PASSWORD_ENV)?);
+
+    PostgresSqlProvider::new(host, port, database, user, password)
+        .context("invalid PostgreSQL configuration")
+}
+
+fn assert_postgres_ready(provider: &dyn SqlDatabaseProvider) -> Result<()> {
+    let result = provider
+        .query("SELECT 1::BIGINT AS ready", &[])
+        .context("PostgreSQL provider is not ready")?;
+    let (columns, rows) = result.into_parts();
+    let rows = rows
+        .collect::<Result<Vec<_>, _>>()
+        .context("PostgreSQL readiness query rows could not be read")?;
+
+    if columns.len() != 1
+        || columns[0].name() != "ready"
+        || rows.len() != 1
+        || rows[0].values() != [SqlValue::Integer(1)]
+    {
+        bail!("PostgreSQL readiness query returned an unexpected result");
+    }
+
     Ok(())
 }
 
