@@ -57,8 +57,11 @@ impl WorkQueueConformanceOptions {
 /// - dropping an unacknowledged delivery permits observable redelivery;
 /// - explicit retry preserves the logical message body.
 ///
-/// This function panics on semantic violations and is intended for provider
-/// test suites/checkpoints.
+/// # Panics
+///
+/// Panics when the timing bounds are invalid, a provider operation fails, or
+/// observed queue behavior violates one of the mandatory baseline semantics.
+/// This function is intended for provider test suites and checkpoints.
 pub fn assert_work_queue_conformance(
     provider: &dyn WorkQueueProvider,
     options: WorkQueueConformanceOptions,
