@@ -163,9 +163,9 @@ impl database::HostTransaction for RuntimeState {
 
 impl database::HostQueryResult for RuntimeState {
     fn columns(&mut self, result: Resource<database::QueryResult>) -> Vec<database::Column> {
-        let result = self.sql_query_result_mut(result.rep()).expect(
-            "Component resource table and SQL query-result state must stay synchronized",
-        );
+        let result = self
+            .sql_query_result_mut(result.rep())
+            .expect("Component resource table and SQL query-result state must stay synchronized");
 
         result
             .columns()
