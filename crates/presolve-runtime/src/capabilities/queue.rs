@@ -45,10 +45,7 @@ impl work_queue::Host for RuntimeState {
         Ok(Some(Resource::new_own(handle)))
     }
 
-    fn ack(
-        &mut self,
-        delivery: Resource<work_queue::Delivery>,
-    ) -> Result<(), work_queue::Error> {
+    fn ack(&mut self, delivery: Resource<work_queue::Delivery>) -> Result<(), work_queue::Error> {
         let delivery = self.remove_queue_delivery(delivery.rep()).ok_or_else(|| {
             work_queue::Error::InvalidDelivery("unknown work-queue delivery resource".to_owned())
         })?;

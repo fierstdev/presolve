@@ -263,7 +263,7 @@ mod tests {
         CLOUDFLARE_ACCOUNT_ID_SETTING, CLOUDFLARE_API_TOKEN_SECRET, CLOUDFLARE_KV_ADAPTER_ID,
         CLOUDFLARE_NAMESPACE_ID_SETTING, CloudflareKvAdapter,
     };
-    use presolve_provider_queue_memory::{MEMORY_QUEUE_ADAPTER_ID, InMemoryWorkQueueAdapter};
+    use presolve_provider_queue_memory::{InMemoryWorkQueueAdapter, MEMORY_QUEUE_ADAPTER_ID};
     use presolve_provider_realization::{
         ProviderAdapterId, ProviderRealizationProfile, SecretReference, SecretResolutionError,
         SecretValue,
