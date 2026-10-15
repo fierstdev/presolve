@@ -64,17 +64,24 @@ start_postgres() {
   export PRESOLVE_POSTGRES_HOST="${address%:*}"
   export PRESOLVE_POSTGRES_PORT="${address##*:}"
 
+  # Container-local readiness is necessary but not sufficient: the proof uses
+  # the host-published endpoint, and Docker's port-forwarding path can lag the
+  # server becoming ready inside the container. Require the same Presolve
+  # PostgreSQL provider path used by conformance/execution to complete a real
+  # query before declaring the test database ready.
   for _ in $(seq 1 60); do
     if docker exec "$POSTGRES_CONTAINER" \
       pg_isready \
       --username "$PRESOLVE_POSTGRES_USER" \
-      --dbname "$PRESOLVE_POSTGRES_DATABASE" >/dev/null 2>&1; then
+      --dbname "$PRESOLVE_POSTGRES_DATABASE" >/dev/null 2>&1 \
+      && "$CONFORMANCE" postgres-ready >/dev/null 2>&1; then
       return
     fi
     sleep 1
   done
 
-  echo "PostgreSQL test server did not become ready" >&2
+  echo "PostgreSQL test server did not become reachable through the Presolve provider" >&2
+  "$CONFORMANCE" postgres-ready >&2 || true
   docker logs "$POSTGRES_CONTAINER" >&2 || true
   exit 1
 }
