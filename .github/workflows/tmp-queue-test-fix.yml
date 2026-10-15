@@ -22,21 +22,17 @@ jobs:
           from pathlib import Path
           path = Path('providers/queue-memory/src/lib.rs')
           text = path.read_text()
-          old = '''        let custom_lease = provider
-              .receive(WorkQueueReceiveOptions::new().with_lease_duration(Duration::from_secs(1)))
-              .expect_err("custom lease should require negotiation");
-          assert_eq!(custom_lease.code(), WorkQueueErrorCode::Unsupported);
-          '''
-          new = '''        let Err(custom_lease) = provider
+          start = text.index('        let custom_lease = provider\n')
+          end_marker = '        assert_eq!(custom_lease.code(), WorkQueueErrorCode::Unsupported);\n'
+          end = text.index(end_marker, start) + len(end_marker)
+          replacement = '''        let Err(custom_lease) = provider
               .receive(WorkQueueReceiveOptions::new().with_lease_duration(Duration::from_secs(1)))
           else {
               panic!("custom lease should require negotiation");
           };
           assert_eq!(custom_lease.code(), WorkQueueErrorCode::Unsupported);
           '''
-          if old not in text:
-              raise SystemExit('target assertion not found')
-          path.write_text(text.replace(old, new, 1))
+          path.write_text(text[:start] + replacement + text[end:])
           PY
           cargo fmt --all
       - name: Commit corrected provider test
