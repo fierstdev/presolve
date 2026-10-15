@@ -273,7 +273,10 @@ mod tests {
         let delay = Duration::from_secs(7);
         let lease = Duration::from_secs(12);
 
-        assert_eq!(WorkQueueSendOptions::new().with_delay(delay).delay(), Some(delay));
+        assert_eq!(
+            WorkQueueSendOptions::new().with_delay(delay).delay(),
+            Some(delay)
+        );
         assert_eq!(
             WorkQueueReceiveOptions::new()
                 .with_lease_duration(lease)
