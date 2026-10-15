@@ -9,6 +9,8 @@
 
 mod kv;
 mod objects;
+mod sql;
 
 pub use kv::assert_key_value_conformance;
 pub use objects::assert_object_store_conformance;
+pub use sql::{SqlConformanceFixture, assert_sql_database_conformance};

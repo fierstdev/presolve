@@ -1,6 +1,11 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use presolve_provider_sdk::{KeyValueProvider, ObjectRead, ObjectStoreProvider};
+#[cfg(test)]
+use presolve_provider_sdk::UnavailableSqlDatabaseProvider;
+use presolve_provider_sdk::{
+    KeyValueProvider, ObjectRead, ObjectStoreProvider, SqlDatabaseProvider, SqlQueryResult,
+    SqlTransaction,
+};
 use wasmtime::{ResourceLimiter, StoreLimits, component::ResourceTable};
 use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
 
@@ -22,20 +27,41 @@ pub(crate) struct RuntimeState {
     limits: StoreLimits,
     key_value_provider: Arc<dyn KeyValueProvider>,
     object_store_provider: Arc<dyn ObjectStoreProvider>,
+    sql_database_provider: Arc<dyn SqlDatabaseProvider>,
     object_reads: BTreeMap<u64, ObjectRead>,
     object_writes: BTreeMap<u64, PendingObjectWrite>,
     max_object_buffer_bytes: usize,
     object_buffered_write_bytes: usize,
     max_object_sessions: usize,
     next_object_handle: u64,
+    sql_transactions: BTreeMap<u32, Box<dyn SqlTransaction>>,
+    sql_query_results: BTreeMap<u32, SqlQueryResult>,
+    max_sql_sessions: usize,
+    next_sql_handle: u32,
 }
 
 impl RuntimeState {
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn new(
         runtime_limits: RuntimeLimits,
         key_value_provider: Arc<dyn KeyValueProvider>,
         object_store_provider: Arc<dyn ObjectStoreProvider>,
+    ) -> Self {
+        Self::new_with_sql(
+            runtime_limits,
+            key_value_provider,
+            object_store_provider,
+            Arc::new(UnavailableSqlDatabaseProvider),
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn new_with_sql(
+        runtime_limits: RuntimeLimits,
+        key_value_provider: Arc<dyn KeyValueProvider>,
+        object_store_provider: Arc<dyn ObjectStoreProvider>,
+        sql_database_provider: Arc<dyn SqlDatabaseProvider>,
     ) -> Self {
         let mut builder = WasiCtx::builder();
 
@@ -45,12 +71,17 @@ impl RuntimeState {
             limits: runtime_limits.store_limits(),
             key_value_provider,
             object_store_provider,
+            sql_database_provider,
             object_reads: BTreeMap::new(),
             object_writes: BTreeMap::new(),
             max_object_buffer_bytes: runtime_limits.max_object_buffer_bytes(),
             object_buffered_write_bytes: 0,
             max_object_sessions: runtime_limits.max_object_sessions(),
             next_object_handle: 1,
+            sql_transactions: BTreeMap::new(),
+            sql_query_results: BTreeMap::new(),
+            max_sql_sessions: runtime_limits.max_sql_sessions(),
+            next_sql_handle: 1,
         }
     }
 
@@ -64,6 +95,10 @@ impl RuntimeState {
 
     pub(crate) fn object_store_provider(&self) -> &dyn ObjectStoreProvider {
         self.object_store_provider.as_ref()
+    }
+
+    pub(crate) fn sql_database_provider(&self) -> &dyn SqlDatabaseProvider {
+        self.sql_database_provider.as_ref()
     }
 
     pub(crate) fn allocate_object_handle(&mut self) -> Option<u64> {
@@ -127,6 +162,53 @@ impl RuntimeState {
 
     pub(crate) fn remove_object_write(&mut self, handle: u64) -> Option<PendingObjectWrite> {
         self.object_writes.remove(&handle)
+    }
+
+    pub(crate) fn can_open_sql_session(&self) -> bool {
+        self.sql_transactions
+            .len()
+            .checked_add(self.sql_query_results.len())
+            .is_some_and(|open| open < self.max_sql_sessions)
+    }
+
+    pub(crate) fn allocate_sql_handle(&mut self) -> Option<u32> {
+        let handle = self.next_sql_handle;
+        self.next_sql_handle = self.next_sql_handle.checked_add(1)?;
+        Some(handle)
+    }
+
+    pub(crate) fn insert_sql_transaction(
+        &mut self,
+        handle: u32,
+        transaction: Box<dyn SqlTransaction>,
+    ) {
+        self.sql_transactions.insert(handle, transaction);
+    }
+
+    pub(crate) fn sql_transaction_mut(
+        &mut self,
+        handle: u32,
+    ) -> Option<&mut Box<dyn SqlTransaction>> {
+        self.sql_transactions.get_mut(&handle)
+    }
+
+    pub(crate) fn remove_sql_transaction(
+        &mut self,
+        handle: u32,
+    ) -> Option<Box<dyn SqlTransaction>> {
+        self.sql_transactions.remove(&handle)
+    }
+
+    pub(crate) fn insert_sql_query_result(&mut self, handle: u32, result: SqlQueryResult) {
+        self.sql_query_results.insert(handle, result);
+    }
+
+    pub(crate) fn sql_query_result_mut(&mut self, handle: u32) -> Option<&mut SqlQueryResult> {
+        self.sql_query_results.get_mut(&handle)
+    }
+
+    pub(crate) fn remove_sql_query_result(&mut self, handle: u32) -> Option<SqlQueryResult> {
+        self.sql_query_results.remove(&handle)
     }
 }
 

@@ -25,4 +25,13 @@ pub(crate) mod objects {
     });
 }
 
+pub(crate) mod sql {
+    wasmtime::component::bindgen!({
+        path: "../../wit/presolve-app",
+        interfaces: "
+            import presolve:sql/database@0.1.0;
+        ",
+    });
+}
+
 pub(crate) use application::Application;

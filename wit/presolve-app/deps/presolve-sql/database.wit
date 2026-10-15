@@ -1,0 +1,93 @@
+package presolve:sql@0.1.0;
+
+/// Host-provided relational SQL database.
+///
+/// This interface is one transport projection of the provider-neutral
+/// `presolve:sql/database@0.1.0` semantic capability. SQL source remains
+/// application-provided; the binding standardizes parameters, scalar values,
+/// results, and transaction ownership.
+interface database {
+    variant value {
+        null,
+        integer(s64),
+        real(f64),
+        text(string),
+        bytes(list<u8>),
+    }
+
+    record column {
+        name: string,
+    }
+
+    record row {
+        values: list<value>,
+    }
+
+    record execute-result {
+        affected-rows: u64,
+    }
+
+    enum isolation {
+        provider-default,
+        serializable,
+    }
+
+    record transaction-options {
+        read-only: bool,
+        isolation: isolation,
+    }
+
+    variant error {
+        unavailable(string),
+        invalid-statement(string),
+        invalid-parameter(string),
+        constraint-violation(string),
+        transaction-state(string),
+        unsupported(string),
+        transient(string),
+        internal(string),
+    }
+
+    /// Incremental query-result cursor.
+    resource query-result {
+        /// Returns immutable result-column metadata in provider-reported order.
+        columns: func() -> list<column>;
+
+        /// Returns the next positional row or none at end-of-results.
+        next-row: func() -> result<option<row>, error>;
+    }
+
+    /// One explicit SQL transaction bound to one logical provider session.
+    ///
+    /// Dropping this resource without consuming it through commit or rollback
+    /// rolls the transaction back according to the semantic capability.
+    resource transaction {
+        execute: func(
+            statement: string,
+            parameters: list<value>,
+        ) -> result<execute-result, error>;
+
+        query: func(
+            statement: string,
+            parameters: list<value>,
+        ) -> result<query-result, error>;
+    }
+
+    execute: func(
+        statement: string,
+        parameters: list<value>,
+    ) -> result<execute-result, error>;
+
+    query: func(
+        statement: string,
+        parameters: list<value>,
+    ) -> result<query-result, error>;
+
+    begin: func(options: transaction-options) -> result<transaction, error>;
+
+    /// Commit consumes the transaction resource.
+    commit: func(transaction: own<transaction>) -> result<_, error>;
+
+    /// Rollback consumes the transaction resource.
+    rollback: func(transaction: own<transaction>) -> result<_, error>;
+}

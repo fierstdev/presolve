@@ -1,8 +1,8 @@
 use std::{sync::Arc, thread, time::Duration};
 
 use presolve_provider_sdk::{
-    KeyValueProvider, ObjectStoreProvider, UnavailableKeyValueProvider,
-    UnavailableObjectStoreProvider,
+    KeyValueProvider, ObjectStoreProvider, SqlDatabaseProvider, UnavailableKeyValueProvider,
+    UnavailableObjectStoreProvider, UnavailableSqlDatabaseProvider,
 };
 use wasmtime::{
     Config, Engine, Store, Trap,
@@ -23,6 +23,7 @@ pub struct RuntimeBuilder {
     limits: RuntimeLimits,
     key_value_provider: Arc<dyn KeyValueProvider>,
     object_store_provider: Arc<dyn ObjectStoreProvider>,
+    sql_database_provider: Arc<dyn SqlDatabaseProvider>,
 }
 
 impl RuntimeBuilder {
@@ -34,6 +35,7 @@ impl RuntimeBuilder {
             limits: RuntimeLimits::default(),
             key_value_provider: Arc::new(UnavailableKeyValueProvider),
             object_store_provider: Arc::new(UnavailableObjectStoreProvider),
+            sql_database_provider: Arc::new(UnavailableSqlDatabaseProvider),
         }
     }
 
@@ -61,6 +63,16 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Supplies the provider for `presolve:sql/database`.
+    ///
+    /// Transaction and query-result resources remain scoped to one runtime
+    /// invocation; the provider implementation itself may be shared.
+    #[must_use]
+    pub fn sql_database_provider(mut self, provider: Arc<dyn SqlDatabaseProvider>) -> Self {
+        self.sql_database_provider = provider;
+        self
+    }
+
     /// Builds the runtime.
     ///
     /// # Errors
@@ -72,6 +84,7 @@ impl RuntimeBuilder {
             self.limits,
             self.key_value_provider,
             self.object_store_provider,
+            self.sql_database_provider,
         )
     }
 }
@@ -92,8 +105,8 @@ pub struct Runtime {
     linker: Linker<RuntimeState>,
     limits: RuntimeLimits,
     key_value_provider: Arc<dyn KeyValueProvider>,
-    // Materialized now; consumed by the object-storage host binding in 13.9.
     object_store_provider: Arc<dyn ObjectStoreProvider>,
+    sql_database_provider: Arc<dyn SqlDatabaseProvider>,
 }
 
 impl Runtime {
@@ -165,10 +178,11 @@ impl Runtime {
     ) -> Result<String, RuntimeError> {
         let mut store = Store::new(
             &self.engine,
-            RuntimeState::new(
+            RuntimeState::new_with_sql(
                 self.limits,
                 Arc::clone(&self.key_value_provider),
                 Arc::clone(&self.object_store_provider),
+                Arc::clone(&self.sql_database_provider),
             ),
         );
 
@@ -208,6 +222,7 @@ impl Runtime {
         limits: RuntimeLimits,
         key_value_provider: Arc<dyn KeyValueProvider>,
         object_store_provider: Arc<dyn ObjectStoreProvider>,
+        sql_database_provider: Arc<dyn SqlDatabaseProvider>,
     ) -> Result<Self, RuntimeError> {
         let mut config = Config::new();
 
@@ -235,12 +250,19 @@ impl Runtime {
         )
         .map_err(RuntimeError::CapabilityLinker)?;
 
+        crate::bindings::sql::presolve::sql::database::add_to_linker::<_, HasSelf<_>>(
+            &mut linker,
+            |state| state,
+        )
+        .map_err(RuntimeError::CapabilityLinker)?;
+
         Ok(Self {
             engine,
             linker,
             limits,
             key_value_provider,
             object_store_provider,
+            sql_database_provider,
         })
     }
 }
