@@ -113,7 +113,11 @@ impl WorkQueueProvider for InMemoryWorkQueueProvider {
             .unwrap_or(self.default_lease_duration);
         let lease_until = checked_add(now, lease_duration, "delivery lease")?;
         let mut state = self.lock_state()?;
-        let Some(index) = state.messages.iter().position(|message| message.is_available(now)) else {
+        let Some(index) = state
+            .messages
+            .iter()
+            .position(|message| message.is_available(now))
+        else {
             return Ok(None);
         };
         let message = state
@@ -217,11 +221,7 @@ impl WorkQueueDelivery for InMemoryDelivery {
     }
 }
 
-fn checked_add(
-    now: Instant,
-    duration: Duration,
-    field: &str,
-) -> Result<Instant, WorkQueueError> {
+fn checked_add(now: Instant, duration: Duration, field: &str) -> Result<Instant, WorkQueueError> {
     now.checked_add(duration).ok_or_else(|| {
         WorkQueueError::invalid_request(format!("{field} exceeds the supported time range"))
     })
