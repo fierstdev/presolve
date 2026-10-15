@@ -1,0 +1,69 @@
+name: Temporary SQL node plumbing
+
+on:
+  push:
+    branches:
+      - tmp/sql-node-plumbing
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: proof/sqlite-postgres-portability
+          fetch-depth: 0
+      - name: Add SQL materialization branch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('crates/presolve-node/src/realization.rs')
+          text = path.read_text()
+          text = text.replace(
+              'use presolve_provider_sdk::{KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE};',
+              'use presolve_provider_sdk::{KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE, SQL_DATABASE_INTERFACE};'
+          )
+          needle = '''            OBJECT_STORE_INTERFACE => {
+                if registry.object_store(provider_id).is_some() {
+                    continue;
+                }
+
+                let provider = realized.object_store().ok_or_else(|| {
+                    ProviderMaterializationError::MissingCapabilityImplementation {
+                        provider_id,
+                        interface: request.interface().to_owned(),
+                    }
+                })?;
+
+                registry.register_object_store(provider_id, provider)?;
+            }
+
+'''
+          replacement = needle + '''            SQL_DATABASE_INTERFACE => {
+                if registry.sql_database(provider_id).is_some() {
+                    continue;
+                }
+
+                let provider = realized.sql_database().ok_or_else(|| {
+                    ProviderMaterializationError::MissingCapabilityImplementation {
+                        provider_id,
+                        interface: request.interface().to_owned(),
+                    }
+                })?;
+
+                registry.register_sql_database(provider_id, provider)?;
+            }
+
+'''
+          if needle not in text:
+              raise SystemExit('object-store materialization branch not found')
+          path.write_text(text.replace(needle, replacement))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/presolve-node/src/realization.rs
+          git commit -m "feat: materialize plan-selected SQL providers"
+          git push origin HEAD:proof/sqlite-postgres-portability
