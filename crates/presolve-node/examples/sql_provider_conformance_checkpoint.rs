@@ -14,10 +14,8 @@ const POSTGRES_DATABASE_ENV: &str = "PRESOLVE_POSTGRES_DATABASE";
 const POSTGRES_USER_ENV: &str = "PRESOLVE_POSTGRES_USER";
 const POSTGRES_PASSWORD_ENV: &str = "PRESOLVE_POSTGRES_PASSWORD";
 
-const INSERT: &str =
-    "INSERT INTO presolve_conformance (id, label, optional_value) VALUES ($1, $2, $3)";
-const SELECT_BY_ID: &str =
-    "SELECT id, label, optional_value FROM presolve_conformance WHERE id = $1 ORDER BY id";
+const INSERT: &str = "INSERT INTO presolve_conformance (id, label, optional_text, bytes_value) VALUES ($1, $2, $3, $4)";
+const SELECT_BY_ID: &str = "SELECT id, label, optional_text, bytes_value FROM presolve_conformance WHERE id = $1 ORDER BY id";
 const UPDATE_LABEL: &str = "UPDATE presolve_conformance SET label = $1 WHERE id = $2";
 const DELETE_BY_ID: &str = "DELETE FROM presolve_conformance WHERE id = $1";
 
@@ -57,7 +55,7 @@ fn main() -> Result<()> {
             let provider = SqliteSqlProvider::new(path).context("invalid SQLite configuration")?;
             provision_schema(
                 &provider,
-                "CREATE TABLE IF NOT EXISTS presolve_conformance (id INTEGER PRIMARY KEY, label TEXT NOT NULL, optional_value BLOB)",
+                "CREATE TABLE IF NOT EXISTS presolve_conformance (id INTEGER PRIMARY KEY, label TEXT NOT NULL, optional_text TEXT, bytes_value BLOB)",
             )?;
             run_conformance(&provider);
         }
@@ -74,7 +72,7 @@ fn main() -> Result<()> {
                 .context("invalid PostgreSQL configuration")?;
             provision_schema(
                 &provider,
-                "CREATE TABLE IF NOT EXISTS presolve_conformance (id BIGINT PRIMARY KEY, label TEXT NOT NULL, optional_value BYTEA)",
+                "CREATE TABLE IF NOT EXISTS presolve_conformance (id BIGINT PRIMARY KEY, label TEXT NOT NULL, optional_text TEXT, bytes_value BYTEA)",
             )?;
             run_conformance(&provider);
         }

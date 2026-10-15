@@ -381,15 +381,15 @@ mod tests {
         let provider = SqliteSqlProvider::new(&path).expect("provider should configure");
         provider
             .execute(
-                "CREATE TABLE presolve_conformance (id INTEGER PRIMARY KEY, label TEXT NOT NULL, optional_value BLOB)",
+                "CREATE TABLE presolve_conformance (id INTEGER PRIMARY KEY, label TEXT NOT NULL, optional_text TEXT, bytes_value BLOB)",
                 &[],
             )
             .expect("schema should create");
         assert_sql_database_conformance(
             &provider,
             SqlConformanceFixture {
-                insert: "INSERT INTO presolve_conformance (id, label, optional_value) VALUES ($1, $2, $3)",
-                select_by_id: "SELECT id, label, optional_value FROM presolve_conformance WHERE id = $1 ORDER BY id",
+                insert: "INSERT INTO presolve_conformance (id, label, optional_text, bytes_value) VALUES ($1, $2, $3, $4)",
+                select_by_id: "SELECT id, label, optional_text, bytes_value FROM presolve_conformance WHERE id = $1 ORDER BY id",
                 update_label: "UPDATE presolve_conformance SET label = $1 WHERE id = $2",
                 delete_by_id: "DELETE FROM presolve_conformance WHERE id = $1",
             },

@@ -290,15 +290,17 @@ fn query_on(
         .iter()
         .map(|value| value.as_ref() as &(dyn ToSql + Sync))
         .collect::<Vec<_>>();
-    let rows = client
-        .query(statement, &refs)
+    let prepared = client
+        .prepare(statement)
         .map_err(|error| map_postgres_error(&error))?;
-    let columns = rows.first().map_or_else(Vec::new, |row| {
-        row.columns()
-            .iter()
-            .map(|column| SqlColumn::new(column.name()))
-            .collect()
-    });
+    let columns = prepared
+        .columns()
+        .iter()
+        .map(|column| SqlColumn::new(column.name()))
+        .collect::<Vec<_>>();
+    let rows = client
+        .query(&prepared, &refs)
+        .map_err(|error| map_postgres_error(&error))?;
     let buffered = rows
         .into_iter()
         .map(|row| postgres_row(&row))
