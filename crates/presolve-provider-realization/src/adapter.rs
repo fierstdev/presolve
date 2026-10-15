@@ -1,7 +1,9 @@
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use presolve_core::ProviderId;
-use presolve_provider_sdk::{KeyValueProvider, ObjectStoreProvider, SqlDatabaseProvider};
+use presolve_provider_sdk::{
+    KeyValueProvider, ObjectStoreProvider, SqlDatabaseProvider, WorkQueueProvider,
+};
 use semver::Version;
 use thiserror::Error;
 
@@ -64,6 +66,7 @@ pub struct RealizedProvider {
     key_value: Option<Arc<dyn KeyValueProvider>>,
     object_store: Option<Arc<dyn ObjectStoreProvider>>,
     sql_database: Option<Arc<dyn SqlDatabaseProvider>>,
+    work_queue: Option<Arc<dyn WorkQueueProvider>>,
 }
 
 impl RealizedProvider {
@@ -75,6 +78,7 @@ impl RealizedProvider {
             key_value: None,
             object_store: None,
             sql_database: None,
+            work_queue: None,
         }
     }
 
@@ -96,6 +100,13 @@ impl RealizedProvider {
     #[must_use]
     pub fn with_sql_database(mut self, provider: Arc<dyn SqlDatabaseProvider>) -> Self {
         self.sql_database = Some(provider);
+        self
+    }
+
+    /// Attaches a leased work-queue implementation.
+    #[must_use]
+    pub fn with_work_queue(mut self, provider: Arc<dyn WorkQueueProvider>) -> Self {
+        self.work_queue = Some(provider);
         self
     }
 
@@ -122,6 +133,12 @@ impl RealizedProvider {
     pub fn sql_database(&self) -> Option<Arc<dyn SqlDatabaseProvider>> {
         self.sql_database.as_ref().map(Arc::clone)
     }
+
+    /// Returns the leased work-queue implementation, if any.
+    #[must_use]
+    pub fn work_queue(&self) -> Option<Arc<dyn WorkQueueProvider>> {
+        self.work_queue.as_ref().map(Arc::clone)
+    }
 }
 
 impl fmt::Debug for RealizedProvider {
@@ -132,6 +149,7 @@ impl fmt::Debug for RealizedProvider {
             .field("key_value", &self.key_value.is_some())
             .field("object_store", &self.object_store.is_some())
             .field("sql_database", &self.sql_database.is_some())
+            .field("work_queue", &self.work_queue.is_some())
             .finish()
     }
 }
