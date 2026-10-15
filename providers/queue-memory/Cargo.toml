@@ -17,4 +17,5 @@ semver.workspace = true
 workspace = true
 
 [dev-dependencies]
+presolve-core.workspace = true
 presolve-provider-conformance.workspace = true
