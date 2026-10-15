@@ -1,0 +1,32 @@
+name: Temporary queue provider validation 2
+
+on: [push]
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/queue-provider-validate2
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Test queue slice and generate lockfile
+        run: cargo test -p presolve-capability -p presolve-provider-sdk -p presolve-provider-conformance -p presolve-provider-queue-memory
+      - name: Clippy queue slice
+        run: cargo clippy -p presolve-capability -p presolve-provider-sdk -p presolve-provider-conformance -p presolve-provider-queue-memory --all-targets -- -D warnings
+      - name: Commit Cargo lockfile
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock
+          if git diff --cached --quiet; then
+            echo 'Cargo.lock already current'
+          else
+            git commit -m 'chore: update Cargo.lock for queue provider'
+            git push origin HEAD:tmp/queue-provider-validate2
+          fi
