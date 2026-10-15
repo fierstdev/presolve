@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Presolve model — Presolve Docs</title>
+  <meta name="description" content="Understand how Presolve separates application identity, environment supply, deterministic resolution, provider realization, and runtime execution.">
+  <link rel="canonical" href="https://presolve.dev/docs/model/">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/docs/mobile.css">
+  <link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+  <header class="site-header"><div class="shell nav-shell"><a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+
+  <main>
+    <section class="page-hero shell">
+      <span class="kicker">Core model</span>
+      <h1>Application, environment, deployment.</h1>
+      <p>Presolve keeps these as separate first-class concepts so application identity does not collapse into one infrastructure choice.</p>
+    </section>
+
+    <div class="docs-layout shell">
+      <aside class="docs-nav">
+        <strong>Documentation</strong>
+        <a href="/docs/">Overview</a>
+        <a href="/docs/model/" aria-current="page">The model</a>
+        <a href="/docs/application/">Application Contract</a>
+        <a href="/docs/environment/">Environment</a>
+        <a href="/docs/releases/">Immutable releases</a>
+        <a href="/docs/capabilities/">Capabilities</a>
+        <a href="/docs/cli/">CLI + planning</a>
+        <a href="/docs/proofs/">Proofs</a>
+      </aside>
+
+      <article class="docs-content">
+        <div class="doc-breadcrumb"><a href="/docs/">Docs</a> / The model</div>
+        <p class="doc-lede">The central Presolve question is not “which cloud are we deploying to?” It is “what does this application require, what can this environment supply, and can the two be matched without changing the application release?”</p>
+
+        <section id="flow">
+          <span class="kicker">Canonical flow</span>
+          <h2>Demand and supply meet at resolution.</h2>
+          <div class="doc-diagram" aria-label="Presolve canonical flow">
+            <div class="doc-flow">
+              <div class="doc-node accent"><small>Application side</small><strong>Application Contract</strong><code>presolve.toml</code><span>workloads · capabilities · resources · network policy</span></div>
+              <div class="doc-arrow">→</div>
+              <div class="doc-node"><small>Immutable release</small><strong>.presolved</strong><code>sha256:…</code><span>application semantics + workload identity</span></div>
+              <div class="doc-arrow">+</div>
+              <div class="doc-node"><small>Environment side</small><strong>Environment Specification</strong><code>presolve.env.toml</code><span>execution support · providers · capacity</span></div>
+            </div>
+            <div class="doc-flow compact" style="margin-top:18px">
+              <div class="doc-node"><small>Normalized inputs</small><strong>Requirements + Inventory</strong><span>validated semantic model</span></div>
+              <div class="doc-arrow">→</div>
+              <div class="doc-node accent"><small>Deterministic decision</small><strong>Resolver</strong><span>compatibility · provider selection · feature negotiation</span></div>
+              <div class="doc-arrow">→</div>
+              <div class="doc-node good"><small>Inspect before execution</small><strong>DeploymentPlan</strong><span>workloads · ProviderIds · versions · negotiated features</span></div>
+            </div>
+          </div>
+          <p>The plan is symbolic. The resolver never needs concrete Redis clients, database connections, cloud credentials, or runtime implementation objects.</p>
+        </section>
+
+        <section id="three-concepts">
+          <span class="kicker">Three concepts</span>
+          <h2>Do not collapse them together.</h2>
+          <div class="doc-card-grid">
+            <div class="doc-card"><span class="doc-card-index">01</span><strong>Application</strong><p>The portable thing being distributed: its requirements, topology, workload identity, and semantic capability needs.</p></div>
+            <div class="doc-card"><span class="doc-card-index">02</span><strong>Environment</strong><p>A declaration of what one place can execute and supply: resources, workload classes, providers, versions, and features.</p></div>
+            <div class="doc-card"><span class="doc-card-index">03</span><strong>Deployment</strong><p>The result of resolving one immutable application release against one environment at one point in time.</p></div>
+            <div class="doc-card"><span class="doc-card-index">04</span><strong>Realization</strong><p>Node-side materialization of the symbolic plan into concrete runtime/provider implementations and realization-time settings.</p></div>
+          </div>
+        </section>
+
+        <section id="boundary">
+          <span class="kicker">Boundary</span>
+          <h2>What changes—and what must not.</h2>
+          <div class="doc-boundary-grid">
+            <div class="doc-boundary good"><strong>Application identity may contain</strong><ul><li>capability requirements</li><li>workload artifact identity</li><li>minimum resources</li><li>network policy</li><li>application topology</li></ul></div>
+            <div class="doc-boundary no"><strong>Application identity must not contain</strong><ul><li>selected environment ID</li><li>selected ProviderId</li><li>cloud credentials or secrets</li><li>service endpoints</li><li>database paths or connection strings</li></ul></div>
+          </div>
+          <p>This separation is the invariant exercised by every portability proof in the repository.</p>
+        </section>
+
+        <section id="resolution">
+          <span class="kicker">Resolution</span>
+          <h2>Compatible is a deterministic statement.</h2>
+          <p>A successful resolution means the environment can satisfy every mandatory application requirement represented by the current semantic model. A rejected resolution returns structured problems instead of silently falling back.</p>
+          <div class="doc-two-col">
+            <div class="doc-boundary good"><strong>Resolved</strong><p><code>component</code> execution is available, resource minimums fit, capability versions match, and required semantic features are supported.</p></div>
+            <div class="doc-boundary no"><strong>Rejected</strong><p>Examples include unsupported workload classes, insufficient resources, no compatible provider version, or a missing required feature.</p></div>
+          </div>
+          <div class="code-block"><pre><code>$ presolve check
+Status: compatible
+
+$ presolve plan
+presolve:sql/database → postgres-sql @ 0.1.0
+required: dialect-postgresql
+status: resolved</code></pre></div>
+        </section>
+
+        <section id="materialization">
+          <span class="kicker">Materialization</span>
+          <h2>ProviderId is the join.</h2>
+          <div class="doc-diagram">
+            <div class="doc-flow compact">
+              <div class="doc-node"><small>Resolver output</small><strong>DeploymentPlan</strong><code>provider_id = prv_…</code></div>
+              <div class="doc-arrow">→</div>
+              <div class="doc-node"><small>Node registry</small><strong>Provider registry</strong><code>prv_… → implementation</code></div>
+              <div class="doc-arrow">→</div>
+              <div class="doc-node good"><small>Concrete execution</small><strong>Runtime</strong><span>memory · Redis · S3 · SQLite · PostgreSQL · queue</span></div>
+            </div>
+          </div>
+          <p>Endpoint addresses, credentials, file paths, and similar operational settings are supplied only when the selected provider is realized.</p>
+        </section>
+
+        <section id="invariants">
+          <span class="kicker">Invariants</span>
+          <h2>The rules Presolve is trying to preserve.</h2>
+          <ol>
+            <li>Application identity is independent of deployment environment.</li>
+            <li>Application, Environment, and Deployment are separate concepts.</li>
+            <li>Applications request capability semantics, not vendors.</li>
+            <li>Capability semantics are independent of binding transport.</li>
+            <li>Resolver output remains symbolic until node materialization.</li>
+            <li>The runtime executes a resolved plan; it does not own environment resolution.</li>
+            <li>A <code>.presolved</code> release never encodes environment-specific provider selection.</li>
+          </ol>
+          <a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/architecture/overview.md">View canonical architecture source on GitHub ↗</a>
+        </section>
+
+        <section id="next">
+          <span class="kicker">Continue</span>
+          <h2>Follow the model into concrete files.</h2>
+          <div class="link-row">
+            <a class="link-card" href="/docs/application/"><strong>Application Contract</strong><span>Describe demand without choosing infrastructure.</span></a>
+            <a class="link-card" href="/docs/environment/"><strong>Environment Specification</strong><span>Describe execution support and provider supply.</span></a>
+            <a class="link-card" href="/docs/releases/"><strong>Immutable releases</strong><span>See exactly what becomes application identity.</span></a>
+            <a class="link-card" href="/docs/proofs/"><strong>Proofs</strong><span>Inspect the evidence that these boundaries hold.</span></a>
+          </div>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
+</body>
+</html>

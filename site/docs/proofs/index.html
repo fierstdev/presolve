@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proofs — Presolve Docs</title>
+  <meta name="description" content="Presolve portability proof matrix: KV, object storage, SQL, queue capability evidence, exact release identities, provider differences, and reproducible commands.">
+  <link rel="canonical" href="https://presolve.dev/docs/proofs/">
+  <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+<main>
+<section class="page-hero shell"><span class="kicker">Executable evidence</span><h1>Proofs, not portability slogans.</h1><p>Each proof isolates one architectural boundary, builds one immutable release, resolves it against declared environments, realizes concrete providers, and verifies application identity did not change.</p></section>
+<div class="docs-layout shell">
+<aside class="docs-nav"><strong>Documentation</strong><a href="/docs/">Overview</a><a href="/docs/model/">The model</a><a href="/docs/application/">Application Contract</a><a href="/docs/environment/">Environment</a><a href="/docs/releases/">Immutable releases</a><a href="/docs/capabilities/">Capabilities</a><a href="/docs/cli/">CLI + planning</a><a href="/docs/proofs/" aria-current="page">Proofs</a></aside>
+<article class="docs-content">
+<div class="doc-breadcrumb"><a href="/docs/">Docs</a> / Proofs</div>
+<p class="doc-lede">The goal is not to show that an adapter can be written. The goal is to expose whether one provider-neutral semantic contract survives materially different implementations while the exact application release remains unchanged.</p>
+
+<section id="coverage"><span class="kicker">Coverage matrix</span><h2>What has actually been exercised.</h2>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Capability</th><th>Providers / environments</th><th>Evidence type</th><th>Identity</th></tr></thead><tbody>
+<tr><td><code>kv/store</code></td><td>memory · Redis · Cloudflare KV</td><td>3 plans; memory + Redis execution; optional live Cloudflare execution</td><td><span class="doc-pill proven">unchanged</span></td></tr>
+<tr><td><code>objects/store</code></td><td>memory · S3-compatible HTTP service</td><td>2 plans; 2 executions</td><td><span class="doc-pill proven">unchanged</span></td></tr>
+<tr><td><code>sql/database</code></td><td>SQLite · PostgreSQL</td><td>shared conformance suite; 2 plans; 2 executions</td><td><span class="doc-pill proven">unchanged</span></td></tr>
+<tr><td><code>queue/work-queue</code></td><td>in-memory leased queue</td><td>conformance + detached-release runtime proof</td><td><span class="doc-pill proven">unchanged</span></td></tr>
+</tbody></table></div>
+<div class="note">Queue is intentionally labeled a capability proof, not cross-provider portability yet. A second materially different queue implementation is the next substitution test.</div></section>
+
+<section id="shape"><span class="kicker">Common proof shape</span><h2>The same invariant is tested repeatedly.</h2>
+<div class="doc-sequence">
+<div class="doc-sequence-step"><span>01</span><div><strong>Build the application release once.</strong><p>No environment participates in application packaging.</p></div></div>
+<div class="doc-sequence-step"><span>02</span><div><strong>Record both identities.</strong><p>Canonical Presolve release digest + SHA-256 of the exact encoded archive bytes.</p></div></div>
+<div class="doc-sequence-step"><span>03</span><div><strong>Resolve the detached release.</strong><p>The same archive reconstructs its requirements and is compared with one or more Environment Specifications.</p></div></div>
+<div class="doc-sequence-step"><span>04</span><div><strong>Realize the exact plan-selected ProviderId.</strong><p>Operational settings and credentials enter only here.</p></div></div>
+<div class="doc-sequence-step"><span>05</span><div><strong>Execute the Component bytes from the release.</strong><p>No application sidecar or provider-specific rebuild replaces the detached release.</p></div></div>
+<div class="doc-sequence-step"><span>06</span><div><strong>Re-hash and fail on mutation.</strong><p>Both the logical release digest and raw archive SHA must be unchanged.</p></div></div>
+</div></section>
+
+<section id="kv"><span class="kicker">Proof 01 · KV</span><h2>Memory → Redis → Cloudflare.</h2>
+<div class="doc-proof-map">
+<div class="doc-proof-row"><strong>Local</strong><code>memory-kv</code><span>in-process provider · resolved + executed</span><span class="doc-pill proven">executed</span></div>
+<div class="doc-proof-row"><strong>Network</strong><code>redis-kv</code><span>RESP/TCP external process · resolved + executed</span><span class="doc-pill proven">executed</span></div>
+<div class="doc-proof-row"><strong>Managed</strong><code>cloudflare-kv</code><span>Workers KV · always planned; live execution with credentials</span><span class="doc-pill">optional live</span></div>
+</div>
+<div class="code-block"><pre><code>bash ./demo/portability/run.sh
+
+release digest: sha256:fa8cb59cf09dd5ed507d865fd4b739f6229e1422367bfe1f9afdfba6adc57c5e
+archive sha256: 45e6f9dca20dce54337f34f403e772e510a1f6b6a333a44112d82c09af014344
+
+portability-local       memory-kv       value:demo-…-local
+portability-redis       redis-kv        value:demo-…-redis
+portability-cloudflare  cloudflare-kv   plan-only by default
+
+release digest unchanged: yes
+archive sha256 unchanged: yes</code></pre></div>
+<p>This is the flagship proof because it spans in-process, networked, and managed-cloud provider shapes while preserving the same application requirement.</p>
+<a class="source-link" href="https://github.com/fierstdev/presolve/tree/main/demo/portability">Inspect the exact KV proof source ↗</a></section>
+
+<section id="objects"><span class="kicker">Proof 02 · Object storage</span><h2>Memory → S3-compatible.</h2>
+<div class="doc-diagram"><div class="doc-flow compact"><div class="doc-node"><small>guest sequence</small><strong>put → head → list</strong><span>then streamed get → delete → head</span></div><div class="doc-arrow">→</div><div class="doc-node"><small>same release</small><strong>objects-demo.presolved</strong></div><div class="doc-arrow">→</div><div class="doc-node good"><small>provider substitution</small><strong>memory / S3</strong><span>same baseline semantics</span></div></div></div>
+<div class="code-block"><pre><code>bash ./scripts/check-object-portability.sh
+
+release digest: sha256:3d67508d77df06a9e9228d9128a579e64b0cc2bdce244f73e2aa148d76819670
+archive sha256: e97f42ffed06356c0f2716d0bfc0233afc81ee7ae3af96a849ed6864404f912f
+
+objects-local  memory-objects  objects:objects-2441-local
+objects-s3     s3-objects      objects:objects-2441-s3
+
+PASS — one .presolved object release, two plans,
+two provider realizations, zero application rebuilds.</code></pre></div>
+<h3>What this provider taught us</h3>
+<ul><li>S3 delete-existence must be synthesized with <code>HEAD → DELETE</code> and is not atomic against external mutation.</li><li>S3-compatible keys have a 1,024-byte provider limit the current capability IR cannot negotiate numerically.</li><li>The first signed PUT implementation buffers before mutation; multipart/large-object semantics should not be implied by the baseline.</li></ul>
+<a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/proofs/object-storage-portability.md">View detailed object proof source ↗</a></section>
+
+<section id="sql"><span class="kicker">Proof 03 · Relational SQL</span><h2>SQLite → PostgreSQL.</h2>
+<p>SQL adds an extra gate: both providers must pass the same semantic conformance suite before the application portability proof runs.</p>
+<div class="doc-proof-map"><div class="doc-proof-row"><strong>SQLite</strong><code>sqlite-sql</code><span>type/transaction conformance + detached release execution</span><span class="doc-pill proven">pass</span></div><div class="doc-proof-row"><strong>PostgreSQL</strong><code>postgres-sql</code><span>live container conformance + same detached release execution</span><span class="doc-pill proven">pass</span></div></div>
+<div class="code-block"><pre><code>bash ./scripts/check-sql-portability.sh
+
+release digest: sha256:28067c62c3fcb5ab5129d39dc9fc6a9c1c87ad0d48aa9845c762cf7c08cd85fb
+archive sha256: bf290904b11662ecfff2866fa446eff5eb9b0d33d41c709108368a4bad1bba95
+
+SQL provider conformance passed: sqlite
+SQL provider conformance passed: postgres
+
+sql-sqlite    sqlite-sql    sql:sql-2392
+sql-postgres  postgres-sql  sql:sql-2392
+
+PASS — one .presolved SQL release, two conforming engines,
+two plans, zero application rebuilds.</code></pre></div>
+<h3>A failure improved the model</h3><p>The first PostgreSQL conformance attempt exposed a fixture bias hidden by SQLite's dynamic typing: text and bytes had been tested through one column. The fixture was corrected to separate typed text/byte columns. PostgreSQL also forced zero-row column metadata to come from prepared-statement metadata rather than the first returned row.</p>
+<div class="note">Presolve does not rewrite SQL. The proof uses a deliberately shared subset and explicit bound parameters; provider-specific dialect dependence remains a negotiated feature.</div>
+<a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/proofs/sqlite-postgres-portability.md">View detailed SQL proof source ↗</a></section>
+
+<section id="queue"><span class="kicker">Proof 04 · Queue capability</span><h2>Leased delivery through the full WIT/runtime path.</h2>
+<p>The queue proof currently establishes the capability/runtime boundary with one concrete provider. It does not yet claim provider substitution.</p>
+<div class="doc-diagram"><div class="doc-flow compact"><div class="doc-node"><small>guest</small><strong>send → receive</strong><span>opaque payload</span></div><div class="doc-arrow">→</div><div class="doc-node accent"><small>delivery resource</small><strong>retry → receive</strong><span>lease/receipt remains opaque</span></div><div class="doc-arrow">→</div><div class="doc-node good"><small>settlement</small><strong>ack</strong><span>no message remains visible</span></div></div></div>
+<div class="code-block"><pre><code>bash ./scripts/check-queue-portability.sh
+
+release digest: sha256:7f848c878310c14995b7963e8e2f27ddd5173e1379de13e6627e5b532a235511
+archive sha256: 4a20e2f0e353ea53371c3bd19bb1ddbf105bb665deae31e788a02db7d767dd9c
+
+environment: queue-memory
+provider: memory-queue
+output: queue:queue-2142
+release digest unchanged: yes
+archive sha256 unchanged: yes</code></pre></div>
+<p>The reusable harness verifies active-lease hiding, abandoned-delivery redelivery, explicit retry, stale delivery-generation rejection, and opaque byte preservation without accidentally requiring FIFO or exactly-once semantics.</p>
+<div class="note">Next proof target: add a materially different network/managed queue provider and run the same immutable release through both before calling queue cross-provider portability proven.</div></section>
+
+<section id="identity"><span class="kicker">Identity invariant</span><h2>Two independent checks prevent a moving target.</h2>
+<div class="doc-identity"><div><strong>Logical release</strong><code>canonical manifest → release digest</code></div><span>+</span><div><strong>Exact file</strong><code>.presolved bytes → archive SHA-256</code></div></div>
+<p>A proof fails if either identity changes after planning or execution. This prevents a provider-specific rebuild, regenerated manifest, or silently mutated archive from being presented as portability.</p></section>
+
+<section id="evaluate"><span class="kicker">Evaluate critically</span><h2>The useful question is where the model breaks.</h2>
+<ol><li>Does an environment-specific assumption leak into the application release?</li><li>Are the capability semantics strong enough to make substitution meaningful?</li><li>Does the DeploymentPlan expose enough of the decision to audit it?</li><li>Can another provider satisfy the contract without changing application code or release identity?</li><li>Which provider limits require typed semantic properties rather than boolean feature names?</li><li>Which real workload would force Presolve to acknowledge a missing abstraction?</li></ol>
+<div class="hero-actions"><a class="button primary" href="/proof/">Open the flagship proof page</a><a class="button secondary" href="https://github.com/fierstdev/presolve/issues">Challenge the model on GitHub ↗</a></div></section>
+</article></div></main>
+<footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
+</body></html>

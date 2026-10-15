@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Immutable releases — Presolve Docs</title>
+  <meta name="description" content="How .presolved bundles encode immutable application identity without embedding environment-specific deployment decisions.">
+  <link rel="canonical" href="https://presolve.dev/docs/releases/">
+  <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+<main>
+<section class="page-hero shell"><span class="kicker">Immutable releases</span><h1>The release does not know where it will run.</h1><p>A <code>.presolved</code> file is Presolve's immutable application release artifact: application semantics and workload identity without environment-specific provider selection.</p></section>
+<div class="docs-layout shell">
+<aside class="docs-nav"><strong>Documentation</strong><a href="/docs/">Overview</a><a href="/docs/model/">The model</a><a href="/docs/application/">Application Contract</a><a href="/docs/environment/">Environment</a><a href="/docs/releases/" aria-current="page">Immutable releases</a><a href="/docs/capabilities/">Capabilities</a><a href="/docs/cli/">CLI + planning</a><a href="/docs/proofs/">Proofs</a></aside>
+<article class="docs-content">
+<div class="doc-breadcrumb"><a href="/docs/">Docs</a> / Immutable releases</div>
+<p class="doc-lede">Portability starts with a stable thing to move. Presolve packages validated application semantics and immutable workload identity once, then resolves that release against environments later.</p>
+
+<section id="format"><span class="kicker">Bundle format</span><h2>Current <code>.presolved</code> format: 0.2.</h2>
+<div class="code-block"><pre><code>orders.presolved
+├── manifest.json
+└── artifacts/
+    ├── api.wasm
+    └── worker.wasm</code></pre></div>
+<p>The archive is deterministic tar. Component artifacts are embedded under <code>artifacts/&lt;workload&gt;.wasm</code>. Container workloads record immutable OCI descriptor identity rather than registry location, tags, credentials, or pull URLs.</p></section>
+
+<section id="manifest"><span class="kicker">Manifest</span><h2>The canonical manifest carries identity.</h2>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Included</th><th>Why it matters</th></tr></thead><tbody><tr><td>application metadata + requirements</td><td>defines the portable application semantics</td></tr><tr><td>workload declarations</td><td>defines executable constituents</td></tr><tr><td>artifact path, digest, size, media type</td><td>binds Component bytes transitively into release identity</td></tr><tr><td>immutable OCI descriptor identity</td><td>binds container content without binding registry location</td></tr><tr><td>interfaces + relationships</td><td>preserves application-local topology</td></tr></tbody></table></div></section>
+
+<section id="identity"><span class="kicker">Identity</span><h2>Logical release identity is derived from canonical manifest bytes.</h2>
+<div class="doc-diagram"><div class="doc-flow compact"><div class="doc-node"><small>Application semantics</small><strong>normalized manifest model</strong></div><div class="doc-arrow">+</div><div class="doc-node"><small>Artifact identity</small><strong>digests + descriptors</strong></div><div class="doc-arrow">→</div><div class="doc-node accent"><small>Canonical serialization</small><strong>release digest</strong><code>sha256:…</code></div></div></div>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Change</th><th>Release identity</th></tr></thead><tbody><tr><td>application semantics change</td><td>changes</td></tr><tr><td>embedded workload bytes change</td><td>changes transitively through artifact digest</td></tr><tr><td>OCI content descriptor changes</td><td>changes</td></tr><tr><td>environment/provider selection changes</td><td><strong>must not change</strong></td></tr><tr><td>re-encode same logical release</td><td>remains the same</td></tr></tbody></table></div></section>
+
+<section id="two-hashes"><span class="kicker">Proof technique</span><h2>Presolve verifies both logical identity and exact archive bytes.</h2>
+<div class="doc-identity"><div><strong>Canonical release digest</strong><code>sha256:fa8cb59cf09dd5ed507d865fd4b739f6229e1422367bfe1f9afdfba6adc57c5e</code></div><span>+</span><div><strong>Encoded archive SHA-256</strong><code>45e6f9dca20dce54337f34f403e772e510a1f6b6a333a44112d82c09af014344</code></div></div>
+<p>The first identifies the logical Presolve release. The second proves that the exact file passed through planning and execution did not mutate. Every same-release proof records both before environment selection and verifies both afterward.</p></section>
+
+<section id="boundary"><span class="kicker">What is absent</span><h2>Deployment details are intentionally excluded.</h2>
+<div class="doc-boundary-grid"><div class="doc-boundary good"><strong>Inside the release</strong><ul><li>application requirements</li><li>workload identity</li><li>capability requirements</li><li>resource/network intent</li><li>application topology</li></ul></div><div class="doc-boundary no"><strong>Outside the release</strong><ul><li>selected EnvironmentId</li><li>selected ProviderIds</li><li>DeploymentPlan</li><li>credentials/secrets</li><li>endpoints, buckets, database paths</li><li>registry locations and deployment placement</li></ul></div></div></section>
+
+<section id="workload-models"><span class="kicker">Workload identity</span><h2>Components and containers participate differently.</h2>
+<div class="doc-two-col"><div class="doc-boundary good"><strong>Component workload</strong><p>The <code>.wasm</code> artifact is embedded in the archive. Its digest, size, and media type are recorded in the manifest.</p></div><div class="doc-boundary good"><strong>Container workload</strong><p>The release records the immutable OCI image manifest/index descriptor. Registry hostname, repository, tag, credentials, and pull URL remain outside application identity.</p></div></div></section>
+
+<section id="verification"><span class="kicker">Verification</span><h2>Decoding revalidates the release.</h2><p>The bundle decoder verifies supported format, safe paths, duplicate/unexpected entries, topology, artifact shape, embedded artifact presence, OCI descriptor form, artifact sizes/digests, and capability requirement structure. Malformed or adversarial archives are rejected before resolution/execution.</p>
+<div class="code-block"><pre><code>$ presolve build
+release: dist/orders.presolved
+
+$ presolve inspect dist/orders.presolved
+# reads application semantics back from the detached release
+
+$ cd path/to/environment
+$ presolve plan /absolute/path/to/dist/orders.presolved
+# discovers presolve.env.toml here and resolves without rebuilding</code></pre></div>
+<a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/presolved-bundle.md">View canonical bundle reference on GitHub ↗</a></section>
+
+<section id="proof"><span class="kicker">Evidence</span><h2>The invariant is executable.</h2><p>KV, object storage, and SQL now each have public same-release proofs. Queue has a detached-release capability proof with one provider and is the next target for cross-provider substitution.</p><a class="link-card" href="/docs/proofs/"><strong>Explore all proofs</strong><span>Digests, provider matrices, commands, observed semantic differences, and explicit non-claims.</span></a></section>
+</article></div></main>
+<footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
+</body></html>

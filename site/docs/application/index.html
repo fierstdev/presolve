@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Application Contract — Presolve Docs</title>
+  <meta name="description" content="Presolve Application Contract reference with complete presolve.toml examples, workloads, capabilities, resources, topology, and boundaries.">
+  <link rel="canonical" href="https://presolve.dev/docs/application/">
+  <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+<main>
+<section class="page-hero shell"><span class="kicker">Application Contract</span><h1>Describe the application, not the infrastructure.</h1><p><code>presolve.toml</code> is the versioned, environment-independent declaration of application semantics and requirements.</p></section>
+<div class="docs-layout shell">
+<aside class="docs-nav"><strong>Documentation</strong><a href="/docs/">Overview</a><a href="/docs/model/">The model</a><a href="/docs/application/" aria-current="page">Application Contract</a><a href="/docs/environment/">Environment</a><a href="/docs/releases/">Immutable releases</a><a href="/docs/capabilities/">Capabilities</a><a href="/docs/cli/">CLI + planning</a><a href="/docs/proofs/">Proofs</a></aside>
+<article class="docs-content">
+<div class="doc-breadcrumb"><a href="/docs/">Docs</a> / Application Contract</div>
+<p class="doc-lede">The Application Contract answers one question: what must remain true about this application regardless of where it is eventually realized?</p>
+
+<section id="example"><span class="kicker">Complete example</span><h2>A multi-capability application.</h2>
+<div class="code-block"><pre><code>contract_version = "0.1"
+
+[application]
+name = "orders"
+version = "1.0.0"
+description = "Example order-processing application"
+
+[[workloads]]
+name = "api"
+kind = "component"
+
+[[workloads]]
+name = "worker"
+kind = "component"
+
+[[interfaces]]
+name = "jobs"
+kind = "event"
+
+[[relationships]]
+from = "api"
+to = "worker"
+interface = "jobs"
+
+[[capabilities]]
+interface = "presolve:kv/store"
+version = "^0.1"
+
+[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+preferred_features = ["range-read"]
+
+[[capabilities]]
+interface = "presolve:sql/database"
+version = "^0.1"
+
+[[capabilities]]
+interface = "presolve:queue/work-queue"
+version = "^0.1"
+
+[resources]
+memory_mib = 256
+cpu_millis = 500
+
+[network]
+outbound = "deny"</code></pre></div>
+<p>Nothing above selects Redis, PostgreSQL, S3, Cloudflare, a filesystem path, a cloud account, or a deployment region. Those are environment/realization concerns.</p></section>
+
+<section id="shape"><span class="kicker">Schema 0.1</span><h2>What the contract can express.</h2>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Section</th><th>Purpose</th><th>Examples</th></tr></thead><tbody>
+<tr><td><code>[application]</code></td><td>Stable application metadata</td><td>name · version · description</td></tr>
+<tr><td><code>[[workloads]]</code></td><td>Logical executable constituents</td><td>Component · container</td></tr>
+<tr><td><code>[[interfaces]]</code></td><td>Application-local communication semantics</td><td>request_response · event</td></tr>
+<tr><td><code>[[relationships]]</code></td><td>Topology between workloads</td><td>api → worker over jobs</td></tr>
+<tr><td><code>[[capabilities]]</code></td><td>External semantic dependencies</td><td>KV · objects · SQL · queue</td></tr>
+<tr><td><code>[resources]</code></td><td>Minimum runtime requirements</td><td>memory_mib · cpu_millis</td></tr>
+<tr><td><code>[network]</code></td><td>Outbound application policy</td><td>deny · allow_list · allow_all</td></tr>
+</tbody></table></div></section>
+
+<section id="workloads"><span class="kicker">Workloads</span><h2>Logical execution units belong to the application.</h2>
+<div class="doc-two-col"><div class="doc-boundary good"><strong>Component</strong><p>A WebAssembly Component workload. Component artifacts can be embedded directly in the immutable release.</p></div><div class="doc-boundary good"><strong>Container</strong><p>An OCI-compatible workload whose immutable descriptor identity is represented by the release without embedding registry location or credentials.</p></div></div>
+<p>Artifact build paths, registry URLs, placement, node names, and provider configuration do not belong in the Application Contract.</p></section>
+
+<section id="capabilities"><span class="kicker">Capabilities</span><h2>Declare semantics and version compatibility.</h2>
+<div class="code-block"><pre><code>[[capabilities]]
+interface = "presolve:sql/database"
+version = "^0.1"
+optional = false
+required_features = ["dialect-postgresql"]
+preferred_features = ["returning"]</code></pre></div>
+<p><code>required_features</code> are hard compatibility constraints. <code>preferred_features</code> influence provider ranking but do not make an otherwise-compatible environment invalid. <code>optional = true</code> permits a capability to remain unbound.</p>
+<p><a href="/docs/capabilities/">Read the capability-contract reference →</a></p></section>
+
+<section id="topology"><span class="kicker">Topology</span><h2>Describe relationships without choosing transport.</h2>
+<div class="doc-diagram"><div class="doc-flow compact"><div class="doc-node"><small>workload</small><strong>api</strong></div><div class="doc-arrow">→</div><div class="doc-node accent"><small>interface</small><strong>jobs</strong><code>event</code></div><div class="doc-arrow">→</div><div class="doc-node"><small>workload</small><strong>worker</strong></div></div></div>
+<p>The relationship says the application has this communication shape. It does not require HTTP, a queue product, a service mesh, or another transport unless those semantics are separately declared.</p></section>
+
+<section id="network"><span class="kicker">Network policy</span><h2>Outbound access is application intent.</h2>
+<div class="code-block"><pre><code>[network]
+outbound = "allow_list"
+allow = ["api.example.com", "storage.example.com:443"]</code></pre></div>
+<p>Targets are hosts or host-and-port values, not URLs. The default is <code>deny</code>.</p></section>
+
+<section id="boundary"><span class="kicker">Boundary</span><h2>What belongs here?</h2>
+<div class="doc-boundary-grid"><div class="doc-boundary good"><strong>Yes — application semantics</strong><ul><li>workload classes</li><li>capability requirements</li><li>required/preferred semantic features</li><li>minimum resource requirements</li><li>network policy</li><li>application-local topology</li></ul></div><div class="doc-boundary no"><strong>No — deployment realization</strong><ul><li>environment selection</li><li>ProviderIds</li><li>provider credentials</li><li>service endpoints</li><li>database paths</li><li>registry location or placement</li></ul></div></div>
+<div class="note">If changing an environment would force you to edit <code>presolve.toml</code> even though application semantics did not change, that is a portability-boundary smell.</div></section>
+
+<section id="validation"><span class="kicker">Validation</span><h2>Contracts fail loudly.</h2><p>Unknown fields are rejected. Presolve validates naming, workload and interface references, capability identifiers/versions/features, resource values, network policy, duplicate declarations, and topology invariants before normalization.</p>
+<div class="code-block"><pre><code>$ presolve inspect
+$ presolve build
+$ presolve check
+$ presolve plan</code></pre></div>
+<a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/application-contract.md">View canonical reference source on GitHub ↗</a></section>
+
+<section id="next"><span class="kicker">Continue</span><h2>Now describe where it could run.</h2><div class="link-row"><a class="link-card" href="/docs/environment/"><strong>Environment Specification</strong><span>Declare concrete supply without changing application identity.</span></a><a class="link-card" href="/docs/releases/"><strong>Immutable releases</strong><span>See how the validated application becomes a distributable artifact.</span></a></div></section>
+</article></div></main>
+<footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
+</body></html>

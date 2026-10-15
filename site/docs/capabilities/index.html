@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Capabilities — Presolve Docs</title>
+  <meta name="description" content="Presolve capability contracts, semantic guarantees, optional features, current providers, and proof coverage.">
+  <link rel="canonical" href="https://presolve.dev/docs/capabilities/">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/docs/mobile.css">
+  <link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+  <header class="site-header"><div class="shell nav-shell"><a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+
+  <main>
+    <section class="page-hero shell">
+      <span class="kicker">Capability contracts</span>
+      <h1>Request semantics, not vendors.</h1>
+      <p>Capabilities describe what an application needs and what a provider guarantees, independently of cloud, protocol, runtime, or implementation language.</p>
+    </section>
+
+    <div class="docs-layout shell">
+      <aside class="docs-nav">
+        <strong>Documentation</strong>
+        <a href="/docs/">Overview</a>
+        <a href="/docs/model/">The model</a>
+        <a href="/docs/application/">Application Contract</a>
+        <a href="/docs/environment/">Environment</a>
+        <a href="/docs/releases/">Immutable releases</a>
+        <a href="/docs/capabilities/" aria-current="page">Capabilities</a>
+        <a href="/docs/cli/">CLI + planning</a>
+        <a href="/docs/proofs/">Proofs</a>
+      </aside>
+
+      <article class="docs-content">
+        <div class="doc-breadcrumb"><a href="/docs/">Docs</a> / Capabilities</div>
+        <p class="doc-lede">A Presolve capability contract has a stable semantic identity, a version, baseline operations, mandatory guarantees, and optional feature vocabulary. Providers advertise the exact version and features they really support; applications declare what they require or prefer.</p>
+
+        <section id="negotiation">
+          <span class="kicker">Negotiation</span>
+          <h2>Required is a constraint. Preferred is a ranking signal.</h2>
+          <div class="code-block"><pre><code>[[capabilities]]
+interface = "presolve:objects/store"
+version = "^0.1"
+required_features = ["range-read"]
+preferred_features = ["user-metadata"]</code></pre></div>
+          <div class="doc-sequence">
+            <div class="doc-sequence-step"><span>01</span><div><strong>Match interface + version.</strong><p>The environment advertises concrete supply such as <code>presolve:objects/store@0.1.0</code>.</p></div></div>
+            <div class="doc-sequence-step"><span>02</span><div><strong>Enforce required features.</strong><p>If a provider lacks <code>range-read</code>, it is not compatible for this application.</p></div></div>
+            <div class="doc-sequence-step"><span>03</span><div><strong>Rank preferred features.</strong><p><code>user-metadata</code> may make one otherwise-compatible provider preferable without making the environment invalid.</p></div></div>
+            <div class="doc-sequence-step"><span>04</span><div><strong>Record what was negotiated.</strong><p>The DeploymentPlan exposes the selected ProviderId, version, and requested features actually satisfied.</p></div></div>
+          </div>
+        </section>
+
+        <section id="matrix">
+          <span class="kicker">Built-in contracts</span>
+          <h2>The current capability surface.</h2>
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead><tr><th>Capability</th><th>Baseline operations</th><th>Current realizations</th><th>Evidence</th></tr></thead>
+              <tbody>
+                <tr><td><code>presolve:kv/store@0.1.0</code></td><td>get · set · delete</td><td>memory · Redis · Cloudflare Workers KV</td><td><span class="doc-pill proven">same-release proof</span></td></tr>
+                <tr><td><code>presolve:objects/store@0.1.0</code></td><td>get · put · head · list · delete</td><td>memory · S3-compatible</td><td><span class="doc-pill proven">same-release proof</span></td></tr>
+                <tr><td><code>presolve:sql/database@0.1.0</code></td><td>execute · query · begin · commit · rollback</td><td>SQLite · PostgreSQL</td><td><span class="doc-pill proven">same-release proof</span></td></tr>
+                <tr><td><code>presolve:queue/work-queue@0.1.0</code></td><td>send · receive · ack · retry</td><td>in-memory leased queue</td><td><span class="doc-pill next">capability proof</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="kv">
+          <span class="kicker">KV</span>
+          <h2><code>presolve:kv/store@0.1.0</code></h2>
+          <p>The smallest built-in contract establishes exact-key state semantics without prescribing whether the implementation is an in-process map, Redis, or a managed cloud KV service.</p>
+          <h3>Mandatory guarantees</h3>
+          <div class="doc-pill-row"><span class="doc-pill">exact-key-identity</span><span class="doc-pill">missing-distinct-from-empty</span><span class="doc-pill">set-replaces-value</span></div>
+          <p>There are currently no optional KV features in the 0.1 contract. The flagship proof exercises memory, Redis, and Cloudflare resolution with the same immutable application release.</p>
+        </section>
+
+        <section id="objects">
+          <span class="kicker">Object storage</span>
+          <h2><code>presolve:objects/store@0.1.0</code></h2>
+          <p>Object storage introduces opaque byte bodies, metadata, prefix listing, streaming reads, and provider limits that are materially different from KV.</p>
+          <h3>Mandatory guarantees</h3>
+          <div class="doc-pill-row"><span class="doc-pill">exact-key-identity</span><span class="doc-pill">opaque-byte-content</span><span class="doc-pill">put-replaces-object</span><span class="doc-pill">read-after-write</span><span class="doc-pill">delete-idempotent</span></div>
+          <h3>Optional features</h3>
+          <div class="doc-pill-row"><span class="doc-pill optional">range-read</span><span class="doc-pill optional">conditional-write</span><span class="doc-pill optional">user-metadata</span></div>
+          <div class="note">The S3-compatible proof exposed real abstraction pressure: S3 delete-existence must be synthesized, S3 keys have a 1,024-byte limit, and large multipart upload semantics are not yet part of the portable baseline.</div>
+        </section>
+
+        <section id="sql">
+          <span class="kicker">Relational SQL</span>
+          <h2><code>presolve:sql/database@0.1.0</code></h2>
+          <p>Presolve standardizes parameter binding, a portable scalar/result model, and transaction ownership. It deliberately does <strong>not</strong> claim that arbitrary SQL source is dialect-portable.</p>
+          <h3>Baseline guarantees</h3>
+          <div class="doc-pill-row"><span class="doc-pill">bound-parameters</span><span class="doc-pill">portable-scalar-values</span><span class="doc-pill">ordered-result-columns</span><span class="doc-pill">transaction-atomicity</span><span class="doc-pill">transaction-session-affinity</span><span class="doc-pill">uncommitted-drop-rolls-back</span></div>
+          <h3>Optional features</h3>
+          <div class="doc-pill-row"><span class="doc-pill optional">dialect-postgresql</span><span class="doc-pill optional">dialect-sqlite</span><span class="doc-pill optional">read-only-transactions</span><span class="doc-pill optional">returning</span><span class="doc-pill optional">savepoints</span><span class="doc-pill optional">serializable-transactions</span></div>
+          <div class="code-block"><pre><code>[[capabilities]]
+interface = "presolve:sql/database"
+version = "^0.1"
+required_features = ["dialect-postgresql"]
+preferred_features = ["returning"]</code></pre></div>
+          <p>The SQLite/PostgreSQL proof uses a deliberately shared SQL subset and the same bound <code>$1</code>, <code>$2</code>, … parameter form. Presolve does not rewrite SQL.</p>
+        </section>
+
+        <section id="queue">
+          <span class="kicker">Work queues</span>
+          <h2><code>presolve:queue/work-queue@0.1.0</code></h2>
+          <p>The baseline models pull-style work distribution: send opaque bytes, receive a finite leased delivery, explicitly acknowledge success, or request retry. Duplicate delivery is legal baseline behavior.</p>
+          <h3>Mandatory guarantees</h3>
+          <div class="doc-pill-row"><span class="doc-pill">at-least-once-delivery</span><span class="doc-pill">leased-delivery</span><span class="doc-pill">explicit-acknowledgement</span><span class="doc-pill">unacknowledged-redelivery</span><span class="doc-pill">retry-preserves-body</span><span class="doc-pill">provider-defined-delivery-order</span></div>
+          <h3>Optional features</h3>
+          <div class="doc-pill-row"><span class="doc-pill optional">delayed-send</span><span class="doc-pill optional">delayed-retry</span><span class="doc-pill optional">delivery-attempt-count</span><span class="doc-pill optional">dead-letter-routing</span><span class="doc-pill optional">configurable-lease-duration</span><span class="doc-pill optional">ordered-receive</span></div>
+          <div class="note">Queue workload triggering is intentionally separate. “This queue exists” and “invoke this workload when a message arrives” are different deployment concerns.</div>
+        </section>
+
+        <section id="transport">
+          <span class="kicker">Transport independence</span>
+          <h2>WIT is a binding target, not the semantic contract.</h2>
+          <div class="doc-diagram">
+            <div class="doc-flow compact">
+              <div class="doc-node accent"><small>Canonical</small><strong>Capability Contract</strong><span>operations · guarantees · features</span></div>
+              <div class="doc-arrow">→</div>
+              <div class="doc-node"><small>Projection</small><strong>WIT / Rust SDK</strong><span>typed binding surface</span></div>
+              <div class="doc-arrow">→</div>
+              <div class="doc-node good"><small>Realization</small><strong>Provider implementation</strong><span>Redis · S3 · PostgreSQL · etc.</span></div>
+            </div>
+          </div>
+          <p>Capability semantics remain independent of ABI, protocol, deployment platform, or implementation language. A future non-Wasm workload can still request the same semantic capability.</p>
+          <a class="source-link" href="https://github.com/fierstdev/presolve/tree/main/crates/presolve-capability/src">View canonical contract definitions on GitHub ↗</a>
+        </section>
+
+        <section id="limits">
+          <span class="kicker">What comes next</span>
+          <h2>Boolean features will not be enough forever.</h2>
+          <p>Real providers have exposed semantic dimensions that are values rather than yes/no features: key-size limits, SQL limits, queue message-size limits, retention ranges, lease-duration ranges, and similar constraints. Presolve has not added a typed semantic-property system yet; provider evidence will determine what that model needs.</p>
+          <a class="link-card" href="/docs/proofs/"><strong>See the proof evidence</strong><span>How real providers have already changed and sharpened the abstractions.</span></a>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
+</body>
+</html>
