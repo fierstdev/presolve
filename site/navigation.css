@@ -1,5 +1,19 @@
 /* Shared navigation enhancement. Loaded after styles.css. */
 
+.docs-toc a[aria-current="location"] {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.docs-page-menu-inner a[aria-current="location"] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.nav-links a[aria-current="page"] {
+  color: var(--text);
+}
+
 @media (max-width: 900px) {
   /* No-JS fallback: keep the original navigation usable instead of hiding it. */
   html:not(.js) .nav-links {
