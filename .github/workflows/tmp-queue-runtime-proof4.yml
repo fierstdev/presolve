@@ -1,0 +1,24 @@
+name: Temporary queue runtime proof 4
+
+on:
+  push:
+    branches:
+      - tmp/queue-runtime-proof4
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --target wasm32-wasip2
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: queue-proof-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            queue-proof-
+      - name: Execute queue runtime proof
+        run: bash ./scripts/check-queue-portability.sh
