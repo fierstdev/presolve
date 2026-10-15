@@ -50,8 +50,9 @@ release: dist/orders.presolved
 $ presolve inspect dist/orders.presolved
 # reads application semantics back from the detached release
 
-$ presolve plan dist/orders.presolved --environment ./presolve.env.toml
-# resolves the release later, without rebuilding it</code></pre></div>
+$ cd path/to/environment
+$ presolve plan /absolute/path/to/dist/orders.presolved
+# discovers presolve.env.toml here and resolves without rebuilding</code></pre></div>
 <a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/presolved-bundle.md">View canonical bundle reference on GitHub ↗</a></section>
 
 <section id="proof"><span class="kicker">Evidence</span><h2>The invariant is executable.</h2><p>KV, object storage, and SQL now each have public same-release proofs. Queue has a detached-release capability proof with one provider and is the next target for cross-provider substitution.</p><a class="link-card" href="/docs/proofs/"><strong>Explore all proofs</strong><span>Digests, provider matrices, commands, observed semantic differences, and explicit non-claims.</span></a></section>
