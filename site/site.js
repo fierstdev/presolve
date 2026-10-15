@@ -52,7 +52,9 @@
 
   function isCurrent(href) {
     if (href.startsWith("http") || href.includes("#")) return false;
-    return normalizePath(href) === currentPath;
+    const normalized = normalizePath(href);
+    if (normalized === "/docs/") return currentPath.startsWith("/docs/");
+    return normalized === currentPath;
   }
 
   function makeLink(label, href) {
@@ -61,6 +63,13 @@
     link.textContent = label;
     if (isCurrent(href)) link.setAttribute("aria-current", "page");
     return link;
+  }
+
+  function markDesktopNavigation() {
+    document.querySelectorAll(".nav-links a").forEach((link) => {
+      const href = link.getAttribute("href");
+      if (href && isCurrent(href)) link.setAttribute("aria-current", "page");
+    });
   }
 
   function buildDocsGroups(container, compact = false) {
@@ -99,9 +108,7 @@
     SITE_LINKS.forEach(([label, href]) => primary.append(makeLink(label, href)));
     panel.append(primary);
 
-    if (currentPath.startsWith("/docs/")) {
-      buildDocsGroups(panel, true);
-    }
+    if (currentPath.startsWith("/docs/")) buildDocsGroups(panel, true);
 
     details.append(panel);
     shell.append(details);
@@ -137,10 +144,12 @@
     const summary = document.createElement("summary");
     summary.textContent = "Browse documentation";
     mobileTree.append(summary);
+
     const tree = document.createElement("nav");
     tree.setAttribute("aria-label", "Documentation navigation");
     buildDocsGroups(tree);
     mobileTree.append(tree);
+
     layout.insertBefore(mobileTree, layout.querySelector(".docs-content"));
   }
 
@@ -148,7 +157,6 @@
     return value
       .toLowerCase()
       .trim()
-      .replace(/<[^>]+>/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "section";
   }
@@ -171,6 +179,7 @@
       });
 
       return {
+        element: section,
         label: heading.textContent.trim(),
         href: `#${section.id}`,
         children,
@@ -221,8 +230,38 @@
     mobileOutline.addEventListener("click", (event) => {
       if (event.target.closest("a")) mobileOutline.removeAttribute("open");
     });
+
+    let ticking = false;
+    const updateCurrentSection = () => {
+      ticking = false;
+      const threshold = 160;
+      let active = entries[0];
+      for (const entry of entries) {
+        if (entry.element.getBoundingClientRect().top <= threshold) active = entry;
+        else break;
+      }
+
+      document.querySelectorAll(".docs-toc a[aria-current='location'], .docs-page-menu-inner a[aria-current='location']")
+        .forEach((link) => link.removeAttribute("aria-current"));
+
+      const escapedId = CSS.escape(active.element.id);
+      document.querySelectorAll(`.docs-toc a[href='#${escapedId}'], .docs-page-menu-inner a[href='#${escapedId}']`)
+        .forEach((link) => link.setAttribute("aria-current", "location"));
+    };
+
+    const requestUpdate = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(updateCurrentSection);
+    };
+
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+    window.addEventListener("resize", requestUpdate);
+    window.addEventListener("hashchange", requestUpdate);
+    updateCurrentSection();
   }
 
+  markDesktopNavigation();
   buildMobileMenu();
   enhanceDocsTree();
   buildPageOutline();
