@@ -162,21 +162,18 @@ impl database::HostTransaction for RuntimeState {
 }
 
 impl database::HostQueryResult for RuntimeState {
-    fn columns(
-        &mut self,
-        result: Resource<database::QueryResult>,
-    ) -> wasmtime::Result<Vec<database::Column>> {
-        let result = self
-            .sql_query_result_mut(result.rep())
-            .ok_or_else(|| wasmtime::Error::msg("unknown SQL query-result resource"))?;
+    fn columns(&mut self, result: Resource<database::QueryResult>) -> Vec<database::Column> {
+        let result = self.sql_query_result_mut(result.rep()).expect(
+            "Component resource table and SQL query-result state must stay synchronized",
+        );
 
-        Ok(result
+        result
             .columns()
             .iter()
             .map(|column| database::Column {
                 name: column.name().to_owned(),
             })
-            .collect())
+            .collect()
     }
 
     fn next_row(
