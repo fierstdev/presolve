@@ -78,13 +78,8 @@ fn main() -> Result<()> {
         )
         .context("memory queue adapter should register")?;
 
-    let registry = realize_plan_providers(
-        plan,
-        &profiles,
-        &adapters,
-        &EnvironmentSecretResolver,
-    )
-    .context("could not realize plan-selected memory queue provider")?;
+    let registry = realize_plan_providers(plan, &profiles, &adapters, &EnvironmentSecretResolver)
+        .context("could not realize plan-selected memory queue provider")?;
 
     let component = component_bytes_from_release(&release_bytes, &bundle)?;
     let runtime = assemble_runtime(plan, &registry)
