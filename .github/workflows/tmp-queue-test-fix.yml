@@ -1,0 +1,48 @@
+name: Temporary queue test fix
+
+on:
+  push:
+    branches:
+      - tmp/queue-test-fix
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/queue-test-fix
+      - run: rustup toolchain install stable --profile minimal --component rustfmt
+      - name: Remove Debug requirement from negative receive assertion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('providers/queue-memory/src/lib.rs')
+          text = path.read_text()
+          old = '''        let custom_lease = provider
+              .receive(WorkQueueReceiveOptions::new().with_lease_duration(Duration::from_secs(1)))
+              .expect_err("custom lease should require negotiation");
+          assert_eq!(custom_lease.code(), WorkQueueErrorCode::Unsupported);
+          '''
+          new = '''        let Err(custom_lease) = provider
+              .receive(WorkQueueReceiveOptions::new().with_lease_duration(Duration::from_secs(1)))
+          else {
+              panic!("custom lease should require negotiation");
+          };
+          assert_eq!(custom_lease.code(), WorkQueueErrorCode::Unsupported);
+          '''
+          if old not in text:
+              raise SystemExit('target assertion not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          cargo fmt --all
+      - name: Commit corrected provider test
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add providers/queue-memory/src/lib.rs
+          git commit -m "test: avoid Debug bound on queue deliveries"
+          git push origin HEAD:tmp/queue-test-fix
