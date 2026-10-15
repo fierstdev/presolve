@@ -1,0 +1,17 @@
+name: Temporary queue demo validation
+
+on:
+  push:
+    branches:
+      - tmp/queue-demo-validate
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component rustfmt --target wasm32-wasip2
+      - name: Check queue example formatting
+        run: cargo fmt --manifest-path examples/queue-demo/Cargo.toml -- --check
+      - name: Build queue Component
+        run: cargo build --manifest-path examples/queue-demo/Cargo.toml --target wasm32-wasip2 --release
