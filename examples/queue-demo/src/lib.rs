@@ -16,10 +16,8 @@ impl bindings::Guest for QueueComponent {
     fn run(input: String) -> String {
         let expected = input.into_bytes();
 
-        if let Err(error) = work_queue::send(
-            &expected,
-            work_queue::SendOptions { delay_ms: None },
-        ) {
+        if let Err(error) = work_queue::send(&expected, work_queue::SendOptions { delay_ms: None })
+        {
             return format!("error:send:{}", error_code(error));
         }
 
@@ -33,10 +31,7 @@ impl bindings::Guest for QueueComponent {
             return "error:first-body-mismatch".to_owned();
         }
 
-        if let Err(error) = work_queue::retry(
-            first,
-            work_queue::RetryOptions { delay_ms: None },
-        ) {
+        if let Err(error) = work_queue::retry(first, work_queue::RetryOptions { delay_ms: None }) {
             return format!("error:retry:{}", error_code(error));
         }
 
