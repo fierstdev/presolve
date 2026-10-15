@@ -23,6 +23,9 @@ pub const DEFAULT_MAX_OBJECT_SESSIONS: usize = 128;
 /// Default maximum number of simultaneously open SQL transaction/result sessions.
 pub const DEFAULT_MAX_SQL_SESSIONS: usize = 128;
 
+/// Default maximum number of simultaneously open work-queue deliveries.
+pub const DEFAULT_MAX_QUEUE_DELIVERIES: usize = 128;
+
 /// Default maximum number of core instances in one store.
 pub const DEFAULT_MAX_INSTANCES: usize = 1_024;
 
@@ -57,6 +60,7 @@ pub struct RuntimeLimits {
     max_object_buffer_bytes: usize,
     max_object_sessions: usize,
     max_sql_sessions: usize,
+    max_queue_deliveries: usize,
     max_instances: usize,
     max_memories: usize,
     max_tables: usize,
@@ -74,6 +78,7 @@ impl RuntimeLimits {
             max_object_buffer_bytes: DEFAULT_MAX_OBJECT_BUFFER_BYTES,
             max_object_sessions: DEFAULT_MAX_OBJECT_SESSIONS,
             max_sql_sessions: DEFAULT_MAX_SQL_SESSIONS,
+            max_queue_deliveries: DEFAULT_MAX_QUEUE_DELIVERIES,
             max_instances: DEFAULT_MAX_INSTANCES,
             max_memories: DEFAULT_MAX_MEMORIES,
             max_tables: DEFAULT_MAX_TABLES,
@@ -114,6 +119,13 @@ impl RuntimeLimits {
     #[must_use]
     pub const fn with_max_sql_sessions(mut self, max_sql_sessions: usize) -> Self {
         self.max_sql_sessions = max_sql_sessions;
+        self
+    }
+
+    /// Sets the maximum number of simultaneously open work-queue deliveries.
+    #[must_use]
+    pub const fn with_max_queue_deliveries(mut self, max_queue_deliveries: usize) -> Self {
+        self.max_queue_deliveries = max_queue_deliveries;
         self
     }
 
@@ -184,6 +196,12 @@ impl RuntimeLimits {
     #[must_use]
     pub const fn max_sql_sessions(self) -> usize {
         self.max_sql_sessions
+    }
+
+    /// Returns the maximum simultaneously open work-queue deliveries.
+    #[must_use]
+    pub const fn max_queue_deliveries(self) -> usize {
+        self.max_queue_deliveries
     }
 
     /// Returns the maximum number of core instances.
@@ -264,6 +282,7 @@ mod tests {
         );
         assert_eq!(limits.max_object_sessions(), DEFAULT_MAX_OBJECT_SESSIONS);
         assert_eq!(limits.max_sql_sessions(), DEFAULT_MAX_SQL_SESSIONS);
+        assert_eq!(limits.max_queue_deliveries(), DEFAULT_MAX_QUEUE_DELIVERIES);
         assert_eq!(limits.max_instances(), DEFAULT_MAX_INSTANCES);
         assert_eq!(limits.max_memories(), DEFAULT_MAX_MEMORIES);
         assert_eq!(limits.max_tables(), DEFAULT_MAX_TABLES);
@@ -279,6 +298,7 @@ mod tests {
             .with_max_object_buffer_bytes(4 * MIB)
             .with_max_object_sessions(7)
             .with_max_sql_sessions(9)
+            .with_max_queue_deliveries(11)
             .with_max_instances(10)
             .with_max_memories(4)
             .with_max_tables(5)
@@ -290,6 +310,7 @@ mod tests {
         assert_eq!(limits.max_object_buffer_bytes(), 4 * MIB);
         assert_eq!(limits.max_object_sessions(), 7);
         assert_eq!(limits.max_sql_sessions(), 9);
+        assert_eq!(limits.max_queue_deliveries(), 11);
         assert_eq!(limits.max_instances(), 10);
         assert_eq!(limits.max_memories(), 4);
         assert_eq!(limits.max_tables(), 5);

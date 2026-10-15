@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-#[cfg(test)]
-use presolve_provider_sdk::UnavailableSqlDatabaseProvider;
 use presolve_provider_sdk::{
     KeyValueProvider, ObjectRead, ObjectStoreProvider, SqlDatabaseProvider, SqlQueryResult,
-    SqlTransaction,
+    SqlTransaction, WorkQueueDelivery, WorkQueueProvider,
 };
+#[cfg(test)]
+use presolve_provider_sdk::{UnavailableSqlDatabaseProvider, UnavailableWorkQueueProvider};
 use wasmtime::{ResourceLimiter, StoreLimits, component::ResourceTable};
 use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
 
@@ -28,6 +28,7 @@ pub(crate) struct RuntimeState {
     key_value_provider: Arc<dyn KeyValueProvider>,
     object_store_provider: Arc<dyn ObjectStoreProvider>,
     sql_database_provider: Arc<dyn SqlDatabaseProvider>,
+    work_queue_provider: Arc<dyn WorkQueueProvider>,
     object_reads: BTreeMap<u64, ObjectRead>,
     object_writes: BTreeMap<u64, PendingObjectWrite>,
     max_object_buffer_bytes: usize,
@@ -38,6 +39,9 @@ pub(crate) struct RuntimeState {
     sql_query_results: BTreeMap<u32, SqlQueryResult>,
     max_sql_sessions: usize,
     next_sql_handle: u32,
+    queue_deliveries: BTreeMap<u32, Box<dyn WorkQueueDelivery>>,
+    max_queue_deliveries: usize,
+    next_queue_handle: u32,
 }
 
 impl RuntimeState {
@@ -48,20 +52,22 @@ impl RuntimeState {
         key_value_provider: Arc<dyn KeyValueProvider>,
         object_store_provider: Arc<dyn ObjectStoreProvider>,
     ) -> Self {
-        Self::new_with_sql(
+        Self::new_with_capabilities(
             runtime_limits,
             key_value_provider,
             object_store_provider,
             Arc::new(UnavailableSqlDatabaseProvider),
+            Arc::new(UnavailableWorkQueueProvider),
         )
     }
 
     #[must_use]
-    pub(crate) fn new_with_sql(
+    pub(crate) fn new_with_capabilities(
         runtime_limits: RuntimeLimits,
         key_value_provider: Arc<dyn KeyValueProvider>,
         object_store_provider: Arc<dyn ObjectStoreProvider>,
         sql_database_provider: Arc<dyn SqlDatabaseProvider>,
+        work_queue_provider: Arc<dyn WorkQueueProvider>,
     ) -> Self {
         let mut builder = WasiCtx::builder();
 
@@ -72,6 +78,7 @@ impl RuntimeState {
             key_value_provider,
             object_store_provider,
             sql_database_provider,
+            work_queue_provider,
             object_reads: BTreeMap::new(),
             object_writes: BTreeMap::new(),
             max_object_buffer_bytes: runtime_limits.max_object_buffer_bytes(),
@@ -82,6 +89,9 @@ impl RuntimeState {
             sql_query_results: BTreeMap::new(),
             max_sql_sessions: runtime_limits.max_sql_sessions(),
             next_sql_handle: 1,
+            queue_deliveries: BTreeMap::new(),
+            max_queue_deliveries: runtime_limits.max_queue_deliveries(),
+            next_queue_handle: 1,
         }
     }
 
@@ -99,6 +109,10 @@ impl RuntimeState {
 
     pub(crate) fn sql_database_provider(&self) -> &dyn SqlDatabaseProvider {
         self.sql_database_provider.as_ref()
+    }
+
+    pub(crate) fn work_queue_provider(&self) -> &dyn WorkQueueProvider {
+        self.work_queue_provider.as_ref()
     }
 
     pub(crate) fn allocate_object_handle(&mut self) -> Option<u64> {
@@ -209,6 +223,35 @@ impl RuntimeState {
 
     pub(crate) fn remove_sql_query_result(&mut self, handle: u32) -> Option<SqlQueryResult> {
         self.sql_query_results.remove(&handle)
+    }
+
+    pub(crate) fn can_open_queue_delivery(&self) -> bool {
+        self.queue_deliveries.len() < self.max_queue_deliveries
+    }
+
+    pub(crate) fn allocate_queue_handle(&mut self) -> Option<u32> {
+        let handle = self.next_queue_handle;
+        self.next_queue_handle = self.next_queue_handle.checked_add(1)?;
+        Some(handle)
+    }
+
+    pub(crate) fn insert_queue_delivery(
+        &mut self,
+        handle: u32,
+        delivery: Box<dyn WorkQueueDelivery>,
+    ) {
+        self.queue_deliveries.insert(handle, delivery);
+    }
+
+    pub(crate) fn queue_delivery(&self, handle: u32) -> Option<&dyn WorkQueueDelivery> {
+        self.queue_deliveries.get(&handle).map(Box::as_ref)
+    }
+
+    pub(crate) fn remove_queue_delivery(
+        &mut self,
+        handle: u32,
+    ) -> Option<Box<dyn WorkQueueDelivery>> {
+        self.queue_deliveries.remove(&handle)
     }
 }
 

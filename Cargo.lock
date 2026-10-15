@@ -1633,6 +1633,7 @@ dependencies = [
  "presolve-provider-kv-redis",
  "presolve-provider-objects-memory",
  "presolve-provider-objects-s3",
+ "presolve-provider-queue-memory",
  "presolve-provider-realization",
  "presolve-provider-sdk",
  "presolve-provider-sql-postgres",
@@ -1714,6 +1715,17 @@ dependencies = [
  "semver",
  "sha2 0.10.9",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "presolve-provider-queue-memory"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "presolve-core",
+ "presolve-provider-conformance",
+ "presolve-provider-realization",
+ "presolve-provider-sdk",
+ "semver",
 ]
 
 [[package]]

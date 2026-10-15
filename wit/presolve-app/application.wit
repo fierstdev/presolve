@@ -31,3 +31,10 @@ world sql-application {
 
     export run: func(input: string) -> string;
 }
+
+/// A Presolve application that requires a leased work queue.
+world queue-application {
+    import presolve:queue/work-queue@0.1.0;
+
+    export run: func(input: string) -> string;
+}

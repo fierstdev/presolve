@@ -1,0 +1,21 @@
+[package]
+name = "presolve-provider-queue-memory"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+presolve-provider-sdk.workspace = true
+presolve-provider-realization.workspace = true
+semver.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+presolve-core.workspace = true
+presolve-provider-conformance.workspace = true

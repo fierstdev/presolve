@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use presolve_core::ProviderId;
-use presolve_provider_sdk::{KeyValueProvider, ObjectStoreProvider, SqlDatabaseProvider};
+use presolve_provider_sdk::{
+    KeyValueProvider, ObjectStoreProvider, SqlDatabaseProvider, WorkQueueProvider,
+};
 use thiserror::Error;
 
 /// Concrete provider implementations available to a `Presolve` node.
@@ -14,6 +16,7 @@ pub struct ProviderRegistry {
     key_value: Vec<(ProviderId, Arc<dyn KeyValueProvider>)>,
     object_store: Vec<(ProviderId, Arc<dyn ObjectStoreProvider>)>,
     sql_database: Vec<(ProviderId, Arc<dyn SqlDatabaseProvider>)>,
+    work_queue: Vec<(ProviderId, Arc<dyn WorkQueueProvider>)>,
 }
 
 impl ProviderRegistry {
@@ -115,6 +118,37 @@ impl ProviderRegistry {
             .find(|(registered_id, _)| *registered_id == provider_id)
             .map(|(_, provider)| Arc::clone(provider))
     }
+
+    /// Registers a leased work-queue provider implementation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderRegistryError::DuplicateWorkQueueProvider`] when an
+    /// implementation has already been registered for `provider_id`.
+    pub fn register_work_queue(
+        &mut self,
+        provider_id: ProviderId,
+        provider: Arc<dyn WorkQueueProvider>,
+    ) -> Result<(), ProviderRegistryError> {
+        if self
+            .work_queue
+            .iter()
+            .any(|(registered_id, _)| *registered_id == provider_id)
+        {
+            return Err(ProviderRegistryError::DuplicateWorkQueueProvider { provider_id });
+        }
+        self.work_queue.push((provider_id, provider));
+        Ok(())
+    }
+
+    /// Returns the registered leased work-queue implementation for `provider_id`.
+    #[must_use]
+    pub fn work_queue(&self, provider_id: ProviderId) -> Option<Arc<dyn WorkQueueProvider>> {
+        self.work_queue
+            .iter()
+            .find(|(registered_id, _)| *registered_id == provider_id)
+            .map(|(_, provider)| Arc::clone(provider))
+    }
 }
 
 /// Error returned while modifying a [`ProviderRegistry`].
@@ -131,6 +165,10 @@ pub enum ProviderRegistryError {
     /// The same provider has already been registered for relational SQL.
     #[error("provider `{provider_id}` is already registered for `presolve:sql/database`")]
     DuplicateSqlDatabaseProvider { provider_id: ProviderId },
+
+    /// The same provider has already been registered for leased work queues.
+    #[error("provider `{provider_id}` is already registered for `presolve:queue/work-queue`")]
+    DuplicateWorkQueueProvider { provider_id: ProviderId },
 }
 
 #[cfg(test)]
@@ -139,6 +177,7 @@ mod tests {
 
     use presolve_provider_kv_memory::InMemoryKeyValueProvider;
     use presolve_provider_objects_memory::InMemoryObjectStoreProvider;
+    use presolve_provider_queue_memory::InMemoryWorkQueueProvider;
     use presolve_provider_sdk::UnavailableSqlDatabaseProvider;
 
     use super::*;
@@ -218,6 +257,32 @@ mod tests {
         assert_eq!(
             error,
             ProviderRegistryError::DuplicateSqlDatabaseProvider { provider_id }
+        );
+    }
+
+    #[test]
+    fn registered_work_queue_provider_can_be_retrieved() {
+        let provider_id = ProviderId::new();
+        let mut registry = ProviderRegistry::new();
+        registry
+            .register_work_queue(provider_id, Arc::new(InMemoryWorkQueueProvider::new()))
+            .expect("work-queue registration should succeed");
+        assert!(registry.work_queue(provider_id).is_some());
+    }
+
+    #[test]
+    fn duplicate_work_queue_provider_is_rejected() {
+        let provider_id = ProviderId::new();
+        let mut registry = ProviderRegistry::new();
+        registry
+            .register_work_queue(provider_id, Arc::new(InMemoryWorkQueueProvider::new()))
+            .expect("first registration should succeed");
+        let error = registry
+            .register_work_queue(provider_id, Arc::new(InMemoryWorkQueueProvider::new()))
+            .expect_err("duplicate registration should fail");
+        assert_eq!(
+            error,
+            ProviderRegistryError::DuplicateWorkQueueProvider { provider_id }
         );
     }
 }

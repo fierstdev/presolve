@@ -8,6 +8,7 @@
 
 mod kv;
 mod objects;
+mod queue;
 mod sql;
 
 pub use kv::{
@@ -17,6 +18,11 @@ pub use kv::{
 pub use objects::{
     OBJECT_STORE_INTERFACE, ObjectInfo, ObjectRead, ObjectStoreError, ObjectStoreErrorCode,
     ObjectStoreProvider, UnavailableObjectStoreProvider,
+};
+pub use queue::{
+    UnavailableWorkQueueProvider, WORK_QUEUE_INTERFACE, WorkQueueDelivery, WorkQueueError,
+    WorkQueueErrorCode, WorkQueueProvider, WorkQueueReceiveOptions, WorkQueueRetryOptions,
+    WorkQueueSendOptions,
 };
 pub use sql::{
     SQL_DATABASE_INTERFACE, SqlColumn, SqlDatabaseError, SqlDatabaseErrorCode, SqlDatabaseProvider,
