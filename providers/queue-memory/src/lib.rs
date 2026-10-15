@@ -17,6 +17,9 @@ use presolve_provider_sdk::{
     WorkQueueRetryOptions, WorkQueueSendOptions,
 };
 
+/// Node-side adapter identity used for the in-memory work queue.
+pub const MEMORY_QUEUE_ADAPTER_ID: &str = "memory:queue";
+
 const DEFAULT_LEASE_DURATION: Duration = Duration::from_secs(30);
 
 #[derive(Debug)]
@@ -227,14 +230,70 @@ fn checked_add(now: Instant, duration: Duration, field: &str) -> Result<Instant,
     })
 }
 
+/// Provider-realization adapter for the local in-memory work queue.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct InMemoryWorkQueueAdapter;
+
+impl presolve_provider_realization::ProviderAdapter for InMemoryWorkQueueAdapter {
+    fn realize(
+        &self,
+        profile: &presolve_provider_realization::ProviderRealizationProfile,
+        requested: &[presolve_provider_realization::ProviderCapabilityRequest],
+        _secrets: &dyn presolve_provider_realization::SecretResolver,
+    ) -> Result<
+        presolve_provider_realization::RealizedProvider,
+        presolve_provider_realization::ProviderAdapterError,
+    > {
+        use presolve_provider_realization::ProviderAdapterError;
+        use presolve_provider_sdk::WORK_QUEUE_INTERFACE;
+        use semver::Version;
+
+        let supported_version = Version::new(0, 1, 0);
+
+        for capability in requested {
+            if capability.interface() != WORK_QUEUE_INTERFACE {
+                return Err(ProviderAdapterError::UnsupportedCapability {
+                    interface: capability.interface().to_owned(),
+                });
+            }
+
+            if capability.version() != &supported_version {
+                return Err(ProviderAdapterError::UnsupportedVersion {
+                    interface: WORK_QUEUE_INTERFACE.to_owned(),
+                    selected_version: capability.version().clone(),
+                    supported_version: supported_version.clone(),
+                });
+            }
+
+            if !capability.negotiated_features().is_empty() {
+                return Err(ProviderAdapterError::UnsupportedFeatures {
+                    interface: WORK_QUEUE_INTERFACE.to_owned(),
+                    features: capability.negotiated_features().join(", "),
+                });
+            }
+        }
+
+        Ok(
+            presolve_provider_realization::RealizedProvider::new(*profile.provider_id())
+                .with_work_queue(Arc::new(InMemoryWorkQueueProvider::new())),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use presolve_provider_conformance::{
         WorkQueueConformanceOptions, assert_work_queue_conformance,
     };
-    use presolve_provider_sdk::{
-        WorkQueueErrorCode, WorkQueueProvider, WorkQueueReceiveOptions, WorkQueueSendOptions,
+    use presolve_provider_realization::{
+        EmptySecretResolver, ProviderAdapter, ProviderAdapterId, ProviderCapabilityRequest,
+        ProviderRealizationProfile,
     };
+    use presolve_provider_sdk::{
+        WORK_QUEUE_INTERFACE, WorkQueueErrorCode, WorkQueueProvider, WorkQueueReceiveOptions,
+        WorkQueueSendOptions,
+    };
+    use semver::Version;
 
     use super::*;
 
@@ -308,5 +367,49 @@ mod tests {
             .expect("second delivery should exist");
         assert_eq!(second.delivery_attempt(), Some(2));
         second.ack().expect("ack should succeed");
+    }
+
+    #[test]
+    fn adapter_realizes_exact_baseline_contract() {
+        let provider_id = presolve_core::ProviderId::new();
+        let profile = ProviderRealizationProfile::new(
+            provider_id,
+            ProviderAdapterId::new(MEMORY_QUEUE_ADAPTER_ID).expect("adapter ID should be valid"),
+        );
+        let requested = [ProviderCapabilityRequest::new(
+            WORK_QUEUE_INTERFACE,
+            Version::new(0, 1, 0),
+            std::iter::empty::<String>(),
+        )];
+
+        let realized = InMemoryWorkQueueAdapter
+            .realize(&profile, &requested, &EmptySecretResolver)
+            .expect("baseline queue should realize");
+
+        assert_eq!(*realized.provider_id(), provider_id);
+        assert!(realized.work_queue().is_some());
+    }
+
+    #[test]
+    fn adapter_rejects_unproven_optional_features() {
+        let provider_id = presolve_core::ProviderId::new();
+        let profile = ProviderRealizationProfile::new(
+            provider_id,
+            ProviderAdapterId::new(MEMORY_QUEUE_ADAPTER_ID).expect("adapter ID should be valid"),
+        );
+        let requested = [ProviderCapabilityRequest::new(
+            WORK_QUEUE_INTERFACE,
+            Version::new(0, 1, 0),
+            ["delayed-send"],
+        )];
+
+        let error = InMemoryWorkQueueAdapter
+            .realize(&profile, &requested, &EmptySecretResolver)
+            .expect_err("unproven optional features should be rejected");
+
+        assert!(matches!(
+            error,
+            presolve_provider_realization::ProviderAdapterError::UnsupportedFeatures { .. }
+        ));
     }
 }
