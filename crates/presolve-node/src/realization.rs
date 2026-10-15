@@ -3,7 +3,9 @@ use presolve_provider_realization::{
     ProviderAdapterError, ProviderAdapterRegistry, ProviderCapabilityRequest,
     ProviderRealizationCatalog, RealizedProvider, SecretResolver,
 };
-use presolve_provider_sdk::{KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE, SQL_DATABASE_INTERFACE};
+use presolve_provider_sdk::{
+    KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE, SQL_DATABASE_INTERFACE, WORK_QUEUE_INTERFACE,
+};
 use presolve_resolver::DeploymentPlan;
 use thiserror::Error;
 
@@ -219,6 +221,21 @@ fn register_selected_capabilities(
                 registry.register_sql_database(provider_id, provider)?;
             }
 
+            WORK_QUEUE_INTERFACE => {
+                if registry.work_queue(provider_id).is_some() {
+                    continue;
+                }
+
+                let provider = realized.work_queue().ok_or_else(|| {
+                    ProviderMaterializationError::MissingCapabilityImplementation {
+                        provider_id,
+                        interface: request.interface().to_owned(),
+                    }
+                })?;
+
+                registry.register_work_queue(provider_id, provider)?;
+            }
+
             interface => {
                 return Err(
                     ProviderMaterializationError::UnsupportedRegistryCapability {
@@ -239,13 +256,14 @@ mod tests {
         atomic::{AtomicUsize, Ordering},
     };
 
-    use presolve_capability::key_value_contract;
+    use presolve_capability::{key_value_contract, work_queue_contract};
     use presolve_contract::parse_contract;
     use presolve_core::{EnvironmentId, ProviderId};
     use presolve_provider_kv_cloudflare::{
         CLOUDFLARE_ACCOUNT_ID_SETTING, CLOUDFLARE_API_TOKEN_SECRET, CLOUDFLARE_KV_ADAPTER_ID,
         CLOUDFLARE_NAMESPACE_ID_SETTING, CloudflareKvAdapter,
     };
+    use presolve_provider_queue_memory::{MEMORY_QUEUE_ADAPTER_ID, InMemoryWorkQueueAdapter};
     use presolve_provider_realization::{
         ProviderAdapterId, ProviderRealizationProfile, SecretReference, SecretResolutionError,
         SecretValue,
@@ -316,6 +334,40 @@ version = "^0.1"
             .clone()
     }
 
+    fn resolved_queue_plan(provider_id: ProviderId) -> DeploymentPlan {
+        let contract = parse_contract(
+            r#"
+contract_version = "0.1"
+
+[application]
+name = "queue-materialization"
+version = "1.0.0"
+
+[[capabilities]]
+interface = "presolve:queue/work-queue"
+version = "^0.1"
+"#,
+        )
+        .expect("queue contract should parse");
+
+        let environment = EnvironmentInventory::new(
+            EnvironmentId::new(),
+            EnvironmentResources::new(1_024, 1_000),
+            vec![ProviderDescriptor::new(
+                provider_id,
+                "memory-queue",
+                vec![ProvidedCapability::from_contract(
+                    work_queue_contract().expect("queue contract should be valid"),
+                )],
+            )],
+        );
+
+        resolve(&contract, &environment)
+            .plan()
+            .expect("queue application should resolve")
+            .clone()
+    }
+
     fn cloudflare_profile(provider_id: ProviderId) -> ProviderRealizationProfile {
         ProviderRealizationProfile::new(
             provider_id,
@@ -363,6 +415,35 @@ version = "^0.1"
 
         assert!(registry.key_value(provider_id).is_some());
         assert_eq!(secrets.calls(), 1);
+    }
+
+    #[test]
+    fn plan_selected_memory_queue_materializes_under_exact_provider_id() {
+        let provider_id = ProviderId::new();
+        let plan = resolved_queue_plan(provider_id);
+
+        let mut profiles = ProviderRealizationCatalog::new();
+        profiles
+            .register(ProviderRealizationProfile::new(
+                provider_id,
+                ProviderAdapterId::new(MEMORY_QUEUE_ADAPTER_ID).expect("adapter ID should work"),
+            ))
+            .expect("queue profile should register");
+
+        let mut adapters = ProviderAdapterRegistry::new();
+        adapters
+            .register(
+                ProviderAdapterId::new(MEMORY_QUEUE_ADAPTER_ID).expect("adapter ID should work"),
+                Arc::new(InMemoryWorkQueueAdapter),
+            )
+            .expect("queue adapter should register");
+
+        let secrets = CountingSecrets::new();
+        let registry = realize_plan_providers(&plan, &profiles, &adapters, &secrets)
+            .expect("selected queue provider should realize");
+
+        assert!(registry.work_queue(provider_id).is_some());
+        assert_eq!(secrets.calls(), 0);
     }
 
     #[test]
