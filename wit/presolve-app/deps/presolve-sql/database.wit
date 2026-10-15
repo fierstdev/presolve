@@ -50,7 +50,7 @@ interface database {
 
     /// Incremental query-result cursor.
     resource query-result {
-        /// Returns result columns in provider-reported order.
+        /// Returns immutable result-column metadata in provider-reported order.
         columns: func() -> list<column>;
 
         /// Returns the next positional row or none at end-of-results.
@@ -58,6 +58,9 @@ interface database {
     }
 
     /// One explicit SQL transaction bound to one logical provider session.
+    ///
+    /// Dropping this resource without consuming it through commit or rollback
+    /// rolls the transaction back according to the semantic capability.
     resource transaction {
         execute: func(
             statement: string,
