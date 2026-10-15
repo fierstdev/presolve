@@ -35,6 +35,9 @@ presolve-executor-docker.workspace = true
 presolve-provider-kv-cloudflare.workspace = true
 presolve-provider-kv-redis.workspace = true
 presolve-provider-objects-s3.workspace = true
+presolve-provider-sql-sqlite.workspace = true
+presolve-provider-sql-postgres.workspace = true
+presolve-provider-conformance.workspace = true
 anyhow.workspace = true
 semver.workspace = true
 

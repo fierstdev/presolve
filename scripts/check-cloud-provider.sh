@@ -9,13 +9,16 @@ cargo test \
   -p presolve-provider-realization \
   -p presolve-provider-kv-cloudflare \
   -p presolve-provider-objects-s3 \
+  -p presolve-provider-sql-sqlite \
+  -p presolve-provider-sql-postgres \
   -p presolve-node
-
 echo "== provider realization clippy =="
 cargo clippy \
   -p presolve-provider-realization \
   -p presolve-provider-kv-cloudflare \
   -p presolve-provider-objects-s3 \
+  -p presolve-provider-sql-sqlite \
+  -p presolve-provider-sql-postgres \
   -p presolve-node \
   --all-targets \
   -- \
@@ -24,3 +27,4 @@ cargo clippy \
 echo "External-provider checkpoint passed"
 echo "Live Cloudflare proof remains opt-in: ./scripts/smoke-cloudflare-kv.sh"
 echo "S3-compatible object portability is exercised in: ./scripts/check-object-portability.sh"
+echo "SQLite/PostgreSQL portability is exercised in: ./scripts/check-sql-portability.sh"
