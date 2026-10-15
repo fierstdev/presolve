@@ -122,9 +122,13 @@ impl WorkQueueProvider for InMemoryWorkQueueProvider {
         }
 
         let now = Instant::now();
-        let lease_until = now.checked_add(self.default_lease_duration).ok_or_else(|| {
-            WorkQueueError::invalid_request("default delivery lease exceeds the supported time range")
-        })?;
+        let lease_until = now
+            .checked_add(self.default_lease_duration)
+            .ok_or_else(|| {
+                WorkQueueError::invalid_request(
+                    "default delivery lease exceeds the supported time range",
+                )
+            })?;
         let mut state = self.lock_state()?;
         let Some(index) = state
             .messages
@@ -371,9 +375,7 @@ mod tests {
         assert_eq!(delayed_send.code(), WorkQueueErrorCode::Unsupported);
 
         let custom_lease = provider
-            .receive(
-                WorkQueueReceiveOptions::new().with_lease_duration(Duration::from_secs(1)),
-            )
+            .receive(WorkQueueReceiveOptions::new().with_lease_duration(Duration::from_secs(1)))
             .expect_err("custom lease should require negotiation");
         assert_eq!(custom_lease.code(), WorkQueueErrorCode::Unsupported);
 
