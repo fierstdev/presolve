@@ -1,0 +1,17 @@
+name: Temporary SQL driver versions
+
+on:
+  push:
+    branches:
+      - tmp/sql-driver-versions
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal
+      - name: Inspect registry versions
+        run: |
+          cargo search rusqlite --limit 1
+          cargo search postgres --limit 1
