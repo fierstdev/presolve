@@ -7,6 +7,7 @@ SQLITE_ENV="$ROOT/examples/portability-proof/sql-sqlite"
 POSTGRES_ENV="$ROOT/examples/portability-proof/sql-postgres"
 PRESOLVE="$ROOT/target/debug/presolve"
 CHECKPOINT="$ROOT/target/debug/examples/sql_release_realization_checkpoint"
+CONFORMANCE="$ROOT/target/debug/examples/sql_provider_conformance_checkpoint"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/presolve-sql-portability.XXXXXX")"
 RELEASE="$TMP/sql-demo.presolved"
 RUN_ID="sql-$$"
@@ -112,11 +113,12 @@ echo "=============================================="
 echo "Claim: one immutable SQL-capable release can resolve and execute through SQLite and PostgreSQL without SQL rewriting or an application rebuild."
 echo
 
-echo "[1/5] Build Presolve tooling"
+echo "[1/6] Build Presolve tooling"
 cargo build --quiet --manifest-path "$ROOT/Cargo.toml" -p presolve-cli
 cargo build --quiet --manifest-path "$ROOT/Cargo.toml" -p presolve-node --example sql_release_realization_checkpoint
+cargo build --quiet --manifest-path "$ROOT/Cargo.toml" -p presolve-node --example sql_provider_conformance_checkpoint
 
-echo "[2/5] Build one immutable SQL application release"
+echo "[2/6] Build one immutable SQL application release"
 rm -rf "$APP/.presolve" "$APP/dist"
 (
   cd "$APP"
@@ -143,7 +145,7 @@ printf "  release digest: %s\n" "$RELEASE_DIGEST"
 printf "  archive sha256: %s\n" "$ARCHIVE_SHA_BEFORE"
 echo
 
-echo "[3/5] Resolve the same release against SQLite and PostgreSQL environments"
+echo "[3/6] Resolve the same release against SQLite and PostgreSQL environments"
 plan_release "$SQLITE_ENV" "$TMP/sqlite-plan.json"
 plan_release "$POSTGRES_ENV" "$TMP/postgres-plan.json"
 
@@ -181,8 +183,13 @@ PY
 
 echo
 
-echo "[4/5] Execute those exact release bytes through both SQL engines"
+echo "[4/6] Require both concrete engines to pass the same SQL conformance harness"
 start_postgres
+"$CONFORMANCE" sqlite
+"$CONFORMANCE" postgres
+
+echo
+echo "[5/6] Execute those exact release bytes through both SQL engines"
 execute_release \
   sqlite \
   "$SQLITE_ENV/presolve.env.toml" \
@@ -219,7 +226,7 @@ PY
 
 echo
 
-echo "[5/5] Verify application identity never changed"
+echo "[6/6] Verify application identity never changed"
 ARCHIVE_SHA_AFTER="$(archive_sha256 "$RELEASE")"
 "$PRESOLVE" inspect "$RELEASE" --json > "$TMP/inspect-after.json"
 FINAL_RELEASE_DIGEST="$(python3 - "$TMP/inspect-after.json" <<'PY'
@@ -244,4 +251,4 @@ fi
 printf "  release digest unchanged: yes (%s)\n" "$RELEASE_DIGEST"
 printf "  archive sha256 unchanged: yes (%s)\n" "$ARCHIVE_SHA_BEFORE"
 echo
-echo "PASS — one .presolved SQL release, two plans, two database engines, zero application rebuilds."
+echo "PASS — one .presolved SQL release, two conforming engines, two plans, zero application rebuilds."
