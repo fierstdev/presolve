@@ -1,0 +1,93 @@
+name: Temporary environment reference refresh
+on: push
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/site-doc-env-refresh
+      - name: Refresh environment reference
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/reference/environment-specification.md')
+          text = path.read_text()
+
+          old = '''Recognized workload execution classes are `component` and `container`. The built-in local node currently executes Components; container execution is being added during Chunk 16. An Environment Specification should advertise `container` only when that environment actually has a compatible container executor.'''
+          new = '''Recognized workload execution classes are `component` and `container`. The repository includes Component execution and a Docker-backed container execution path. An Environment Specification should advertise a workload class only when that environment actually has a compatible executor; the declaration remains a statement of real environment supply.'''
+          if old not in text:
+              raise SystemExit('expected workload-status text not found')
+          text = text.replace(old, new)
+
+          old = '''Current built-in semantic contracts include:
+
+```text
+presolve:kv/store@0.1.0
+presolve:objects/store@0.1.0
+```'''
+          new = '''Current built-in semantic contracts include:
+
+```text
+presolve:kv/store@0.1.0
+presolve:objects/store@0.1.0
+presolve:sql/database@0.1.0
+presolve:queue/work-queue@0.1.0
+```'''
+          if old not in text:
+              raise SystemExit('expected built-in capability list not found')
+          text = text.replace(old, new)
+
+          start = text.find('## What Chunk 14 establishes')
+          end = text.find('## Related documentation')
+          if start < 0 or end < 0 or end <= start:
+              raise SystemExit('expected chunk-era section markers not found')
+          replacement = '''## Current result
+
+The environment side of the portability model is implemented through a declarative, normalized supply document:
+
+```text
+Application Contract
+        +
+Environment Specification
+        │
+        ▼
+normalized compatibility model
+        │
+        ▼
+deterministic resolution
+        │
+        ▼
+symbolic DeploymentPlan
+        │
+        ▼
+ProviderId-based node materialization
+```
+
+The local CLI generates and persists `EnvironmentId` and `ProviderId` values, supports provider add/list/remove workflows, validates environment documents, and uses the nearest `presolve.env.toml` for compatibility checks, planning, and local execution.
+
+Concrete provider configuration remains outside the Environment Specification. Current proof slices materialize Redis addresses, S3 endpoints/buckets/credentials, SQLite database paths, PostgreSQL connection settings/secrets, Cloudflare account/namespace credentials, and queue implementation state only after a plan has selected the corresponding ProviderId.
+
+The current built-in capability families deliberately expose different semantic pressure: object-store limits, SQL dialect/type/transaction differences, and queue lease/settlement behavior are represented or documented rather than being silently normalized away.
+
+'''
+          text = text[:start] + replacement + text[end:]
+
+          path.write_text(text)
+          PY
+
+      - name: Validate docs
+        run: python3 scripts/check-docs.py
+
+      - name: Commit refreshed reference
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/reference/environment-specification.md
+          git commit -m 'docs: refresh environment specification status'
+          git push origin HEAD:tmp/site-doc-env-refresh
