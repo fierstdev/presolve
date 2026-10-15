@@ -47,17 +47,73 @@ pre { max-width: 100%; }
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(10,10,10,.9);
+  background: rgba(10,10,10,.94);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(12px);
 }
-.nav-shell { height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.nav-shell { position: relative; height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .brand { display: inline-flex; align-items: center; gap: 11px; flex: 0 0 auto; font-weight: 720; letter-spacing: -.02em; }
 .brand img { display: block; }
 .nav-links { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 28px; font-size: 14px; color: #bdbdb7; }
 .nav-links a { display: inline-flex; min-height: 44px; align-items: center; white-space: nowrap; }
 .nav-links a:hover { color: var(--text); }
 .nav-github { color: var(--text) !important; }
+.mobile-menu { display: none; }
+.mobile-menu summary {
+  list-style: none;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: #0d0d0d;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+  user-select: none;
+}
+.mobile-menu summary::-webkit-details-marker { display: none; }
+.mobile-menu summary::after { content: "+"; color: var(--muted); font: 16px var(--mono); }
+.mobile-menu[open] summary::after { content: "−"; }
+.mobile-menu-panel {
+  position: absolute;
+  top: calc(100% + 1px);
+  right: 0;
+  width: min(420px, calc(100vw - 28px));
+  max-height: calc(100dvh - 76px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  background: #0d0d0d;
+  box-shadow: 0 28px 80px rgba(0,0,0,.52);
+}
+.mobile-menu-primary,
+.mobile-menu-group { display: grid; }
+.mobile-menu-primary { gap: 4px; }
+.mobile-menu-group { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.mobile-menu-group > span {
+  padding: 4px 12px 8px;
+  color: var(--muted-2);
+  font: 10px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+.mobile-menu-panel a {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  color: #c2c2bc;
+  font-size: 14px;
+}
+.mobile-menu-panel a:hover,
+.mobile-menu-panel a:focus-visible { background: var(--panel); color: var(--text); outline: none; }
+.mobile-menu-panel a[aria-current="page"] { color: var(--text); background: var(--panel); }
+.mobile-menu-panel a[aria-current="page"]::after { content: "Current"; color: var(--accent); font: 10px var(--mono); text-transform: uppercase; letter-spacing: .06em; }
 .hero { padding: 112px 0 86px; }
 .eyebrow, .kicker {
   font-family: var(--mono);
@@ -198,10 +254,9 @@ h2 { margin: 14px 0 20px; font-size: clamp(36px, 5vw, 64px); line-height: 1.02; 
 
 @media (max-width: 900px) {
   .nav-shell { gap: 18px; }
-  .nav-links { gap: 18px; }
-  .nav-links a:not(.nav-github) { display: none; }
-  .nav-links a[href="/proof/"],
-  .nav-links a[href="/docs/"] { display: inline-flex; }
+  .nav-links { display: none; }
+  .mobile-menu { display: block; }
+  .mobile-menu summary { display: inline-flex; }
   .model-grid { grid-template-columns: 1fr; }
   .resolver-card { min-height: 150px; }
   .plan-strip { grid-template-columns: 1fr; gap: 8px; }
@@ -219,9 +274,7 @@ h2 { margin: 14px 0 20px; font-size: clamp(36px, 5vw, 64px); line-height: 1.02; 
   .nav-shell { height: 62px; gap: 14px; }
   .brand { gap: 8px; }
   .brand img { width: 22px; height: auto; }
-  .nav-links { gap: 14px; font-size: 13px; }
-  .nav-links a[href="/proof/"] { display: none; }
-  .nav-github { font-size: 13px; }
+  .mobile-menu-panel { position: fixed; top: 63px; left: 14px; right: 14px; width: auto; max-height: calc(100dvh - 78px); }
   .hero { padding: 68px 0 58px; }
   h1 { margin: 20px 0 22px; font-size: clamp(42px, 14vw, 64px); line-height: .98; letter-spacing: -.048em; }
   h2 { font-size: clamp(32px, 10vw, 44px); line-height: 1.04; }
@@ -259,9 +312,7 @@ h2 { margin: 14px 0 20px; font-size: clamp(36px, 5vw, 64px); line-height: 1.02; 
 @media (max-width: 430px) {
   .shell { width: min(calc(100% - 24px), var(--shell)); }
   .brand span { font-size: 15px; }
-  .nav-links { gap: 12px; }
-  .nav-links a[href="/docs/"] { display: inline-flex; }
-  .nav-github { font-size: 12px; }
+  .mobile-menu summary { padding: 0 10px; }
   .hero { padding-top: 56px; }
   h1 { font-size: clamp(40px, 13vw, 56px); }
   .hero-actions { flex-direction: column; }
