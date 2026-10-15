@@ -12,7 +12,10 @@ use crate::{
 pub fn is_known_capability_interface(interface: &str) -> bool {
     matches!(
         interface,
-        KEY_VALUE_INTERFACE | OBJECT_STORE_INTERFACE | SQL_DATABASE_INTERFACE | WORK_QUEUE_INTERFACE
+        KEY_VALUE_INTERFACE
+            | OBJECT_STORE_INTERFACE
+            | SQL_DATABASE_INTERFACE
+            | WORK_QUEUE_INTERFACE
     )
 }
 
