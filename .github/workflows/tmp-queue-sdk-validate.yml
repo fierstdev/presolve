@@ -1,0 +1,16 @@
+name: Temporary queue SDK validation
+
+on: [push]
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Test queue slice
+        run: cargo test -p presolve-capability -p presolve-provider-sdk -p presolve-provider-conformance
+      - name: Clippy queue slice
+        run: cargo clippy -p presolve-capability -p presolve-provider-sdk -p presolve-provider-conformance --all-targets -- -D warnings
