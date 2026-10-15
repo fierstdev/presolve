@@ -25,6 +25,8 @@ Current first-class documentation routes include:
 
 When capability semantics or public proof evidence changes, update both the canonical repository documentation/code and the corresponding website page in the same development phase.
 
+`scripts/check-docs.py` validates both repository Markdown links and the local `href`/`src` graph across the static site. The existing Architecture CI job therefore rejects broken documentation routes or missing site assets.
+
 ## Local preview
 
 From the repository root:
