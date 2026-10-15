@@ -1,150 +1,76 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Docs — Presolve</title>
-  <meta name="description" content="Get started with Presolve: Application Contracts, Environment Specifications, builds, compatibility checks, and deployment plans.">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Documentation — Presolve</title>
+  <meta name="description" content="Presolve documentation: core model, Application Contracts, environments, immutable releases, capability contracts, CLI planning, and executable portability proofs.">
   <link rel="canonical" href="https://presolve.dev/docs/">
-  <meta name="theme-color" content="#0a0a0a">
-  <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css">
-  <link rel="stylesheet" href="/docs/mobile.css">
+  <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
 </head>
 <body>
-  <header class="site-header">
-    <div class="shell nav-shell">
-      <a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a>
-      <nav class="nav-links" aria-label="Primary navigation">
-        <a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a>
-      </nav>
-    </div>
-  </header>
+<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+<main>
+<section class="page-hero shell"><span class="kicker">Documentation</span><h1>Understand the model.<br>Then run the proof.</h1><p>Presolve separates immutable application identity from deployment supply. These docs cover the model, the concrete files, semantic capability negotiation, planning, and the public evidence behind the portability claim.</p></section>
+<div class="docs-layout shell">
+<aside class="docs-nav"><strong>Documentation</strong><a href="/docs/" aria-current="page">Overview</a><a href="/docs/model/">The model</a><a href="/docs/application/">Application Contract</a><a href="/docs/environment/">Environment</a><a href="/docs/releases/">Immutable releases</a><a href="/docs/capabilities/">Capabilities</a><a href="/docs/cli/">CLI + planning</a><a href="/docs/proofs/">Proofs</a></aside>
+<article class="docs-content">
+<p class="doc-lede">The website is the primary documentation reading surface. Repository Markdown remains available as the canonical implementation/audit trail, but you should not need to leave presolve.dev to understand how Presolve works.</p>
 
-  <main>
-    <section class="page-hero shell">
-      <span class="kicker">Documentation</span>
-      <h1>Start with the model.</h1>
-      <p>Presolve separates application requirements from environment supply. The CLI then builds, inspects, checks, and resolves that model.</p>
-    </section>
+<section id="start"><span class="kicker">Start here</span><h2>Read in this order.</h2>
+<div class="docs-hub-grid">
+<a class="doc-card" href="/docs/model/"><span class="doc-card-index">01 · Concept</span><strong>The Presolve model</strong><p>Application demand, environment supply, deterministic resolution, symbolic plans, and provider realization.</p></a>
+<a class="doc-card" href="/docs/application/"><span class="doc-card-index">02 · Authoring</span><strong>Application Contract</strong><p>Write <code>presolve.toml</code> without selecting infrastructure.</p></a>
+<a class="doc-card" href="/docs/environment/"><span class="doc-card-index">03 · Supply</span><strong>Environment Specification</strong><p>Declare workload support, capacity, ProviderIds, versions, and semantic features.</p></a>
+<a class="doc-card" href="/docs/releases/"><span class="doc-card-index">04 · Distribution</span><strong>Immutable releases</strong><p>Understand <code>.presolved</code>, deterministic identity, and what deployment details are excluded.</p></a>
+<a class="doc-card" href="/docs/capabilities/"><span class="doc-card-index">05 · Semantics</span><strong>Capability contracts</strong><p>KV, object storage, SQL, and leased work-queue semantics with current provider coverage.</p></a>
+<a class="doc-card" href="/docs/cli/"><span class="doc-card-index">06 · Workflow</span><strong>CLI + planning</strong><p>Inspect, build, check, plan, manage environments, use JSON output, and run local development.</p></a>
+<a class="doc-card" href="/docs/proofs/"><span class="doc-card-index">07 · Evidence</span><strong>Proofs</strong><p>Exact digests, provider matrices, proof commands, semantic failures, and explicit non-claims.</p></a>
+<a class="doc-card" href="/status/"><span class="doc-card-index">08 · Reality</span><strong>Current status</strong><p>What is implemented today, what is still pre-stable, and what comes next.</p></a>
+</div></section>
 
-    <div class="docs-layout shell">
-      <aside class="docs-nav">
-        <strong>On this page</strong>
-        <a href="#install">Build from source</a>
-        <a href="#proof">Run the proof</a>
-        <a href="#application">Application Contract</a>
-        <a href="#environment">Environment</a>
-        <a href="#workflow">Workflow</a>
-        <a href="#json">JSON output</a>
-        <a href="#reference">Reference</a>
-      </aside>
-
-      <article class="docs-content">
-        <section id="install">
-          <span class="kicker">Developer Preview</span>
-          <h2>Build from source</h2>
-          <p>Versioned binaries are not published yet. For now, build the CLI from the repository.</p>
-          <div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
+<section id="quickstart"><span class="kicker">Developer Preview</span><h2>Clone it and ask Presolve questions.</h2>
+<div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
 cd presolve
 cargo build -p presolve-cli
 
-./target/debug/presolve --help</code></pre></div>
-          <div class="note">Presolve is pre-stable. CLI and schema compatibility are not guaranteed yet.</div>
-        </section>
+presolve env init
+presolve inspect
+presolve check
+presolve plan</code></pre></div>
+<p>The four core commands answer different questions: what does the app require, what immutable release are we distributing, can this environment satisfy it, and what exact provider/workload selections did the resolver make?</p>
+<div class="hero-actions"><a class="button primary" href="/docs/cli/">CLI guide</a><a class="button secondary" href="/docs/model/">Understand the model</a></div></section>
 
-        <section id="proof">
-          <span class="kicker">Flagship proof</span>
-          <h2>Reproduce the core portability claim.</h2>
-          <p>The fastest way to evaluate Presolve is to run the same proof used by public CI. It builds one immutable release once, resolves it against memory, Redis, and Cloudflare environments, executes the same release through memory and Redis, and verifies that the application identity did not change.</p>
-          <div class="code-block"><pre><code>bash ./demo/portability/run.sh</code></pre></div>
-          <p>The default path requires no cloud credentials. See <a href="/proof/">the proof page</a> for the provider matrix, scope, and links to the technical walkthrough.</p>
-        </section>
+<section id="proof"><span class="kicker">Executable evidence</span><h2>Current coverage spans four capability families.</h2>
+<div class="doc-proof-map">
+<div class="doc-proof-row"><strong>KV</strong><code>kv/store</code><span>memory · Redis · Cloudflare KV</span><span class="doc-pill proven">same-release</span></div>
+<div class="doc-proof-row"><strong>Objects</strong><code>objects/store</code><span>memory · S3-compatible</span><span class="doc-pill proven">same-release</span></div>
+<div class="doc-proof-row"><strong>SQL</strong><code>sql/database</code><span>SQLite · PostgreSQL</span><span class="doc-pill proven">same-release</span></div>
+<div class="doc-proof-row"><strong>Queue</strong><code>queue/work-queue</code><span>leased in-memory provider</span><span class="doc-pill next">capability proof</span></div>
+</div>
+<div class="code-block"><pre><code># flagship KV proof
+bash ./demo/portability/run.sh
 
-        <section id="application">
-          <span class="kicker">Application</span>
-          <h2>Declare requirements in <code>presolve.toml</code>.</h2>
-          <p>The Application Contract describes the application without choosing the infrastructure that will satisfy it.</p>
-          <div class="code-block"><pre><code>contract_version = "0.1"
+# additional independent proof jobs
+bash ./scripts/check-object-portability.sh
+bash ./scripts/check-sql-portability.sh
+bash ./scripts/check-queue-portability.sh</code></pre></div>
+<p><a href="/docs/proofs/">Explore the evidence and provider differences →</a></p></section>
 
-[application]
-name = "orders"
-version = "1.0.0"
+<section id="current-capabilities"><span class="kicker">Built-in semantics</span><h2>Applications can currently request these contracts.</h2>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Interface</th><th>Version</th><th>Baseline focus</th></tr></thead><tbody>
+<tr><td><code>presolve:kv/store</code></td><td>0.1.0</td><td>exact-key get/set/delete</td></tr>
+<tr><td><code>presolve:objects/store</code></td><td>0.1.0</td><td>opaque objects, metadata, list, streamed read</td></tr>
+<tr><td><code>presolve:sql/database</code></td><td>0.1.0</td><td>bound parameters, portable scalar/results, transactions</td></tr>
+<tr><td><code>presolve:queue/work-queue</code></td><td>0.1.0</td><td>at-least-once leased delivery, ack, retry</td></tr>
+</tbody></table></div>
+<p><a href="/docs/capabilities/">Read the semantic guarantees and optional features →</a></p></section>
 
-[[workloads]]
-name = "api"
-kind = "component"
+<section id="boundaries"><span class="kicker">Mental model</span><h2>Keep these boundaries visible.</h2>
+<div class="doc-boundary-grid"><div class="doc-boundary good"><strong>Application</strong><ul><li>requirements</li><li>workload identity</li><li>capability semantics</li><li>resource/network intent</li></ul></div><div class="doc-boundary no"><strong>Realization</strong><ul><li>provider endpoints</li><li>credentials/secrets</li><li>database paths</li><li>cloud account/bucket/namespace configuration</li></ul></div></div></section>
 
-[[capabilities]]
-interface = "presolve:kv/store"
-version = "^0.1"
-
-[resources]
-memory_mib = 128
-cpu_millis = 250
-
-[network]
-outbound = "deny"</code></pre></div>
-          <p>Workloads, capability requirements, resource needs, topology, and network policy become part of the application model. Provider credentials and environment-specific endpoints do not.</p>
-        </section>
-
-        <section id="environment">
-          <span class="kicker">Environment</span>
-          <h2>Describe available supply in <code>presolve.env.toml</code>.</h2>
-          <p>The Environment Specification says what execution classes, resources, and capability providers are available here.</p>
-          <div class="code-block"><pre><code>presolve env init local
-presolve env provider add memory-services --provides kv
-presolve env check</code></pre></div>
-          <p>Providers receive stable <code>ProviderId</code> values. The resolver chooses among declared supply; provider realization details stay outside the Application Contract.</p>
-        </section>
-
-        <section id="workflow">
-          <span class="kicker">CLI</span>
-          <h2>The current workflow</h2>
-          <h3>Inspect source semantics</h3>
-          <div class="code-block"><pre><code>presolve inspect</code></pre></div>
-          <p>Shows Presolve's normalized view of the nearest Application Contract. No environment is required.</p>
-
-          <h3>Build an immutable release</h3>
-          <div class="code-block"><pre><code>presolve build
-presolve inspect dist/orders.presolved</code></pre></div>
-          <p>The <code>.presolved</code> release contains immutable application identity and requirements, not deployment configuration.</p>
-
-          <h3>Check compatibility</h3>
-          <div class="code-block"><pre><code>presolve check</code></pre></div>
-          <p>Answers whether the nearest environment can satisfy the application and reports stable resolver diagnostics when it cannot.</p>
-
-          <h3>Inspect the exact plan</h3>
-          <div class="code-block"><pre><code>presolve plan</code></pre></div>
-          <p>Shows the successful symbolic <code>DeploymentPlan</code>: workloads, exact selected providers and versions, negotiated features, and unbound optional capabilities.</p>
-        </section>
-
-        <section id="json">
-          <span class="kicker">Automation</span>
-          <h2>Versioned JSON projections</h2>
-          <div class="code-block"><pre><code>presolve inspect --json
-presolve check --json
-presolve plan --json
-presolve inspect dist/orders.presolved --json</code></pre></div>
-          <p>Machine output uses the explicit <code>presolve.cli</code> schema instead of serializing internal Rust structs directly. Rejected <code>check</code> and <code>plan</code> calls emit structured PS2xxx problems before returning a non-zero status.</p>
-        </section>
-
-        <section id="reference">
-          <span class="kicker">Repository docs</span>
-          <h2>Go deeper</h2>
-          <p>The repository documentation remains the source of truth while Presolve is in developer preview.</p>
-          <div class="link-row">
-            <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/proofs/flagship-portability-walkthrough.md"><strong>Portability walkthrough ↗</strong><span>Step-by-step explanation of the flagship proof</span></a>
-            <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/application-contract.md"><strong>Application Contract ↗</strong><span><code>presolve.toml</code> reference</span></a>
-            <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/environment-specification.md"><strong>Environment Specification ↗</strong><span><code>presolve.env.toml</code> reference</span></a>
-            <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/presolved-bundle.md"><strong>.presolved bundle ↗</strong><span>Immutable release format</span></a>
-            <a class="link-card" href="https://github.com/fierstdev/presolve/blob/main/docs/architecture/inspection-and-planning.md"><strong>Inspection and planning ↗</strong><span>CLI semantic boundaries</span></a>
-          </div>
-        </section>
-      </article>
-    </div>
-  </main>
-
-  <footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
-</body>
-</html>
+<section id="source"><span class="kicker">Auditability</span><h2>The website explains; the repository proves.</h2><p>Every page links back to the relevant implementation/reference source when deeper auditing is useful. The website intentionally summarizes and visualizes the current model rather than hiding the docs behind GitHub's Markdown renderer.</p>
+<div class="hero-actions"><a class="button secondary" href="https://github.com/fierstdev/presolve/tree/main/docs">Repository documentation ↗</a><a class="button secondary" href="https://github.com/fierstdev/presolve">Source repository ↗</a></div></section>
+</article></div></main>
+<footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
+</body></html>
