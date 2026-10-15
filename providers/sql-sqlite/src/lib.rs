@@ -55,7 +55,7 @@ impl SqliteSqlProvider {
     }
 
     fn connect(&self) -> Result<Connection, SqlDatabaseError> {
-        Connection::open(&self.path).map_err(map_sqlite_error)
+        Connection::open(&self.path).map_err(|error| map_sqlite_error(&error))
     }
 }
 
@@ -85,14 +85,14 @@ impl SqlDatabaseProvider for SqliteSqlProvider {
         if options.read_only() {
             connection
                 .execute_batch("PRAGMA query_only = ON")
-                .map_err(map_sqlite_error)?;
+                .map_err(|error| map_sqlite_error(&error))?;
         }
 
         match options.isolation() {
             SqlTransactionIsolation::ProviderDefault | SqlTransactionIsolation::Serializable => {
                 connection
                     .execute_batch("BEGIN")
-                    .map_err(map_sqlite_error)?;
+                    .map_err(|error| map_sqlite_error(&error))?;
             }
         }
 
@@ -137,7 +137,7 @@ impl SqlTransaction for SqliteTransaction {
     fn commit(mut self: Box<Self>) -> Result<(), SqlDatabaseError> {
         self.connection()?
             .execute_batch("COMMIT")
-            .map_err(map_sqlite_error)?;
+            .map_err(|error| map_sqlite_error(&error))?;
         self.active = false;
         self.connection.take();
         Ok(())
@@ -146,7 +146,7 @@ impl SqlTransaction for SqliteTransaction {
     fn rollback(mut self: Box<Self>) -> Result<(), SqlDatabaseError> {
         self.connection()?
             .execute_batch("ROLLBACK")
-            .map_err(map_sqlite_error)?;
+            .map_err(|error| map_sqlite_error(&error))?;
         self.active = false;
         self.connection.take();
         Ok(())
@@ -172,7 +172,7 @@ fn execute_on(
     let values = parameters.iter().map(sqlite_value).collect::<Vec<_>>();
     let affected = connection
         .execute(statement, params_from_iter(values))
-        .map_err(map_sqlite_error)?;
+        .map_err(|error| map_sqlite_error(&error))?;
     Ok(SqlExecuteResult::new(affected as u64))
 }
 
@@ -182,7 +182,9 @@ fn query_on(
     parameters: &[SqlValue],
 ) -> Result<SqlQueryResult, SqlDatabaseError> {
     let values = parameters.iter().map(sqlite_value).collect::<Vec<_>>();
-    let mut prepared = connection.prepare(statement).map_err(map_sqlite_error)?;
+    let mut prepared = connection
+        .prepare(statement)
+        .map_err(|error| map_sqlite_error(&error))?;
     let columns = prepared
         .column_names()
         .iter()
@@ -191,14 +193,15 @@ fn query_on(
     let column_count = columns.len();
     let mut rows = prepared
         .query(params_from_iter(values))
-        .map_err(map_sqlite_error)?;
+        .map_err(|error| map_sqlite_error(&error))?;
     let mut buffered = Vec::new();
 
-    while let Some(row) = rows.next().map_err(map_sqlite_error)? {
+    while let Some(row) = rows.next().map_err(|error| map_sqlite_error(&error))? {
         let mut values = Vec::with_capacity(column_count);
         for index in 0..column_count {
             values.push(sqlite_row_value(
-                row.get_ref(index).map_err(map_sqlite_error)?,
+                row.get_ref(index)
+                    .map_err(|error| map_sqlite_error(&error))?,
             )?);
         }
         buffered.push(Ok(SqlRow::new(values)));
@@ -231,7 +234,7 @@ fn sqlite_row_value(value: ValueRef<'_>) -> Result<SqlValue, SqlDatabaseError> {
     }
 }
 
-fn map_sqlite_error(error: SqliteError) -> SqlDatabaseError {
+fn map_sqlite_error(error: &SqliteError) -> SqlDatabaseError {
     use rusqlite::ErrorCode;
 
     match error.sqlite_error_code() {

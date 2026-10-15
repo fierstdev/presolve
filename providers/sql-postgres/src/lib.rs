@@ -124,7 +124,9 @@ impl PostgresSqlProvider {
             .dbname(&self.database)
             .user(&self.user)
             .password(self.password.expose_secret());
-        config.connect(NoTls).map_err(map_postgres_error)
+        config
+            .connect(NoTls)
+            .map_err(|error| map_postgres_error(&error))
     }
 }
 
@@ -157,7 +159,9 @@ impl SqlDatabaseProvider for PostgresSqlProvider {
         if options.read_only() {
             begin.push_str(" READ ONLY");
         }
-        client.batch_execute(&begin).map_err(map_postgres_error)?;
+        client
+            .batch_execute(&begin)
+            .map_err(|error| map_postgres_error(&error))?;
         Ok(Box::new(PostgresTransaction {
             client: Some(client),
             active: true,
@@ -199,7 +203,7 @@ impl SqlTransaction for PostgresTransaction {
     fn commit(mut self: Box<Self>) -> Result<(), SqlDatabaseError> {
         self.client()?
             .batch_execute("COMMIT")
-            .map_err(map_postgres_error)?;
+            .map_err(|error| map_postgres_error(&error))?;
         self.active = false;
         self.client.take();
         Ok(())
@@ -208,7 +212,7 @@ impl SqlTransaction for PostgresTransaction {
     fn rollback(mut self: Box<Self>) -> Result<(), SqlDatabaseError> {
         self.client()?
             .batch_execute("ROLLBACK")
-            .map_err(map_postgres_error)?;
+            .map_err(|error| map_postgres_error(&error))?;
         self.active = false;
         self.client.take();
         Ok(())
@@ -272,7 +276,7 @@ fn execute_on(
         .collect::<Vec<_>>();
     let affected = client
         .execute(statement, &refs)
-        .map_err(map_postgres_error)?;
+        .map_err(|error| map_postgres_error(&error))?;
     Ok(SqlExecuteResult::new(affected))
 }
 
@@ -286,7 +290,9 @@ fn query_on(
         .iter()
         .map(|value| value.as_ref() as &(dyn ToSql + Sync))
         .collect::<Vec<_>>();
-    let rows = client.query(statement, &refs).map_err(map_postgres_error)?;
+    let rows = client
+        .query(statement, &refs)
+        .map_err(|error| map_postgres_error(&error))?;
     let columns = rows.first().map_or_else(Vec::new, |row| {
         row.columns()
             .iter()
@@ -311,7 +317,9 @@ fn postgres_row(row: &Row) -> Result<SqlRow, SqlDatabaseError> {
 fn postgres_row_value(row: &Row, index: usize, ty: &Type) -> Result<SqlValue, SqlDatabaseError> {
     macro_rules! optional {
         ($rust:ty, $map:expr) => {{
-            let value: Option<$rust> = row.try_get(index).map_err(map_postgres_error)?;
+            let value: Option<$rust> = row
+                .try_get(index)
+                .map_err(|error| map_postgres_error(&error))?;
             Ok(value.map_or(SqlValue::Null, $map))
         }};
     }
@@ -331,7 +339,7 @@ fn postgres_row_value(row: &Row, index: usize, ty: &Type) -> Result<SqlValue, Sq
     }
 }
 
-fn map_postgres_error(error: postgres::Error) -> SqlDatabaseError {
+fn map_postgres_error(error: &postgres::Error) -> SqlDatabaseError {
     let message = error.to_string();
     let Some(db_error) = error.as_db_error() else {
         return SqlDatabaseError::unavailable(message);
