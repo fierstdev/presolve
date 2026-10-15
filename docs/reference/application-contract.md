@@ -36,7 +36,7 @@ kind = "component"
 
 [[interfaces]]
 name = "jobs"
-kind = "request_response"
+kind = "event"
 
 [[relationships]]
 from = "api"
@@ -53,13 +53,24 @@ version = "^0.1"
 required_features = ["range-read"]
 preferred_features = ["user-metadata"]
 
+[[capabilities]]
+interface = "presolve:sql/database"
+version = "^0.1"
+preferred_features = ["returning"]
+
+[[capabilities]]
+interface = "presolve:queue/work-queue"
+version = "^0.1"
+
 [resources]
-memory_mib = 128
-cpu_millis = 250
+memory_mib = 256
+cpu_millis = 500
 
 [network]
 outbound = "deny"
 ```
+
+The example intentionally names semantic requirements rather than Redis, S3, SQLite, PostgreSQL, Cloudflare, queue vendors, endpoints, credentials, or deployment placement.
 
 ## `contract_version`
 
@@ -106,7 +117,7 @@ Recognized workload kinds:
 | Value | Meaning | Current execution status |
 | --- | --- | --- |
 | `component` | WebAssembly Component workload | implemented |
-| `container` | OCI-compatible container workload | schema + resolution implemented; execution in progress |
+| `container` | OCI-compatible container workload | immutable identity, resolution, and Docker execution path implemented |
 
 Workload kind is application semantics. Build artifact paths, image registry locations, and deployment placement do not belong in `presolve.toml`.
 
@@ -119,7 +130,7 @@ Application-local communication semantics:
 ```toml
 [[interfaces]]
 name = "jobs"
-kind = "request_response"
+kind = "event"
 ```
 
 Implemented kinds:
@@ -177,6 +188,33 @@ preferred_features = ["user-metadata"]
 
 A feature may not be repeated across required and preferred feature lists.
 
+### Current built-in semantic contracts
+
+```text
+presolve:kv/store@0.1.0
+presolve:objects/store@0.1.0
+presolve:sql/database@0.1.0
+presolve:queue/work-queue@0.1.0
+```
+
+These contracts standardize application-visible semantics, not one concrete transport or vendor implementation.
+
+For example, an application that depends on PostgreSQL-family SQL syntax can declare that assumption explicitly:
+
+```toml
+[[capabilities]]
+interface = "presolve:sql/database"
+version = "^0.1"
+required_features = ["dialect-postgresql"]
+preferred_features = ["returning"]
+```
+
+Presolve does not claim that arbitrary SQLite and PostgreSQL SQL source is interchangeable. Dialect dependence remains an explicit semantic requirement when needed.
+
+Similarly, the baseline work-queue contract guarantees at-least-once leased delivery with explicit acknowledgement and retry. FIFO ordering, dead-letter routing, configurable lease duration, and delayed delivery are optional features rather than implicit baseline behavior.
+
+See [Capability contracts](../architecture/capability-contracts.md), [SQL capability semantics](../architecture/sql-capability.md), and [Work-queue capability semantics](../architecture/work-queue-capability.md).
+
 ## `[resources]`
 
 Resource requirements are minimums:
@@ -226,6 +264,7 @@ Do not place these in `presolve.toml`:
 - environment selection
 - provider IDs
 - provider credentials
+- provider endpoints or database paths
 - build artifact paths
 - deployment placement
 - infrastructure resource names
