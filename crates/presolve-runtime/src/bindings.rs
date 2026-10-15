@@ -25,6 +25,15 @@ pub(crate) mod objects {
     });
 }
 
+pub(crate) mod queue {
+    wasmtime::component::bindgen!({
+        path: "../../wit/presolve-app",
+        interfaces: "
+            import presolve:queue/work-queue@0.1.0;
+        ",
+    });
+}
+
 pub(crate) mod sql {
     wasmtime::component::bindgen!({
         path: "../../wit/presolve-app",
