@@ -1,0 +1,14 @@
+name: Temporary PostgreSQL image digest
+
+on:
+  push:
+    branches:
+      - tmp/postgres-image-digest
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          docker pull postgres:18-alpine
+          docker image inspect postgres:18-alpine --format '{{index .RepoDigests 0}}'
