@@ -1,0 +1,39 @@
+name: Temporary SQL provider Clippy fix
+
+on:
+  push:
+    branches:
+      - tmp/sql-provider-clippy-fix
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: proof/sqlite-postgres-portability
+          fetch-depth: 0
+      - run: rustup toolchain install stable --profile minimal --component rustfmt
+      - name: Borrow driver errors in mappers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name, ty, mapper in [
+              ('providers/sql-sqlite/src/lib.rs', 'SqliteError', 'map_sqlite_error'),
+              ('providers/sql-postgres/src/lib.rs', 'postgres::Error', 'map_postgres_error'),
+          ]:
+              p = Path(name)
+              text = p.read_text()
+              text = text.replace(f'fn {mapper}(error: {ty})', f'fn {mapper}(error: &{ty})')
+              text = text.replace(f'.map_err({mapper})', f'.map_err(|error| {mapper}(&error))')
+              p.write_text(text)
+          PY
+          cargo fmt --all
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add providers/sql-sqlite/src/lib.rs providers/sql-postgres/src/lib.rs
+          git commit -m "refactor: borrow SQL driver errors"
+          git push origin HEAD:proof/sqlite-postgres-portability
