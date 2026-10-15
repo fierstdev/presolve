@@ -133,10 +133,7 @@ mod tests {
 
         assert_eq!(contract.interface(), WORK_QUEUE_INTERFACE);
         assert_eq!(contract.version(), &Version::new(0, 1, 0));
-        assert_eq!(
-            contract.operations(),
-            ["ack", "receive", "retry", "send"]
-        );
+        assert_eq!(contract.operations(), ["ack", "receive", "retry", "send"]);
         assert_eq!(
             contract.guarantees(),
             [
