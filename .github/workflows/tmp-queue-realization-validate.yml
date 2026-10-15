@@ -23,6 +23,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           path = Path('crates/presolve-node/src/realization.rs')
           text = path.read_text()
 
@@ -34,14 +35,16 @@ jobs:
               raise SystemExit('expected provider SDK import not found')
           text = text.replace(old_import, new_import, 1)
 
-          marker = '''            interface => {
-                return Err(
-                    ProviderMaterializationError::UnsupportedRegistryCapability {
-                        interface: interface.to_owned(),
-                    },
-                );
-            }'''
-          replacement = '''            WORK_QUEUE_INTERFACE => {
+          function_start = text.find('fn register_selected_capabilities(')
+          if function_start < 0:
+              raise SystemExit('register_selected_capabilities not found')
+
+          marker = '            interface => {'
+          marker_index = text.find(marker, function_start)
+          if marker_index < 0:
+              raise SystemExit('fallback interface arm not found')
+
+          queue_arm = '''            WORK_QUEUE_INTERFACE => {
                 if registry.work_queue(provider_id).is_some() {
                     continue;
                 }
@@ -56,16 +59,8 @@ jobs:
                 registry.register_work_queue(provider_id, provider)?;
             }
 
-            interface => {
-                return Err(
-                    ProviderMaterializationError::UnsupportedRegistryCapability {
-                        interface: interface.to_owned(),
-                    },
-                );
-            }'''
-          if marker not in text:
-              raise SystemExit('expected realization match marker not found')
-          text = text.replace(marker, replacement, 1)
+'''
+          text = text[:marker_index] + queue_arm + text[marker_index:]
           path.write_text(text)
           PY
 
