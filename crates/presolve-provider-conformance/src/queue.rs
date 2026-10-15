@@ -1,4 +1,7 @@
-use std::{thread, time::{Duration, Instant}};
+use std::{
+    thread,
+    time::{Duration, Instant},
+};
 
 use presolve_provider_sdk::{
     WorkQueueDelivery, WorkQueueProvider, WorkQueueReceiveOptions, WorkQueueRetryOptions,
@@ -103,10 +106,7 @@ fn assert_unacknowledged_redelivery(
         .expect("redelivered message acknowledgement should succeed");
 }
 
-fn assert_explicit_retry(
-    provider: &dyn WorkQueueProvider,
-    options: WorkQueueConformanceOptions,
-) {
+fn assert_explicit_retry(provider: &dyn WorkQueueProvider, options: WorkQueueConformanceOptions) {
     let body = b"presolve-queue-explicit-retry";
     provider
         .send(body, WorkQueueSendOptions::default())
