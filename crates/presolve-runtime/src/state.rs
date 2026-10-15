@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use presolve_provider_sdk::{
     KeyValueProvider, ObjectRead, ObjectStoreProvider, SqlDatabaseProvider, SqlQueryResult,
-    SqlTransaction, UnavailableSqlDatabaseProvider,
+    SqlTransaction,
 };
 use wasmtime::{ResourceLimiter, StoreLimits, component::ResourceTable};
 use wasmtime_wasi::{WasiCtx, WasiCtxView, WasiView};
@@ -39,20 +39,6 @@ pub(crate) struct RuntimeState {
 }
 
 impl RuntimeState {
-    #[must_use]
-    pub(crate) fn new(
-        runtime_limits: RuntimeLimits,
-        key_value_provider: Arc<dyn KeyValueProvider>,
-        object_store_provider: Arc<dyn ObjectStoreProvider>,
-    ) -> Self {
-        Self::new_with_sql(
-            runtime_limits,
-            key_value_provider,
-            object_store_provider,
-            Arc::new(UnavailableSqlDatabaseProvider),
-        )
-    }
-
     #[must_use]
     pub(crate) fn new_with_sql(
         runtime_limits: RuntimeLimits,
