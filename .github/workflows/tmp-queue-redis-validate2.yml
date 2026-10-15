@@ -1,0 +1,39 @@
+name: Temporary Redis queue validation 2
+
+on:
+  push:
+    branches:
+      - tmp/queue-redis-validate2
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/queue-redis-validate2
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+      - name: Fix doc lint and format
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('providers/queue-redis/src/lib.rs')
+          text = path.read_text()
+          text = text.replace('Application Contract, DeploymentPlan, or release', 'Application Contract, `DeploymentPlan`, or release', 1)
+          path.write_text(text)
+          PY
+          cargo fmt --all
+      - name: Test Redis queue provider
+        run: cargo test -p presolve-provider-queue-redis
+      - name: Clippy Redis queue provider
+        run: cargo clippy -p presolve-provider-queue-redis --all-targets -- -D warnings
+      - name: Commit validated provider and lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add providers/queue-redis/src/lib.rs Cargo.lock
+          git commit -m "provider: validate Redis Streams queue"
+          git push origin HEAD:tmp/queue-redis-validate2
