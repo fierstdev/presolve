@@ -1,0 +1,26 @@
+name: Temporary SQL lockfile generation
+
+on:
+  push:
+    branches:
+      - tmp/sql-lockfile
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: proof/sqlite-postgres-portability
+          fetch-depth: 0
+      - run: rustup toolchain install stable --profile minimal
+      - run: cargo generate-lockfile
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "build: lock SQL provider dependencies"
+          git push origin HEAD:proof/sqlite-postgres-portability
