@@ -13,9 +13,7 @@ use presolve_provider_sql_postgres::{
     POSTGRES_DATABASE_SETTING, POSTGRES_HOST_SETTING, POSTGRES_PASSWORD_SECRET,
     POSTGRES_PORT_SETTING, POSTGRES_SQL_ADAPTER_ID, POSTGRES_USER_SETTING, PostgresSqlAdapter,
 };
-use presolve_provider_sql_sqlite::{
-    SQLITE_PATH_SETTING, SQLITE_SQL_ADAPTER_ID, SqliteSqlAdapter,
-};
+use presolve_provider_sql_sqlite::{SQLITE_PATH_SETTING, SQLITE_SQL_ADAPTER_ID, SqliteSqlAdapter};
 use presolve_resolver::{DeploymentPlan, resolve};
 
 const SQLITE_PATH_ENV: &str = "PRESOLVE_SQLITE_PATH";
