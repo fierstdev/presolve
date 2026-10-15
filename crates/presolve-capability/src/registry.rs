@@ -2,7 +2,8 @@ use semver::Version;
 
 use crate::{
     CapabilityContract, CapabilityContractError, KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE,
-    SQL_DATABASE_INTERFACE, key_value_contract, object_store_contract, sql_database_contract,
+    SQL_DATABASE_INTERFACE, WORK_QUEUE_INTERFACE, key_value_contract, object_store_contract,
+    sql_database_contract, work_queue_contract,
 };
 
 /// Returns whether `interface` is a built-in capability interface understood by
@@ -11,7 +12,7 @@ use crate::{
 pub fn is_known_capability_interface(interface: &str) -> bool {
     matches!(
         interface,
-        KEY_VALUE_INTERFACE | OBJECT_STORE_INTERFACE | SQL_DATABASE_INTERFACE
+        KEY_VALUE_INTERFACE | OBJECT_STORE_INTERFACE | SQL_DATABASE_INTERFACE | WORK_QUEUE_INTERFACE
     )
 }
 
@@ -34,6 +35,7 @@ pub fn canonical_contract_for(
         KEY_VALUE_INTERFACE => key_value_contract()?,
         OBJECT_STORE_INTERFACE => object_store_contract()?,
         SQL_DATABASE_INTERFACE => sql_database_contract()?,
+        WORK_QUEUE_INTERFACE => work_queue_contract()?,
         _ => return Ok(None),
     };
 
@@ -53,6 +55,7 @@ mod tests {
         assert!(is_known_capability_interface(KEY_VALUE_INTERFACE));
         assert!(is_known_capability_interface(OBJECT_STORE_INTERFACE));
         assert!(is_known_capability_interface(SQL_DATABASE_INTERFACE));
+        assert!(is_known_capability_interface(WORK_QUEUE_INTERFACE));
         assert!(!is_known_capability_interface("example:custom/service"));
     }
 
@@ -73,6 +76,17 @@ mod tests {
 
         assert_eq!(
             canonical_contract_for(SQL_DATABASE_INTERFACE, contract.version())
+                .expect("lookup should succeed"),
+            Some(contract)
+        );
+    }
+
+    #[test]
+    fn queue_builtin_version_returns_contract() {
+        let contract = work_queue_contract().expect("work queue contract should be valid");
+
+        assert_eq!(
+            canonical_contract_for(WORK_QUEUE_INTERFACE, contract.version())
                 .expect("lookup should succeed"),
             Some(contract)
         );
