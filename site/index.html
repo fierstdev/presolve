@@ -3,93 +3,106 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Presolve — Build software once. Decide where it runs later.</title>
-  <meta name="description" content="Presolve packages applications into immutable releases, matches them against environment capabilities, and emits inspectable deployment plans.">
+  <title>Presolve — Build once. Decide where it runs later.</title>
+  <meta name="description" content="Presolve lets you build an application once, check whether a target environment can run that exact build, and see what infrastructure it will use before you ship it.">
   <link rel="canonical" href="https://presolve.dev/">
   <meta property="og:title" content="Presolve">
-  <meta property="og:description" content="Build software once. Decide where it runs later.">
+  <meta property="og:description" content="Build once. Decide where it runs later.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://presolve.dev/">
   <meta name="theme-color" content="#0a0a0a">
   <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/navigation.css">
+  <script src="/site.js" defer></script>
 </head>
 <body>
   <header class="site-header">
     <div class="shell nav-shell">
       <a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a>
-      <nav class="nav-links" aria-label="Primary navigation"><a href="#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav>
+      <nav class="nav-links" aria-label="Primary navigation"><a href="#how">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav>
     </div>
   </header>
 
   <main>
     <section class="hero shell">
       <div class="eyebrow"><span class="dot"></span> Developer Preview</div>
-      <h1>Build software once.<br>Decide where it runs later.</h1>
-      <p class="hero-copy">Presolve packages an application and its requirements into an immutable release. Environments declare what they can provide. Presolve resolves the two and produces an inspectable deployment plan.</p>
-      <div class="hero-actions"><a class="button primary" href="/proof/">Run the portability proof</a><a class="button secondary" href="/docs/">Read the docs</a></div>
+      <h1>Build once.<br>Decide where it runs later.</h1>
+      <p class="hero-copy">Presolve lets you build an application without baking a specific cloud, database, or storage provider into it. Build it once, then check where that exact build can run and what infrastructure it will use.</p>
+      <div class="hero-actions"><a class="button primary" href="/docs/getting-started/">Get started</a><a class="button secondary" href="/proof/">See the same-build proof</a></div>
       <div class="hero-terminal" aria-label="Presolve command line workflow">
         <div class="terminal-top"><span></span><span></span><span></span><strong>presolve</strong></div>
         <pre><code><span class="prompt">$</span> presolve build
 <span class="dim">release:</span> dist/orders.presolved
 <span class="dim">digest:</span>  sha256:8f6d…
 
-<span class="prompt">$</span> presolve check
+<span class="prompt">$</span> presolve check dist/orders.presolved
 <span class="good">Status: compatible</span>
 
-<span class="prompt">$</span> presolve plan
-<span class="dim">presolve:sql/database</span> → postgres-sql <span class="dim">@ 0.1.0</span></code></pre>
+<span class="prompt">$</span> presolve plan dist/orders.presolved
+<span class="dim">key-value storage</span> → cloudflare-kv
+<span class="dim">sql database</span>      → postgres-sql</code></pre>
       </div>
     </section>
 
-    <section id="model" class="section shell">
-      <div class="section-heading"><span class="kicker">The model</span><h2>Application requirements stay separate from deployment supply.</h2><p>The application describes what it needs. The environment describes what exists here. The resolver joins them without putting infrastructure choices into application identity.</p></div>
+    <section class="section section-rule shell">
+      <div class="section-heading"><span class="kicker">Why Presolve</span><h2>Infrastructure can change without turning your app into a different build.</h2><p>Presolve separates what your application needs from the specific service that provides it.</p></div>
+      <div class="proof-grid benefit-grid">
+        <article><span>01</span><strong>Write needs, not vendor choices</strong><p>Your application can ask for storage, SQL, queues, and other services without making one provider part of the application itself.</p></article>
+        <article><span>02</span><strong>Check before you ship</strong><p>Presolve tells you whether an environment can satisfy the application and reports what is missing when it cannot.</p></article>
+        <article><span>03</span><strong>Keep the build unchanged</strong><p>Move the same packaged application between environments instead of rebuilding it just to switch infrastructure.</p></article>
+      </div>
+    </section>
+
+    <section id="how" class="section section-rule shell workflow-section">
+      <div class="section-heading"><span class="kicker">The workflow</span><h2>Four commands. Four useful answers.</h2><p>You can use Presolve without learning its internal architecture first.</p></div>
+      <div class="workflow-list">
+        <div><code>presolve inspect</code><span><strong>What does my application need?</strong><br>See the application Presolve understands before choosing an environment.</span></div>
+        <div><code>presolve build</code><span><strong>What am I distributing?</strong><br>Create the packaged application that can be checked against different environments.</span></div>
+        <div><code>presolve check</code><span><strong>Can it run here?</strong><br>Verify that the current environment can provide everything the application requires.</span></div>
+        <div><code>presolve plan</code><span><strong>What will it use?</strong><br>See the exact runtime and providers Presolve selected before execution.</span></div>
+      </div>
+      <div class="hero-actions"><a class="button primary" href="/docs/getting-started/">Follow the tutorial</a><a class="button secondary" href="/docs/cli/">CLI reference</a></div>
+    </section>
+
+    <section class="section section-rule shell">
+      <div class="split-heading"><div><span class="kicker">The portability proof</span><h2>Same application file. Different infrastructure.</h2></div><p>Presolve's flagship proof builds the application once, keeps the release digest unchanged, and checks that same file against materially different environments.</p></div>
+      <div class="release-demo">
+        <div class="release-file"><span class="file-type">built once</span><strong>kv-demo.presolved</strong><code>sha256: unchanged</code></div>
+        <div class="release-lines" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="environment-stack">
+          <div><strong>Local</strong><span>in-memory KV</span></div>
+          <div><strong>Network service</strong><span>Redis</span></div>
+          <div><strong>Managed cloud</strong><span>Cloudflare KV</span></div>
+        </div>
+      </div>
+      <div class="hero-actions"><a class="button primary" href="/proof/">See the proof</a><a class="button secondary" href="/docs/proofs/">Read the evidence</a></div>
+    </section>
+
+    <section id="model" class="section section-rule shell">
+      <div class="section-heading"><span class="kicker">Under the hood</span><h2>The app says what it needs. The environment says what it has. Presolve matches them.</h2><p>This is the formal model behind the simple workflow above. You only need these terms when you want to go deeper.</p></div>
       <div class="model-grid">
-        <article class="model-card"><div class="model-label">Application Contract</div><code>presolve.toml</code><ul><li>workloads</li><li>capabilities</li><li>resource requirements</li><li>network policy</li></ul></article>
-        <div class="resolver-card"><div class="resolver-mark">P</div><strong>Resolver</strong><span>compatibility + selection</span></div>
-        <article class="model-card"><div class="model-label">Environment Specification</div><code>presolve.env.toml</code><ul><li>execution support</li><li>provider supply</li><li>resource capacity</li><li>stable provider IDs</li></ul></article>
+        <article class="model-card"><div class="model-label">Your application</div><code>presolve.toml</code><ul><li>what code should run</li><li>which services it needs</li><li>resource needs</li><li>network intent</li></ul></article>
+        <div class="resolver-card"><div class="resolver-mark">P</div><strong>Presolve</strong><span>checks + matches</span></div>
+        <article class="model-card"><div class="model-label">Target environment</div><code>presolve.env.toml</code><ul><li>where code can run</li><li>available providers</li><li>resource capacity</li><li>provider identities</li></ul></article>
       </div>
-      <div class="plan-strip"><span>output</span><strong>DeploymentPlan</strong><code>exact workloads · providers · versions · negotiated features</code></div>
+      <div class="plan-strip"><span>result</span><strong>Deployment plan</strong><code>the exact workload and provider choices Presolve made</code></div>
+      <div class="hero-actions"><a class="button secondary" href="/docs/model/">Read the architecture</a><a class="button secondary" href="/docs/capabilities/">Capability details</a></div>
     </section>
 
     <section class="section section-rule shell">
-      <div class="split-heading"><div><span class="kicker">Immutable release</span><h2>The release does not know where it will run.</h2></div><p>A <code>.presolved</code> bundle carries application identity, requirements, workload artifact identity, and topology. Environment-specific endpoints, credentials, provider configuration, registry locations, and placement stay outside it.</p></div>
-      <div class="release-demo"><div class="release-file"><span class="file-type">.presolved</span><strong>orders.presolved</strong><code>sha256:8f6dc2…</code></div><div class="release-lines" aria-hidden="true"><i></i><i></i><i></i></div><div class="environment-stack"><div><strong>Local</strong><span>memory providers · Component runtime</span></div><div><strong>Network services</strong><span>Redis · S3-compatible · PostgreSQL</span></div><div><strong>Managed infrastructure</strong><span>Cloudflare Workers KV</span></div></div></div>
-    </section>
-
-    <section id="proof" class="section section-rule shell">
-      <div class="section-heading compact"><span class="kicker">Flagship proof</span><h2>One release. Three environments. Zero application rebuilds.</h2><p>The KV flagship builds one detached release once, resolves those exact bytes against memory, Redis, and Cloudflare environments, executes through materially different providers, and verifies that identity never changes. Independent object-storage, SQL, and queue proof jobs now exercise additional capability families.</p></div>
-      <div class="workflow-list"><div><code>portability-local</code><span><strong>memory-kv</strong> · resolved + executed</span></div><div><code>portability-redis</code><span><strong>redis-kv</strong> · resolved + executed over TCP</span></div><div><code>portability-cloudflare</code><span><strong>cloudflare-kv</strong> · resolved; live execution with credentials</span></div></div>
-      <div class="code-block"><pre><code>$ bash ./demo/portability/run.sh
-
-release digest unchanged: yes
-archive sha256 unchanged: yes
-
-PASS — one .presolved release, three plans,
-two provider realizations, zero application rebuilds.</code></pre></div>
-      <div class="hero-actions"><a class="button primary" href="/proof/">See the proof</a><a class="button secondary" href="/docs/proofs/">All proof evidence</a></div>
-    </section>
-
-    <section class="section section-rule shell workflow-section">
-      <div class="section-heading compact"><span class="kicker">Workflow</span><h2>Four commands, four different questions.</h2></div>
-      <div class="workflow-list"><div><code>presolve inspect</code><span>What does this application require?</span></div><div><code>presolve build</code><span>What immutable release are we distributing?</span></div><div><code>presolve check</code><span>Can this environment satisfy it?</span></div><div><code>presolve plan</code><span>What exactly did the resolver select?</span></div></div>
-    </section>
-
-    <section class="section section-rule shell">
-      <div class="section-heading compact"><span class="kicker">Implemented today</span><h2>The proof rests on working architecture, not a mock.</h2><p>Presolve is pre-stable, but the portability path is implemented and continuously checked in public CI.</p></div>
+      <div class="section-heading compact"><span class="kicker">Available today</span><h2>This is working software, not a portability mockup.</h2><p>Presolve is still pre-stable, but the core build, compatibility, planning, provider, and proof paths are implemented and checked in public CI.</p></div>
       <div class="proof-grid">
-        <article><span>01</span><strong>Workloads</strong><p>WebAssembly Components plus OCI/container workload identity and execution paths.</p></article>
-        <article><span>02</span><strong>Capabilities</strong><p>Versioned KV, object-storage, relational SQL, and leased work-queue semantic contracts.</p></article>
-        <article><span>03</span><strong>Providers</strong><p>Memory, Redis, Cloudflare KV, S3-compatible storage, SQLite, PostgreSQL, and queue realizations.</p></article>
-        <article><span>04</span><strong>Proof suite</strong><p>Same-release KV, objects, and SQL proofs plus a detached-release queue capability proof.</p></article>
-        <article><span>05</span><strong>Resolution</strong><p>Deterministic compatibility checks and inspectable symbolic deployment plans.</p></article>
-        <article><span>06</span><strong>Build + authoring</strong><p>Deterministic packaging with Rust and TypeScript authoring paths around a language-neutral contract.</p></article>
+        <article><span>01</span><strong>Application builds</strong><p>Create deterministic <code>.presolved</code> packages from supported authoring paths.</p></article>
+        <article><span>02</span><strong>Compatibility checks</strong><p>Detect when an environment cannot provide something the application requires.</p></article>
+        <article><span>03</span><strong>Inspectable plans</strong><p>See the providers and versions selected before runtime objects are created.</p></article>
+        <article><span>04</span><strong>Multiple providers</strong><p>Current implementations include memory, Redis, Cloudflare KV, S3-compatible storage, SQLite, PostgreSQL, and queues.</p></article>
+        <article><span>05</span><strong>Multiple workload paths</strong><p>WebAssembly Components and OCI/container workload identity and execution paths are represented.</p></article>
+        <article><span>06</span><strong>Public proofs</strong><p>KV, object-storage, SQL, and queue checks exercise portability and semantic compatibility.</p></article>
       </div>
     </section>
 
-    <section class="section section-rule shell boundaries"><div class="split-heading"><div><span class="kicker">Scope</span><h2>Presolve is not a control plane.</h2></div><div><p>The current project stops at deterministic compatibility, immutable application identity, provider selection, and execution/materialization boundaries.</p><p>Scheduling, service mesh, fleet management, registries, and full deployment lifecycle management are not being folded into the core before the portability model has external proof.</p></div></div></section>
-
-    <section class="cta shell"><span class="kicker">Developer Preview</span><h2>Run the proof. Break the assumptions.</h2><p>Presolve is developed in public under Apache-2.0. The most useful feedback right now is where the Application / Environment boundary fails under real infrastructure.</p><div class="hero-actions"><a class="button primary" href="/proof/">Run the proof</a><a class="button secondary" href="/docs/">Read the documentation</a></div></section>
+    <section class="cta shell"><span class="kicker">Developer Preview</span><h2>Start with the workflow. Dig into the architecture when you need it.</h2><p>Presolve is developed in public under Apache-2.0. Run the tutorial, inspect the proof, and tell us where the portability model fails under real infrastructure.</p><div class="hero-actions"><a class="button primary" href="/docs/getting-started/">Get started</a><a class="button secondary" href="https://github.com/fierstdev/presolve">View GitHub ↗</a></div></section>
   </main>
 
   <footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>

@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Getting started — Presolve Docs</title>
+  <meta name="description" content="A step-by-step Presolve tutorial: install the CLI, run the KV example, create a local environment, build one release, check compatibility, inspect the plan, and run locally.">
+  <link rel="canonical" href="https://presolve.dev/docs/getting-started/">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/navigation.css">
+  <link rel="stylesheet" href="/docs/mobile.css">
+  <link rel="stylesheet" href="/docs/docs.css">
+  <script src="/site.js" defer></script>
+</head>
+<body>
+<header class="site-header">
+  <div class="shell nav-shell">
+    <a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a>
+    <nav class="nav-links" aria-label="Primary navigation"><a href="/#how">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="page-hero shell">
+  <span class="kicker">Getting started</span>
+  <h1>Run your first Presolve workflow.</h1>
+  <p>This guide uses the repository's KV example to show the complete developer loop. You will build the application once, describe a local environment, check compatibility, inspect the resulting plan, and run the app without learning the full architecture first.</p>
+</section>
+
+<div class="docs-layout shell">
+  <aside class="docs-nav">
+    <strong>Documentation</strong>
+    <a href="/docs/">Documentation home</a>
+    <a href="/docs/getting-started/" aria-current="page">Getting started</a>
+    <a href="/docs/cli/">CLI & workflows</a>
+    <a href="/docs/application/">Define your application</a>
+    <a href="/docs/environment/">Define an environment</a>
+    <a href="/docs/releases/">Built releases</a>
+    <a href="/docs/capabilities/">Capabilities</a>
+    <a href="/docs/model/">Architecture</a>
+    <a href="/docs/proofs/">Proofs</a>
+  </aside>
+
+  <article class="docs-content">
+    <div class="doc-breadcrumb"><a href="/docs/">Docs</a> / Getting started</div>
+    <p class="doc-lede">The goal is to make the Presolve workflow concrete before introducing its formal vocabulary. By the end, you should be able to answer three practical questions: what am I shipping, can this environment run it, and what will Presolve use there?</p>
+
+    <section id="prerequisites">
+      <span class="kicker">Before you begin</span>
+      <h2>Prerequisites.</h2>
+      <p>Presolve is currently a developer preview and the CLI is built from source. For this walkthrough you need Git and a Rust toolchain with Cargo. The included KV example builds a WebAssembly Component through the repository's current Rust authoring path.</p>
+      <div class="doc-table-wrap">
+        <table class="doc-table">
+          <thead><tr><th>Tool</th><th>Why you need it</th><th>Check</th></tr></thead>
+          <tbody>
+            <tr><td>Git</td><td>Clone the Presolve repository</td><td><code>git --version</code></td></tr>
+            <tr><td>Rust + Cargo</td><td>Build the CLI and Rust example</td><td><code>cargo --version</code></td></tr>
+            <tr><td><code>wasm32-wasip2</code> target</td><td>Build the example Component</td><td><code>rustup target add wasm32-wasip2</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">You do not need Redis, PostgreSQL, S3, Cloudflare credentials, or Docker for this first local walkthrough.</div>
+    </section>
+
+    <section id="install">
+      <span class="kicker">Step 1</span>
+      <h2>Build the Presolve CLI.</h2>
+      <div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
+cd presolve
+
+cargo build -p presolve-cli
+export PATH="$PWD/target/debug:$PATH"
+
+presolve --help</code></pre></div>
+      <p>The final command should print the Presolve CLI help. Keeping <code>target/debug</code> on your <code>PATH</code> means the rest of the guide can use <code>presolve</code> directly.</p>
+      <h3>What this does not do</h3>
+      <p>Building the CLI does not build an application release and does not create an environment. It only prepares the developer tooling.</p>
+    </section>
+
+    <section id="example">
+      <span class="kicker">Step 2</span>
+      <h2>Open the KV example.</h2>
+      <div class="code-block"><pre><code>cd examples/kv-demo
+ls</code></pre></div>
+      <p>The directory contains normal application source plus <code>presolve.toml</code>. That file tells Presolve what the application is and what it requires. For this example, the important requirement is key-value storage.</p>
+      <div class="doc-two-col">
+        <div class="doc-boundary good"><strong>Application source</strong><p>The code that implements the example's behavior.</p></div>
+        <div class="doc-boundary good"><strong><code>presolve.toml</code></strong><p>The portable description of what the application needs to run.</p></div>
+      </div>
+      <p>You can inspect the application before any environment exists:</p>
+      <div class="code-block"><pre><code>presolve inspect</code></pre></div>
+      <p>Use this whenever you want to verify what Presolve understands from the application definition without mixing in deployment choices.</p>
+    </section>
+
+    <section id="environment">
+      <span class="kicker">Step 3</span>
+      <h2>Create a local environment.</h2>
+      <p>An application says what it needs. An environment says what is available here. For local development, create an environment beside the example and add an in-memory KV provider:</p>
+      <div class="code-block"><pre><code>presolve env init local-dev
+presolve env provider add memory-services --provides kv
+presolve env show
+presolve env check</code></pre></div>
+      <p>This creates <code>presolve.env.toml</code>. The generated environment has a stable identity, explicit execution support, resource capacity, and the KV service you just declared.</p>
+      <h3>Why this is separate from the app</h3>
+      <p>The example still asks for key-value storage. It does not need to know that this environment satisfies that need with an in-memory provider. A different environment can satisfy the same requirement with Redis or Cloudflare KV.</p>
+      <div class="note"><code>presolve env check</code> validates the environment file itself. It does not yet answer whether this particular application can run there. That is the job of <code>presolve check</code>.</div>
+    </section>
+
+    <section id="build">
+      <span class="kicker">Step 4</span>
+      <h2>Build the application once.</h2>
+      <div class="code-block"><pre><code>presolve build</code></pre></div>
+      <p>The current Rust authoring path builds the example Component and packages the application into a <code>.presolved</code> release under <code>dist/</code>.</p>
+      <p>You should see output identifying both the release path and its digest. Conceptually, this is the thing you ship:</p>
+      <div class="code-block"><pre><code>dist/kv-demo.presolved
+sha256:…</code></pre></div>
+      <p>Presolve does not need the local environment in order to decide what this release is. The build remains separate from environment selection.</p>
+      <h3>Inspect the detached release</h3>
+      <div class="code-block"><pre><code>presolve inspect dist/kv-demo.presolved</code></pre></div>
+      <p>This reads the application definition back from the packaged release. It is useful when the source tree is no longer present or when you want to confirm exactly what was packaged.</p>
+    </section>
+
+    <section id="check">
+      <span class="kicker">Step 5</span>
+      <h2>Ask whether the environment can run it.</h2>
+      <div class="code-block"><pre><code>presolve check</code></pre></div>
+      <p>Presolve compares the application's requirements with the local environment. In this walkthrough, the KV requirement should match the <code>memory-services</code> provider.</p>
+      <p>A successful result means the environment can satisfy the mandatory requirements represented by the current model. If something is missing, Presolve returns a structured diagnostic instead of silently choosing a weaker fallback.</p>
+      <h3>Try the failure mode</h3>
+      <p>To understand what Presolve is protecting you from, remove the provider, run the check, then add it back:</p>
+      <div class="code-block"><pre><code>presolve env provider remove memory-services
+presolve check
+
+presolve env provider add memory-services --provides kv
+presolve check</code></pre></div>
+      <p>The first check should reject the environment because the app still requires KV storage. The second should return to a compatible state.</p>
+    </section>
+
+    <section id="plan">
+      <span class="kicker">Step 6</span>
+      <h2>Inspect what Presolve selected.</h2>
+      <div class="code-block"><pre><code>presolve plan</code></pre></div>
+      <p><code>check</code> answers whether the match is possible. <code>plan</code> shows the actual result of that match: the environment identity, workloads, selected provider identities, versions, and negotiated features.</p>
+      <div class="doc-sequence">
+        <div class="doc-sequence-step"><span>01</span><div><strong>The app asks for KV.</strong><p>The application does not name an infrastructure vendor.</p></div></div>
+        <div class="doc-sequence-step"><span>02</span><div><strong>The environment offers memory KV.</strong><p>The environment declares concrete supply.</p></div></div>
+        <div class="doc-sequence-step"><span>03</span><div><strong>The plan records the match.</strong><p>You can inspect the selected provider before runtime materialization.</p></div></div>
+      </div>
+      <h3>Machine-readable output</h3>
+      <p>For CI, automation, editors, and higher-level tooling, use the versioned JSON projection:</p>
+      <div class="code-block"><pre><code>presolve inspect --json
+presolve check --json
+presolve plan --json</code></pre></div>
+      <p>Do not scrape human output when a machine-readable form is available.</p>
+    </section>
+
+    <section id="run">
+      <span class="kicker">Step 7</span>
+      <h2>Run the app locally.</h2>
+      <div class="code-block"><pre><code>presolve dev --input "hello"</code></pre></div>
+      <p>The local development path resolves the same application/environment boundary, realizes the selected local provider implementation, assembles the runtime, and invokes the Component.</p>
+      <p>The important separation remains intact: the app asked for KV semantics, the environment supplied a provider, the plan selected it, and only then did the local node materialize the implementation.</p>
+    </section>
+
+    <section id="mental-model">
+      <span class="kicker">The mental model</span>
+      <h2>You now know the core workflow.</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table">
+          <thead><tr><th>You want to know…</th><th>Use…</th><th>Plain meaning</th></tr></thead>
+          <tbody>
+            <tr><td>What does my app need?</td><td><code>presolve inspect</code></td><td>Read the app definition without choosing infrastructure.</td></tr>
+            <tr><td>What exact application am I shipping?</td><td><code>presolve build</code></td><td>Create the portable <code>.presolved</code> release.</td></tr>
+            <tr><td>Can this environment run it?</td><td><code>presolve check</code></td><td>Validate compatibility before execution.</td></tr>
+            <tr><td>What did Presolve choose?</td><td><code>presolve plan</code></td><td>Inspect the selected runtime/provider bindings.</td></tr>
+            <tr><td>Can I run it locally?</td><td><code>presolve dev</code></td><td>Resolve, materialize local providers, and execute.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Everything deeper in the documentation explains one of these steps in more detail.</p>
+    </section>
+
+    <section id="troubleshooting">
+      <span class="kicker">Troubleshooting</span>
+      <h2>Common first-run problems.</h2>
+      <h3><code>presolve: command not found</code></h3>
+      <p>The CLI binary is not on your current shell's path. From the repository root, run <code>export PATH="$PWD/target/debug:$PATH"</code> again, or invoke the binary by its full path.</p>
+      <h3>The WebAssembly target is missing</h3>
+      <p>Install it with <code>rustup target add wasm32-wasip2</code>, then retry <code>presolve build</code>.</p>
+      <h3>No environment is found</h3>
+      <p>Run <code>presolve env init</code> in the example directory or a parent directory. Presolve searches upward for the nearest <code>presolve.env.toml</code>.</p>
+      <h3><code>presolve check</code> reports a missing capability</h3>
+      <p>The application requires a service the environment does not currently advertise. For this guide, confirm that <code>presolve env provider list</code> contains a provider offering KV.</p>
+      <h3>The environment validates, but the app is still rejected</h3>
+      <p><code>presolve env check</code> only validates the environment declaration. Use <code>presolve check</code> to evaluate the application against it. A valid environment can still be incompatible with a particular application.</p>
+    </section>
+
+    <section id="next">
+      <span class="kicker">Continue</span>
+      <h2>Go deeper only where you need to.</h2>
+      <div class="link-row">
+        <a class="link-card" href="/docs/cli/"><strong>CLI & workflows</strong><span>All core commands, JSON output, diagnostics, environment management, and local execution.</span></a>
+        <a class="link-card" href="/docs/application/"><strong>Define your application</strong><span>Workloads, service requirements, resources, topology, and network policy.</span></a>
+        <a class="link-card" href="/docs/environment/"><strong>Define an environment</strong><span>Execution support, provider supply, resources, stable IDs, and realization boundaries.</span></a>
+        <a class="link-card" href="/docs/proofs/"><strong>Run the portability proofs</strong><span>See the same release evaluated and executed through materially different providers.</span></a>
+      </div>
+    </section>
+  </article>
+</div>
+</main>
+
+<footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
+</body>
+</html>

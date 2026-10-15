@@ -1,0 +1,57 @@
+/* Shared navigation enhancement. Loaded after styles.css. */
+
+.docs-toc a[aria-current="location"] {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.docs-page-menu-inner a[aria-current="location"] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.nav-links a[aria-current="page"] {
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  /* No-JS fallback: keep the original navigation usable instead of hiding it. */
+  html:not(.js) .nav-links {
+    display: flex;
+    max-width: min(72vw, 620px);
+    gap: 14px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  html:not(.js) .nav-links a {
+    flex: 0 0 auto;
+  }
+
+  /* Enhanced experience: the desktop links are replaced by the mobile menu. */
+  .js .nav-links { display: none; }
+  .js .mobile-menu { display: block; }
+  .js .mobile-menu summary { display: inline-flex; }
+}
+
+@media (max-width: 620px) {
+  html:not(.js) .nav-links {
+    max-width: 64vw;
+    font-size: 12px;
+  }
+
+  .mobile-menu-panel {
+    position: fixed;
+    top: 63px;
+    left: 14px;
+    right: 14px;
+    width: auto;
+    max-height: calc(100dvh - 78px);
+  }
+}
+
+@media (max-width: 430px) {
+  html:not(.js) .nav-links { max-width: 58vw; }
+}

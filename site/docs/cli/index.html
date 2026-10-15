@@ -2,21 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CLI and planning — Presolve Docs</title>
-  <meta name="description" content="Presolve CLI workflow for environment setup, inspection, immutable builds, compatibility checks, deployment plans, diagnostics, and JSON automation.">
+  <title>CLI and workflows — Presolve Docs</title>
+  <meta name="description" content="Presolve CLI reference for environment setup, application inspection, builds, compatibility checks, deployment plans, diagnostics, JSON automation, and local execution.">
   <link rel="canonical" href="https://presolve.dev/docs/cli/">
   <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
+  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/navigation.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
+  <script src="/site.js" defer></script>
 </head>
 <body>
-<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#how">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
 <main>
-<section class="page-hero shell"><span class="kicker">CLI + planning</span><h1>Inspect before you realize.</h1><p>The current CLI separates semantic inspection, immutable packaging, compatibility checking, planning, environment management, and local execution.</p></section>
+<section class="page-hero shell"><span class="kicker">CLI & workflows</span><h1>Use Presolve from the command line.</h1><p>Inspect what an app needs, build the release you will ship, check whether an environment can run it, inspect the selected plan, and execute locally. This page is the command reference; first-time users should start with the guided tutorial.</p><div class="hero-actions"><a class="button primary" href="/docs/getting-started/">Getting started</a></div></section>
 <div class="docs-layout shell">
-<aside class="docs-nav"><strong>Documentation</strong><a href="/docs/">Overview</a><a href="/docs/model/">The model</a><a href="/docs/application/">Application Contract</a><a href="/docs/environment/">Environment</a><a href="/docs/releases/">Immutable releases</a><a href="/docs/capabilities/">Capabilities</a><a href="/docs/cli/" aria-current="page">CLI + planning</a><a href="/docs/proofs/">Proofs</a></aside>
+<aside class="docs-nav"><strong>Documentation</strong><a href="/docs/">Overview</a><a href="/docs/getting-started/">Getting started</a><a href="/docs/cli/" aria-current="page">CLI & workflows</a><a href="/docs/application/">Define your application</a><a href="/docs/environment/">Define an environment</a><a href="/docs/releases/">Built releases</a><a href="/docs/capabilities/">Capabilities</a><a href="/docs/model/">Architecture</a><a href="/docs/proofs/">Proofs</a></aside>
 <article class="docs-content">
-<div class="doc-breadcrumb"><a href="/docs/">Docs</a> / CLI + planning</div>
-<p class="doc-lede">The CLI is designed around different questions. <code>inspect</code> explains semantics, <code>build</code> creates the immutable thing, <code>check</code> answers compatibility, and <code>plan</code> shows the exact symbolic selection before provider materialization.</p>
+<div class="doc-breadcrumb"><a href="/docs/">Docs</a> / CLI & workflows</div>
+<p class="doc-lede">The five commands to remember are <code>inspect</code>, <code>build</code>, <code>check</code>, <code>plan</code>, and <code>dev</code>. Environment commands describe what a target can provide. The sections below cover the complete current CLI surface and the machine-readable outputs intended for automation.</p>
 
 <section id="install"><span class="kicker">Developer Preview</span><h2>Build the current CLI from source.</h2>
 <div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
@@ -27,28 +28,31 @@ export PATH="$PWD/target/debug:$PATH"
 presolve --help</code></pre></div>
 <div class="note">Presolve is pre-stable. Public CI packages the CLI for Linux x86_64/arm64 and macOS Intel/Apple Silicon, but tagged binary distribution is still being matured.</div></section>
 
-<section id="environment"><span class="kicker">Local environment</span><h2>Start with declared supply.</h2>
+<section id="environment"><span class="kicker">Local environment</span><h2>Describe what is available here.</h2>
 <div class="code-block"><pre><code>presolve env init
 presolve env provider add memory-services --provides kv,objects
 presolve env show
 presolve env check</code></pre></div>
-<p>The environment tooling generates/persists stable <code>EnvironmentId</code> and <code>ProviderId</code> values so normal local development does not require hand-managing opaque identities.</p>
+<p>The environment tooling generates and persists stable environment/provider identities so normal local development does not require hand-managing opaque IDs. <code>env show</code> explains the discovered environment; <code>env check</code> validates the environment declaration itself.</p>
 <div class="note">The ergonomic <code>--provides</code> shorthand currently covers <code>kv</code> and <code>objects</code>. Advanced/current contracts such as SQL and queues can be declared with exact <code>--capability INTERFACE@VERSION</code> arguments or authored directly in <code>presolve.env.toml</code>.</div></section>
 
-<section id="workflow"><span class="kicker">Four core commands</span><h2>Four questions, four outputs.</h2>
+<section id="workflow"><span class="kicker">Core commands</span><h2>Five commands, five different jobs.</h2>
 <div class="doc-sequence">
-<div class="doc-sequence-step"><span>01</span><div><strong><code>presolve inspect</code> — What does this application mean?</strong><p>Shows the normalized source Application Contract without requiring an environment.</p><div class="code-block"><pre><code>presolve inspect
+<div class="doc-sequence-step"><span>01</span><div><strong><code>presolve inspect</code> — What does the app require?</strong><p>Shows the normalized source application definition without requiring an environment.</p><div class="code-block"><pre><code>presolve inspect
 presolve inspect --json</code></pre></div></div></div>
-<div class="doc-sequence-step"><span>02</span><div><strong><code>presolve build</code> — What immutable release are we distributing?</strong><p>Builds/encodes a detached <code>.presolved</code> release whose identity does not include an environment.</p><div class="code-block"><pre><code>presolve build
+<div class="doc-sequence-step"><span>02</span><div><strong><code>presolve build</code> — What exact release are we distributing?</strong><p>Builds and packages a detached <code>.presolved</code> release whose identity does not include an environment.</p><div class="code-block"><pre><code>presolve build
 presolve inspect dist/orders.presolved</code></pre></div></div></div>
-<div class="doc-sequence-step"><span>03</span><div><strong><code>presolve check</code> — Can this environment satisfy it?</strong><p>Runs deterministic compatibility and reports structured PS2xxx resolution problems when requirements cannot be satisfied.</p><div class="code-block"><pre><code>presolve check
+<div class="doc-sequence-step"><span>03</span><div><strong><code>presolve check</code> — Can this environment satisfy the app?</strong><p>Runs compatibility checks and reports structured problems when mandatory requirements cannot be satisfied.</p><div class="code-block"><pre><code>presolve check
 presolve check dist/orders.presolved --json</code></pre></div></div></div>
-<div class="doc-sequence-step"><span>04</span><div><strong><code>presolve plan</code> — What exactly did the resolver select?</strong><p>Emits the symbolic DeploymentPlan: environment identity, workloads, ProviderIds, exact versions, negotiated features, and optional unbound requirements.</p><div class="code-block"><pre><code>presolve plan
+<div class="doc-sequence-step"><span>04</span><div><strong><code>presolve plan</code> — What exactly did Presolve select?</strong><p>Shows the environment, workloads, provider identities, exact versions, negotiated features, and optional unbound requirements selected for this application.</p><div class="code-block"><pre><code>presolve plan
 presolve plan dist/orders.presolved --json</code></pre></div></div></div>
+<div class="doc-sequence-step"><span>05</span><div><strong><code>presolve dev</code> — Can I run the resolved application locally?</strong><p>Checks compatibility, constructs the plan, realizes supported local providers, assembles the runtime, and invokes the application.</p><div class="code-block"><pre><code>presolve dev
+presolve dev --input "hello"</code></pre></div></div></div>
 </div></section>
 
-<section id="plan"><span class="kicker">DeploymentPlan</span><h2>The plan is inspectable before implementation objects exist.</h2>
-<div class="doc-diagram"><div class="doc-flow compact"><div class="doc-node"><small>immutable demand</small><strong>orders.presolved</strong></div><div class="doc-arrow">+</div><div class="doc-node"><small>declared supply</small><strong>presolve.env.toml</strong></div><div class="doc-arrow">→</div><div class="doc-node accent"><small>symbolic output</small><strong>DeploymentPlan</strong><span>ProviderIds, not connections</span></div></div></div>
+<section id="plan"><span class="kicker">Deployment plan</span><h2>Inspect the decision before runtime objects exist.</h2>
+<p>A deployment plan is the recorded result of matching one application to one environment. It identifies what Presolve selected; it does not contain live database clients, sockets, secrets, or cloud SDK objects.</p>
+<div class="doc-diagram"><div class="doc-flow compact"><div class="doc-node"><small>application build</small><strong>orders.presolved</strong></div><div class="doc-arrow">+</div><div class="doc-node"><small>target</small><strong>presolve.env.toml</strong></div><div class="doc-arrow">→</div><div class="doc-node accent"><small>inspectable result</small><strong>DeploymentPlan</strong><span>providers, versions, features</span></div></div></div>
 <div class="code-block"><pre><code>application: orders 1.0.0
 environment: production
 status: resolved
@@ -62,7 +66,7 @@ presolve:objects/store
   provider: s3-objects
   version: 0.1.0
   features: range-read</code></pre></div>
-<p>The exact human output may evolve during preview; the important boundary is that the plan contains semantic/provider identity selection, not database clients, sockets, secrets, or cloud SDK objects.</p></section>
+<p>The exact human formatting may evolve during preview. Automation should use the JSON form described below.</p></section>
 
 <section id="json"><span class="kicker">Automation</span><h2>Use the versioned JSON projection for tooling.</h2>
 <div class="code-block"><pre><code>presolve inspect --json
@@ -75,13 +79,13 @@ presolve inspect dist/orders.presolved --json</code></pre></div>
   "schema_version": "0.1",
   "kind": "..."
 }</code></pre></div>
-<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Command</th><th>Machine meaning</th></tr></thead><tbody><tr><td><code>inspect --json</code></td><td>normalized source application semantics; no environment required</td></tr><tr><td><code>inspect RELEASE --json</code></td><td>verified immutable release identity and semantics; no environment required</td></tr><tr><td><code>check --json</code></td><td>compatibility status + structured resolver problems; no full plan payload</td></tr><tr><td><code>plan --json</code></td><td>exact symbolic DeploymentPlan when resolved; <code>plan: null</code> when rejected</td></tr></tbody></table></div>
-<p>Rejected <code>check</code> and <code>plan</code> calls write their structured payload to stdout and then return a non-zero status. Automation should branch on stable problem <code>type</code>/<code>code</code> fields rather than scraping human text.</p>
-<a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/cli-json.md">View the canonical JSON field reference on GitHub ↗</a></section>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Command</th><th>Machine meaning</th></tr></thead><tbody><tr><td><code>inspect --json</code></td><td>normalized source application semantics; no environment required</td></tr><tr><td><code>inspect RELEASE --json</code></td><td>verified detached release identity and semantics; no environment required</td></tr><tr><td><code>check --json</code></td><td>compatibility status + structured resolution problems; no full plan payload</td></tr><tr><td><code>plan --json</code></td><td>exact symbolic deployment plan when resolved; <code>plan: null</code> when rejected</td></tr></tbody></table></div>
+<p>Rejected <code>check</code> and <code>plan</code> calls write their structured payload to stdout and return a non-zero status. Branch on stable problem <code>type</code>/<code>code</code> fields rather than scraping human text.</p>
+<a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/cli-json.md">Canonical JSON field reference on GitHub ↗</a></section>
 
-<section id="diagnostics"><span class="kicker">Diagnostics</span><h2>Stable codes distinguish validation from resolution failures.</h2>
-<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Range</th><th>Subsystem</th><th>Examples</th></tr></thead><tbody><tr><td><code>PS1xxx</code></td><td>Application Contract</td><td><code>PS1001</code> parse error · <code>PS1005</code> duplicate capability · <code>PS1016</code> invalid capability feature</td></tr><tr><td><code>PS2xxx</code></td><td>Resolution</td><td><code>PS2001</code> missing capability · <code>PS2004</code> missing required semantic feature · <code>PS2005</code> unsupported workload</td></tr></tbody></table></div>
-<p>Application semantic validation can return multiple <code>PS1xxx</code> diagnostics. Resolution failures preserve <code>PS2xxx</code> codes through <code>check</code>, <code>plan</code>, and local execution. Environment Specification validation is typed today but does not yet invent a stable <code>PSxxxx</code> taxonomy merely for symmetry.</p>
+<section id="diagnostics"><span class="kicker">Diagnostics</span><h2>Stable codes separate application errors from compatibility failures.</h2>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Range</th><th>Subsystem</th><th>Examples</th></tr></thead><tbody><tr><td><code>PS1xxx</code></td><td>Application definition</td><td><code>PS1001</code> parse error · <code>PS1005</code> duplicate capability · <code>PS1016</code> invalid capability feature</td></tr><tr><td><code>PS2xxx</code></td><td>Compatibility/resolution</td><td><code>PS2001</code> missing capability · <code>PS2004</code> missing required feature · <code>PS2005</code> unsupported workload</td></tr></tbody></table></div>
+<p>Application validation can return multiple <code>PS1xxx</code> diagnostics. Compatibility failures preserve <code>PS2xxx</code> codes through <code>check</code>, <code>plan</code>, and local execution.</p>
 <div class="code-block"><pre><code>{
   "status": "rejected",
   "plan": null,
@@ -94,22 +98,25 @@ presolve inspect dist/orders.presolved --json</code></pre></div>
     }
   ]
 }</code></pre></div>
-<a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/diagnostics.md">View the complete canonical diagnostic table on GitHub ↗</a></section>
+<a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/diagnostics.md">Complete diagnostic table on GitHub ↗</a></section>
 
-<section id="dev"><span class="kicker">Local execution</span><h2><code>presolve dev</code> closes the loop locally.</h2><p>The local development path discovers the application/environment, validates compatibility, constructs the plan, materializes local provider/runtime configuration, and executes through the same architecture used by detached-release checkpoints.</p>
+<section id="dev"><span class="kicker">Local execution</span><h2><code>presolve dev</code> closes the local loop.</h2><p>The local path discovers the application and environment, validates compatibility, constructs the plan, materializes supported local provider/runtime configuration, and executes through the same architecture used by detached-release checkpoints.</p>
 <div class="code-block"><pre><code>presolve env check
 presolve check
 presolve plan
-presolve dev</code></pre></div></section>
+presolve dev</code></pre></div>
+<p><code>dev</code> is convenient for local iteration; <code>check</code> and <code>plan</code> remain useful separately because they let you inspect compatibility and decisions without executing anything.</p></section>
 
-<section id="proof-commands"><span class="kicker">Proof commands</span><h2>Run architecture claims directly.</h2>
+<section id="proof-commands"><span class="kicker">Proof commands</span><h2>Run the portability claims directly.</h2>
 <div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Command</th><th>What it exercises</th></tr></thead><tbody>
 <tr><td><code>bash ./demo/portability/run.sh</code></td><td>KV: memory, Redis, Cloudflare planning; same release identity</td></tr>
 <tr><td><code>bash ./scripts/check-object-portability.sh</code></td><td>Object storage: memory ↔ S3-compatible</td></tr>
 <tr><td><code>bash ./scripts/check-sql-portability.sh</code></td><td>SQL conformance + SQLite ↔ PostgreSQL</td></tr>
-<tr><td><code>bash ./scripts/check-queue-portability.sh</code></td><td>Queue WIT/runtime/provider capability proof with leased delivery semantics</td></tr>
+<tr><td><code>bash ./scripts/check-queue-portability.sh</code></td><td>Queue runtime/provider capability proof with leased delivery semantics</td></tr>
 </tbody></table></div>
 <p><a href="/docs/proofs/">See the detailed proof walkthroughs →</a></p></section>
+
+<section id="next"><span class="kicker">Related documentation</span><h2>Follow the command into the concept.</h2><div class="link-row"><a class="link-card" href="/docs/application/"><strong>Application definition</strong><span>What <code>inspect</code> and <code>build</code> read from your project.</span></a><a class="link-card" href="/docs/environment/"><strong>Environment definition</strong><span>What <code>env</code>, <code>check</code>, and <code>plan</code> use as target supply.</span></a><a class="link-card" href="/docs/releases/"><strong>Built releases</strong><span>What <code>build</code> produces and what identity means.</span></a><a class="link-card" href="/docs/proofs/"><strong>Proofs</strong><span>How the same release is exercised against different providers.</span></a></div></section>
 </article></div></main>
 <footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
 </body></html>

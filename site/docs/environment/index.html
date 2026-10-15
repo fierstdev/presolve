@@ -6,20 +6,21 @@
   <meta name="description" content="Presolve Environment Specification reference: resources, execution classes, providers, capability supply, semantic features, and realization boundaries.">
   <link rel="canonical" href="https://presolve.dev/docs/environment/">
   <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
+  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/navigation.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
+  <script src="/site.js" defer></script>
 </head>
 <body>
-<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#how">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
 <main>
-<section class="page-hero shell"><span class="kicker">Environment Specification</span><h1>Describe what this environment can supply.</h1><p><code>presolve.env.toml</code> is a declarative inventory of execution support, resource capacity, and provider semantics. It is not a deployment plan and does not contain credentials.</p></section>
+<section class="page-hero shell"><span class="kicker">Define an environment</span><h1>Describe what this environment can provide.</h1><p><code>presolve.env.toml</code> describes which workloads can run here, the available resources, and the services/providers that can satisfy application requirements. It is not a secrets file or deployment plan.</p></section>
 <div class="docs-layout shell">
-<aside class="docs-nav"><strong>Documentation</strong><a href="/docs/">Overview</a><a href="/docs/model/">The model</a><a href="/docs/application/">Application Contract</a><a href="/docs/environment/" aria-current="page">Environment</a><a href="/docs/releases/">Immutable releases</a><a href="/docs/capabilities/">Capabilities</a><a href="/docs/cli/">CLI + planning</a><a href="/docs/proofs/">Proofs</a></aside>
+<aside class="docs-nav"><strong>Documentation</strong><a href="/docs/">Overview</a><a href="/docs/getting-started/">Getting started</a><a href="/docs/cli/">CLI & workflows</a><a href="/docs/application/">Define your application</a><a href="/docs/environment/" aria-current="page">Define an environment</a><a href="/docs/releases/">Built releases</a><a href="/docs/capabilities/">Capabilities</a><a href="/docs/model/">Architecture</a><a href="/docs/proofs/">Proofs</a></aside>
 <article class="docs-content">
-<div class="doc-breadcrumb"><a href="/docs/">Docs</a> / Environment Specification</div>
-<p class="doc-lede">The application says “I need relational SQL.” The environment says “I can supply SQLite here” or “I can supply PostgreSQL here.” Presolve resolves those statements without moving connection strings or provider configuration into the application.</p>
+<div class="doc-breadcrumb"><a href="/docs/">Docs</a> / Define an environment</div>
+<p class="doc-lede">The application says “I need relational SQL.” The environment says “I can provide SQLite here” or “I can provide PostgreSQL here.” Presolve compares those statements without putting connection strings or provider configuration into the application.</p>
 
-<section id="flow"><span class="kicker">Position in the model</span><h2>Supply becomes normalized resolver input.</h2>
-<div class="doc-diagram"><div class="doc-flow compact"><div class="doc-node accent"><small>Authored</small><strong>Environment Specification</strong><code>presolve.env.toml</code></div><div class="doc-arrow">→</div><div class="doc-node"><small>Validated + normalized</small><strong>Environment Inventory</strong><span>exact provider supply</span></div><div class="doc-arrow">→</div><div class="doc-node good"><small>Compared with demand</small><strong>Resolver</strong><span>compatibility + selection</span></div></div></div></section>
+<section id="flow"><span class="kicker">Where it fits</span><h2>Environment supply becomes compatibility input.</h2>
+<div class="doc-diagram"><div class="doc-flow compact"><div class="doc-node accent"><small>Authored</small><strong>Environment file</strong><code>presolve.env.toml</code></div><div class="doc-arrow">→</div><div class="doc-node"><small>Validated</small><strong>Environment inventory</strong><span>exact provider supply</span></div><div class="doc-arrow">→</div><div class="doc-node good"><small>Compared with app needs</small><strong>Compatibility + plan</strong><span>check + selection</span></div></div></div></section>
 
 <section id="example"><span class="kicker">Representative example</span><h2>A local multi-provider environment.</h2>
 <div class="code-block"><pre><code>specification_version = "0.1"
@@ -64,13 +65,13 @@ name = "memory-queue"
 [[providers.capabilities]]
 interface = "presolve:queue/work-queue"
 version = "0.1.0"</code></pre></div>
-<p>The specification says these providers and semantics exist. It still does not say where a SQLite file lives, which Redis host to dial, which S3 bucket to use, or which password unlocks PostgreSQL.</p></section>
+<p>The file says these providers and semantics exist. It still does not say where a SQLite file lives, which Redis host to dial, which S3 bucket to use, or which password unlocks PostgreSQL.</p></section>
 
-<section id="identity"><span class="kicker">Stable identity</span><h2>Names are human-facing. IDs are joins.</h2>
-<div class="doc-two-col"><div class="doc-boundary good"><strong>EnvironmentId</strong><p><code>env_&lt;uuid&gt;</code> identifies the environment declaration across renames.</p></div><div class="doc-boundary good"><strong>ProviderId</strong><p><code>prv_&lt;uuid&gt;</code> identifies one concrete supply instance and becomes the stable join into node materialization.</p></div></div>
-<div class="doc-diagram"><div class="doc-flow compact"><div class="doc-node"><small>Specification</small><strong>Provider</strong><code>prv_…</code></div><div class="doc-arrow">→</div><div class="doc-node accent"><small>Resolution</small><strong>DeploymentPlan</strong><code>provider_id = prv_…</code></div><div class="doc-arrow">→</div><div class="doc-node good"><small>Node</small><strong>ProviderRegistry</strong><code>prv_… → implementation</code></div></div></div></section>
+<section id="identity"><span class="kicker">Stable identity</span><h2>Names are for people. IDs are for stable joins.</h2>
+<div class="doc-two-col"><div class="doc-boundary good"><strong>EnvironmentId</strong><p><code>env_&lt;uuid&gt;</code> identifies the environment declaration across human-facing renames.</p></div><div class="doc-boundary good"><strong>ProviderId</strong><p><code>prv_&lt;uuid&gt;</code> identifies one concrete supply instance and becomes the stable join into runtime materialization.</p></div></div>
+<div class="doc-diagram"><div class="doc-flow compact"><div class="doc-node"><small>Environment</small><strong>Provider</strong><code>prv_…</code></div><div class="doc-arrow">→</div><div class="doc-node accent"><small>Plan</small><strong>Selected provider</strong><code>provider_id = prv_…</code></div><div class="doc-arrow">→</div><div class="doc-node good"><small>Runtime</small><strong>Provider registry</strong><code>prv_… → implementation</code></div></div></div></section>
 
-<section id="supply"><span class="kicker">Capability supply</span><h2>Environments advertise exact versions.</h2>
+<section id="supply"><span class="kicker">Service supply</span><h2>Environments advertise exact versions.</h2>
 <div class="code-block"><pre><code>[[providers.capabilities]]
 interface = "presolve:objects/store"
 version = "0.1.0"
@@ -78,23 +79,31 @@ features = ["range-read", "user-metadata"]</code></pre></div>
 <p>The application may request a version range such as <code>^0.1</code>; the environment advertises an exact version because it represents concrete supply. A provider advertises only optional semantic features it actually supports.</p>
 <div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Application requirement</th><th>Provider supply</th><th>Result</th></tr></thead><tbody><tr><td><code>objects ^0.1</code> + required <code>range-read</code></td><td><code>objects 0.1.0</code> + <code>range-read</code></td><td>compatible</td></tr><tr><td><code>sql ^0.1</code> + required <code>dialect-postgresql</code></td><td><code>sql 0.1.0</code> + <code>dialect-sqlite</code></td><td>rejected</td></tr><tr><td><code>queue ^0.1</code> + preferred <code>ordered-receive</code></td><td><code>queue 0.1.0</code> baseline only</td><td>compatible, lower rank</td></tr></tbody></table></div></section>
 
-<section id="resources"><span class="kicker">Resources + execution</span><h2>The resolver also checks whether the workload fits.</h2>
+<section id="resources"><span class="kicker">Resources + execution</span><h2>Presolve also checks whether the workload fits.</h2>
 <div class="code-block"><pre><code>[resources]
 memory_mib = 4096
 cpu_millis = 4000
 
 [execution]
 workloads = ["component", "container"]</code></pre></div>
-<p>Resource capacity is currently resolver-visible supply; it is not a multi-application scheduler or reservation system. Workload execution support is explicit and is not inferred from whichever providers happen to be installed.</p></section>
+<p>Resource capacity is currently compatibility-visible supply; it is not a multi-application scheduler or reservation system. Workload execution support is explicit and is not inferred from whichever providers happen to be installed.</p></section>
 
-<section id="realization"><span class="kicker">Realization boundary</span><h2>Operational settings stay outside the specification.</h2>
-<div class="doc-boundary-grid"><div class="doc-boundary good"><strong>Environment Specification</strong><ul><li>provider identity</li><li>capability interface + exact version</li><li>supported semantic features</li><li>resource capacity</li><li>workload classes</li></ul></div><div class="doc-boundary no"><strong>Node/provider realization</strong><ul><li>Redis address</li><li>S3 endpoint/bucket/region</li><li>SQLite file path</li><li>PostgreSQL host/user/password</li><li>cloud account IDs and API credentials</li></ul></div></div>
-<p>This distinction is what lets the same Environment Specification remain a semantic supply declaration rather than a secrets file or provider SDK configuration document.</p></section>
+<section id="realization"><span class="kicker">Runtime boundary</span><h2>Operational settings stay outside the environment file.</h2>
+<div class="doc-boundary-grid"><div class="doc-boundary good"><strong>Environment file</strong><ul><li>provider identity</li><li>capability interface + exact version</li><li>supported semantic features</li><li>resource capacity</li><li>workload classes</li></ul></div><div class="doc-boundary no"><strong>Runtime/provider configuration</strong><ul><li>Redis address</li><li>S3 endpoint/bucket/region</li><li>SQLite file path</li><li>PostgreSQL host/user/password</li><li>cloud account IDs and API credentials</li></ul></div></div>
+<p>This distinction keeps <code>presolve.env.toml</code> a declaration of what the environment can supply rather than turning it into a secrets file.</p></section>
 
-<section id="validation"><span class="kicker">Validation</span><h2>Environment inputs are treated as untrusted.</h2><p>Presolve rejects malformed IDs, duplicate providers, unsupported specification versions, unknown fields, providers with no capabilities, malformed capability interfaces/versions/features, duplicate workload kinds, and other semantic inconsistencies before resolution.</p>
-<a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/environment-specification.md">View canonical reference source on GitHub ↗</a></section>
+<section id="commands"><span class="kicker">CLI workflow</span><h2>Create and inspect environments without editing IDs by hand.</h2>
+<div class="code-block"><pre><code>presolve env init local-dev
+presolve env provider add memory-services --provides kv,objects
+presolve env provider list
+presolve env show
+presolve env check</code></pre></div>
+<p>For the complete command behavior and advanced capability declarations, see <a href="/docs/cli/">CLI & workflows</a>.</p></section>
 
-<section id="next"><span class="kicker">Continue</span><h2>See what resolution produces.</h2><div class="link-row"><a class="link-card" href="/docs/cli/"><strong>Check + plan</strong><span>Inspect compatibility and the exact symbolic DeploymentPlan.</span></a><a class="link-card" href="/docs/proofs/"><strong>Proofs</strong><span>See one release resolved against multiple checked-in environments.</span></a></div></section>
+<section id="validation"><span class="kicker">Validation</span><h2>Environment inputs are treated as untrusted.</h2><p>Presolve rejects malformed IDs, duplicate providers, unsupported specification versions, unknown fields, providers with no capabilities, malformed capability interfaces/versions/features, duplicate workload kinds, and other semantic inconsistencies before compatibility checks run.</p>
+<a class="source-link" href="https://github.com/fierstdev/presolve/blob/main/docs/reference/environment-specification.md">Canonical environment reference on GitHub ↗</a></section>
+
+<section id="next"><span class="kicker">Continue</span><h2>See what matching produces.</h2><div class="link-row"><a class="link-card" href="/docs/cli/"><strong>Check + plan</strong><span>Inspect compatibility and the exact deployment plan.</span></a><a class="link-card" href="/docs/proofs/"><strong>Proofs</strong><span>See one release evaluated against multiple checked-in environments.</span></a></div></section>
 </article></div></main>
 <footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
 </body></html>

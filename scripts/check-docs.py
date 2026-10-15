@@ -1,35 +1,50 @@
 #!/usr/bin/env python3
-"""Check local links in public Presolve Markdown and static-site documentation."""
+"""Check public Presolve Markdown and static-site documentation."""
 
 from __future__ import annotations
 
 import re
 import sys
+import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE_ROOT = ROOT / "site"
 LINK_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 SCANNED = [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
 SITE_SCANNED = sorted(SITE_ROOT.rglob("*.html"))
+PUBLIC_SITE_SCANNED = [
+    path for path in SITE_SCANNED if SITE_ROOT / "assets" not in path.parents
+]
 
 
 class SiteLinkParser(HTMLParser):
-    """Collect local-link candidates from static HTML attributes."""
+    """Collect local-link candidates and anchor IDs from static HTML."""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.targets: list[str] = []
+        self.hrefs: list[str] = []
+        self.ids: set[str] = set()
 
     def handle_starttag(
         self, tag: str, attrs: list[tuple[str, str | None]]
     ) -> None:
-        del tag
+        attributes = dict(attrs)
+        element_id = attributes.get("id")
+        if element_id:
+            self.ids.add(element_id)
+
+        if tag == "a" and attributes.get("name"):
+            self.ids.add(attributes["name"] or "")
+
         for name, value in attrs:
             if name in {"href", "src"} and value:
                 self.targets.append(value)
+            if name == "href" and value:
+                self.hrefs.append(value)
 
 
 def local_target(raw: str) -> str | None:
@@ -58,15 +73,16 @@ def local_target(raw: str) -> str | None:
     return target or None
 
 
+def is_external_site_target(raw: str) -> bool:
+    target = raw.strip().lower()
+    return target.startswith(
+        ("http://", "https://", "mailto:", "data:", "javascript:", "//")
+    )
+
+
 def site_target(source: Path, raw: str) -> Path | None:
     target = raw.strip()
-    if not target or target.startswith("#") or target.startswith("//"):
-        return None
-
-    lowered = target.lower()
-    if lowered.startswith(
-        ("http://", "https://", "mailto:", "data:", "javascript:")
-    ):
+    if not target or target.startswith("#") or is_external_site_target(target):
         return None
 
     target = unquote(target.split("#", 1)[0].split("?", 1)[0])
@@ -82,6 +98,18 @@ def site_target(source: Path, raw: str) -> Path | None:
         resolved /= "index.html"
 
     return resolved.resolve()
+
+
+def parse_site_page(path: Path, cache: dict[Path, SiteLinkParser]) -> SiteLinkParser:
+    resolved = path.resolve()
+    cached = cache.get(resolved)
+    if cached is not None:
+        return cached
+
+    parser = SiteLinkParser()
+    parser.feed(resolved.read_text())
+    cache[resolved] = parser
+    return parser
 
 
 def check_markdown_links(failures: list[str]) -> None:
@@ -113,10 +141,11 @@ def check_markdown_links(failures: list[str]) -> None:
                 )
 
 
-def check_site_links(failures: list[str]) -> None:
+def check_site_links(
+    failures: list[str], cache: dict[Path, SiteLinkParser]
+) -> None:
     for source in SITE_SCANNED:
-        parser = SiteLinkParser()
-        parser.feed(source.read_text())
+        parser = parse_site_page(source, cache)
 
         for raw in parser.targets:
             resolved = site_target(source, raw)
@@ -137,21 +166,121 @@ def check_site_links(failures: list[str]) -> None:
                 )
 
 
+def check_site_fragments(
+    failures: list[str], cache: dict[Path, SiteLinkParser]
+) -> None:
+    for source in PUBLIC_SITE_SCANNED:
+        parser = parse_site_page(source, cache)
+
+        for raw in parser.hrefs:
+            target = raw.strip()
+            if not target or is_external_site_target(target):
+                continue
+
+            split = urlsplit(target)
+            if not split.fragment:
+                continue
+
+            fragment = unquote(split.fragment)
+            if split.path:
+                resolved = site_target(source, target)
+                if resolved is None or not resolved.exists():
+                    # Missing files are reported by check_site_links.
+                    continue
+            else:
+                resolved = source.resolve()
+
+            target_parser = parse_site_page(resolved, cache)
+            if fragment not in target_parser.ids:
+                failures.append(
+                    f"{source.relative_to(ROOT)}: missing anchor #{fragment} "
+                    f"in {resolved.relative_to(ROOT)}"
+                )
+
+
+def check_public_site_shell(failures: list[str]) -> None:
+    required_assets = ('href="/navigation.css"', 'src="/site.js"')
+
+    for source in PUBLIC_SITE_SCANNED:
+        text = source.read_text()
+        relative = source.relative_to(ROOT)
+
+        if 'name="viewport"' not in text:
+            failures.append(f"{relative}: missing responsive viewport metadata")
+        if 'class="site-header"' not in text:
+            failures.append(f"{relative}: missing shared site header")
+
+        for required in required_assets:
+            if required not in text:
+                failures.append(f"{relative}: missing shared navigation asset {required}")
+
+        if SITE_ROOT / "docs" in source.parents:
+            for required in (
+                'href="/docs/docs.css"',
+                'class="docs-layout shell"',
+                'class="docs-nav"',
+                'class="docs-content"',
+            ):
+                if required not in text:
+                    failures.append(
+                        f"{relative}: missing documentation shell marker {required}"
+                    )
+
+
+def public_site_url(source: Path) -> str:
+    relative = source.relative_to(SITE_ROOT)
+    if relative == Path("index.html"):
+        return "https://presolve.dev/"
+
+    path = relative.as_posix()
+    if path.endswith("/index.html"):
+        path = path[: -len("index.html")]
+    return f"https://presolve.dev/{path}"
+
+
+def check_sitemap(failures: list[str]) -> None:
+    sitemap = SITE_ROOT / "sitemap.xml"
+    if not sitemap.exists():
+        failures.append("site/sitemap.xml: missing sitemap")
+        return
+
+    try:
+        root = ET.fromstring(sitemap.read_text())
+    except ET.ParseError as error:
+        failures.append(f"site/sitemap.xml: invalid XML: {error}")
+        return
+
+    namespace = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    listed = {
+        element.text.strip()
+        for element in root.findall("s:url/s:loc", namespace)
+        if element.text and element.text.strip()
+    }
+
+    expected = {public_site_url(source) for source in PUBLIC_SITE_SCANNED}
+    for missing in sorted(expected - listed):
+        failures.append(f"site/sitemap.xml: missing public page {missing}")
+
+
 def main() -> int:
     failures: list[str] = []
+    cache: dict[Path, SiteLinkParser] = {}
 
     check_markdown_links(failures)
-    check_site_links(failures)
+    check_site_links(failures, cache)
+    check_site_fragments(failures, cache)
+    check_public_site_shell(failures)
+    check_sitemap(failures)
 
     if failures:
-        print("Documentation link check failed:", file=sys.stderr)
+        print("Documentation/site check failed:", file=sys.stderr)
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
 
     print(
-        "Documentation link check passed "
-        f"({len(SCANNED)} Markdown files, {len(SITE_SCANNED)} site pages)."
+        "Documentation/site check passed "
+        f"({len(SCANNED)} Markdown files, {len(PUBLIC_SITE_SCANNED)} public site pages)."
     )
     return 0
 
