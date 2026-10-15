@@ -1,0 +1,99 @@
+name: Temporary SQL status documentation
+
+on:
+  push:
+    branches:
+      - tmp/sql-doc-status
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/sql-doc-status
+
+      - name: Update status, roadmap, and docs index
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          status = Path('docs/development/project-status.md')
+          text = status.read_text()
+          needle = '| S3-compatible object-storage provider adapter | Implemented |\n'
+          replacement = needle + '| SQLite SQL provider adapter | Implemented |\n| PostgreSQL SQL provider adapter | Implemented |\n'
+          if replacement not in text:
+              if needle not in text:
+                  raise SystemExit('status provider insertion point missing')
+              text = text.replace(needle, replacement, 1)
+
+          needle = '| Same-release object-storage portability proof | Implemented |\n'
+          replacement = needle + '| Same-release SQLite/PostgreSQL SQL portability proof | Implemented |\n'
+          if replacement not in text:
+              if needle not in text:
+                  raise SystemExit('status proof insertion point missing')
+              text = text.replace(needle, replacement, 1)
+
+          old = 'Relational SQL semantic design is now explicit. `presolve:sql/database@0.1.0` defines the baseline execution, parameter, scalar-value, result, and transaction semantics while deliberately refusing to claim that arbitrary SQL dialects are interchangeable. PostgreSQL- and SQLite-family dialect assumptions are negotiated as semantic features. See [SQL capability semantics](../architecture/sql-capability.md).\n'
+          new = old + '\nRelational SQL portability is now proven across SQLite and PostgreSQL. The SQL WIT/runtime projection uses bounded transaction and query-result resources; both concrete providers pass the same typed-schema conformance semantics; and one immutable `sql-demo.presolved` release executes unchanged through both engines using a deliberately shared SQL subset. Provider paths, endpoints, and credentials remain realization-time inputs. See [SQLite/PostgreSQL portability proof](../proofs/sqlite-postgres-portability.md).\n'
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('status SQL paragraph missing')
+              text = text.replace(old, new, 1)
+
+          old = '''- derive the SQL provider SDK/binding surface from the new semantic contract
+- implement SQLite and PostgreSQL providers and prove one immutable SQL release through both using a deliberately shared SQL subset
+- use those providers to decide whether SQL limits/isolation need typed semantic properties beyond boolean feature negotiation
+- follow SQL with asynchronous queue semantics and materially different queue implementations
+'''
+          new = '''- use the SQLite/PostgreSQL evidence to decide whether SQL limits or isolation levels justify typed semantic properties beyond boolean feature negotiation
+- design asynchronous queue semantics around delivery guarantees, ordering, retries, visibility/lease behavior, message limits, and dead-letter handling
+- implement materially different queue providers only after that semantic contract is explicit
+- build a realistic multi-capability reference application once queue coverage joins the existing KV, object-storage, and SQL proofs
+'''
+          if old not in text:
+              raise SystemExit('status planned SQL block missing')
+          text = text.replace(old, new, 1)
+          status.write_text(text)
+
+          roadmap = Path('docs/development/roadmap.md')
+          text = roadmap.read_text()
+          old = '- **next:** design a SQL capability contract around explicit portable semantics before selecting concrete SQLite, PostgreSQL, and managed-SQL provider implementations; do not treat generic SQL syntax alone as sufficient portability\n- **after SQL:** design asynchronous queue semantics around delivery guarantees, ordering, retries, visibility/lease behavior, message limits, and dead-letter handling before adding queue adapters\n'
+          new = '- **complete:** relational SQL semantic contract, WIT/runtime resource binding, SQLite and PostgreSQL provider adapters, shared typed-schema conformance, and a same-release proof across both engines without SQL rewriting\n- **next:** design asynchronous queue semantics around delivery guarantees, ordering, retries, visibility/lease behavior, message limits, and dead-letter handling before adding queue adapters\n'
+          if old not in text:
+              raise SystemExit('roadmap SQL priority block missing')
+          text = text.replace(old, new, 1)
+          roadmap.write_text(text)
+
+          index = Path('docs/README.md')
+          text = index.read_text()
+          marker = '### Development\n\n'
+          proof_section = '''### Proofs and validation
+
+- [Flagship portability walkthrough](proofs/flagship-portability-walkthrough.md) — one immutable KV release across memory, Redis, and Cloudflare planning/realization paths.
+- [Fresh-clone flagship reproduction](validation/fresh-clone-flagship-reproduction.md) — owner-operated reproduction from a fresh public clone on a separate Linux machine.
+- [Object-storage portability proof](proofs/object-storage-portability.md) — one immutable object release across memory and S3-compatible storage.
+- [SQLite/PostgreSQL portability proof](proofs/sqlite-postgres-portability.md) — typed SQL conformance and one immutable relational release across two engines.
+
+'''
+          if proof_section not in text:
+              if marker not in text:
+                  raise SystemExit('docs index development marker missing')
+              text = text.replace(marker, proof_section + marker, 1)
+          index.write_text(text)
+          PY
+
+      - name: Validate documentation
+        run: python ./scripts/check-docs.py
+
+      - name: Commit validated docs
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/README.md docs/development/project-status.md docs/development/roadmap.md
+          git diff --cached --check
+          git commit -m 'docs: mark SQL portability proof complete'
+          git push origin HEAD:tmp/sql-doc-status
