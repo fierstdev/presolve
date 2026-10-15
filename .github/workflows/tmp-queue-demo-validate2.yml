@@ -1,0 +1,31 @@
+name: Temporary queue demo validation 2
+
+on:
+  push:
+    branches:
+      - tmp/queue-demo-validate2
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/queue-demo-validate2
+      - run: rustup toolchain install stable --profile minimal --component rustfmt --target wasm32-wasip2
+      - name: Check queue example formatting
+        run: cargo fmt --manifest-path examples/queue-demo/Cargo.toml -- --check
+      - name: Build queue Component
+        run: cargo build --manifest-path examples/queue-demo/Cargo.toml --target wasm32-wasip2 --release
+      - name: Commit generated queue example lockfile
+        run: |
+          if git status --short -- examples/queue-demo/Cargo.lock | grep -q .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add examples/queue-demo/Cargo.lock
+            git commit -m "chore: add queue demo lockfile"
+            git push origin HEAD:tmp/queue-demo-validate2
+          fi
