@@ -1,0 +1,28 @@
+name: Temporary SQL runtime main reconciliation
+
+on:
+  push:
+    branches:
+      - tmp/sql-runtime-reconcile-main
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: runtime/sql-capability-binding
+          fetch-depth: 0
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          if ! git merge --no-edit origin/main; then
+            git checkout --theirs crates/presolve-capability/src/sql.rs
+            git add crates/presolve-capability/src/sql.rs
+            git commit --no-edit
+          fi
+          git push origin HEAD:runtime/sql-capability-binding
