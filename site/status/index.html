@@ -1,108 +1,33 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Status — Presolve</title>
-  <meta name="description" content="Current implementation status and explicit non-guarantees for Presolve Developer Preview.">
+  <meta name="description" content="Current Presolve Developer Preview implementation status, public portability proof coverage, and explicit non-guarantees.">
   <link rel="canonical" href="https://presolve.dev/status/">
-  <meta name="theme-color" content="#0a0a0a">
-  <link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css">
+  <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/docs/docs.css">
 </head>
 <body>
-  <header class="site-header">
-    <div class="shell nav-shell">
-      <a class="brand" href="/" aria-label="Presolve home"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a>
-      <nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav>
-    </div>
-  </header>
+<header class="site-header"><div class="shell nav-shell"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#model">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
+<main>
+<section class="page-hero shell"><span class="kicker">Developer Preview</span><h1>Current status.</h1><p>Presolve is under active development. This page separates implemented architecture and public evidence from things the project still does not claim.</p></section>
+<div class="status-grid shell">
+<article class="status-card"><span class="kicker">Implemented</span><h2>Portability core</h2><ul class="status-list"><li class="yes">Application Contract 0.1</li><li class="yes">Environment Specification 0.1</li><li class="yes">Deterministic compatibility resolver</li><li class="yes">Symbolic DeploymentPlan</li><li class="yes">Stable EnvironmentId + ProviderId identity</li><li class="yes">Required/preferred feature negotiation</li><li class="yes">Node-side provider realization boundary</li></ul><div class="hero-actions"><a class="button secondary" href="/docs/model/">Read the model</a></div></article>
 
-  <main>
-    <section class="page-hero shell">
-      <span class="kicker">Developer Preview</span>
-      <h1>Current status.</h1>
-      <p>Presolve is under active development. This page separates what exists in the repository from what is still intentionally outside the product contract.</p>
-    </section>
+<article class="status-card"><span class="kicker">Implemented</span><h2>Capability semantics</h2><ul class="status-list"><li class="yes"><code>presolve:kv/store@0.1.0</code></li><li class="yes"><code>presolve:objects/store@0.1.0</code></li><li class="yes"><code>presolve:sql/database@0.1.0</code></li><li class="yes"><code>presolve:queue/work-queue@0.1.0</code></li><li class="yes">WIT/runtime bindings for current Component capability paths</li><li class="yes">Reusable provider conformance harnesses</li></ul><div class="hero-actions"><a class="button secondary" href="/docs/capabilities/">Capability reference</a></div></article>
 
-    <div class="status-grid shell">
-      <article class="status-card">
-        <span class="kicker">Implemented</span>
-        <h2>Portability core</h2>
-        <ul class="status-list">
-          <li class="yes">Application Contract 0.1</li>
-          <li class="yes">Environment Specification 0.1</li>
-          <li class="yes">Deterministic compatibility resolver</li>
-          <li class="yes">Symbolic DeploymentPlan</li>
-          <li class="yes">Stable EnvironmentId and ProviderId identity</li>
-          <li class="yes">Required/preferred feature negotiation</li>
-        </ul>
-      </article>
+<article class="status-card"><span class="kicker">Implemented</span><h2>Providers + execution</h2><ul class="status-list"><li class="yes">WebAssembly Component workloads</li><li class="yes">OCI/container workload identity + execution path</li><li class="yes">Docker local executor</li><li class="yes">Memory KV/object/queue providers</li><li class="yes">Redis KV adapter over RESP/TCP</li><li class="yes">Cloudflare Workers KV adapter</li><li class="yes">S3-compatible object adapter</li><li class="yes">SQLite + PostgreSQL SQL adapters</li></ul></article>
 
-      <article class="status-card">
-        <span class="kicker">Implemented</span>
-        <h2>Execution + providers</h2>
-        <ul class="status-list">
-          <li class="yes">WebAssembly Component workloads</li>
-          <li class="yes">OCI/container workload path</li>
-          <li class="yes">Docker local executor</li>
-          <li class="yes">KV + object-storage capability contracts</li>
-          <li class="yes">In-memory KV/object providers</li>
-          <li class="yes">Redis KV adapter over RESP/TCP</li>
-          <li class="yes">Cloudflare Workers KV adapter</li>
-        </ul>
-      </article>
+<article class="status-card"><span class="kicker">Implemented</span><h2>Developer workflow</h2><ul class="status-list"><li class="yes"><code>presolve build</code></li><li class="yes"><code>presolve inspect</code> source + release views</li><li class="yes"><code>presolve check</code></li><li class="yes"><code>presolve plan</code></li><li class="yes"><code>presolve env …</code> environment management</li><li class="yes"><code>presolve dev</code> local workflow</li><li class="yes">Versioned JSON projections</li><li class="yes">Rust + TypeScript authoring paths</li></ul><div class="hero-actions"><a class="button secondary" href="/docs/cli/">CLI guide</a></div></article>
 
-      <article class="status-card">
-        <span class="kicker">Implemented</span>
-        <h2>Developer workflow</h2>
-        <ul class="status-list">
-          <li class="yes"><code>presolve build</code></li>
-          <li class="yes"><code>presolve inspect</code> source + release views</li>
-          <li class="yes"><code>presolve check</code></li>
-          <li class="yes"><code>presolve plan</code></li>
-          <li class="yes">Versioned JSON projections</li>
-          <li class="yes">Rust + TypeScript authoring paths</li>
-        </ul>
-      </article>
+<article class="status-card full"><span class="kicker">Public proof suite</span><h2>Same-release evidence now covers three provider families plus queue runtime semantics.</h2>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Slice</th><th>Providers/environments</th><th>Status</th></tr></thead><tbody><tr><td>KV</td><td>memory · Redis · Cloudflare KV</td><td>same-release portability proven</td></tr><tr><td>Object storage</td><td>memory · S3-compatible</td><td>same-release portability proven</td></tr><tr><td>Relational SQL</td><td>SQLite · PostgreSQL</td><td>conformance + same-release portability proven</td></tr><tr><td>Work queue</td><td>in-memory leased queue</td><td>full capability/runtime proof; second provider next</td></tr></tbody></table></div>
+<div class="hero-actions"><a class="button primary" href="/proof/">Public proof page</a><a class="button secondary" href="/docs/proofs/">Detailed evidence</a></div></article>
 
-      <article class="status-card">
-        <span class="kicker">Public proof</span>
-        <h2>Same-release portability</h2>
-        <ul class="status-list">
-          <li class="yes">One detached <code>.presolved</code> release built once</li>
-          <li class="yes">Memory, Redis, and Cloudflare environment resolution</li>
-          <li class="yes">Memory and real Redis execution from the same release bytes</li>
-          <li class="yes">Optional live Cloudflare Workers KV execution</li>
-          <li class="yes">Release digest and archive SHA verification</li>
-          <li class="yes">Exact public demo command verified by CI</li>
-        </ul>
-        <div class="hero-actions"><a class="button secondary" href="/proof/">Inspect the proof</a></div>
-      </article>
+<article class="status-card"><span class="kicker">Not a guarantee</span><h2>Not stable yet</h2><ul class="status-list"><li class="no">Stable CLI/schema/SDK compatibility</li><li class="no">Production-grade cloud-provider support</li><li class="no">Arbitrary workload portability</li><li class="no">Automatic infrastructure provisioning</li><li class="no">Native executable workload class</li><li class="no">Full deployment lifecycle/control plane</li></ul></article>
 
-      <article class="status-card">
-        <span class="kicker">Not a guarantee</span>
-        <h2>Not stable yet</h2>
-        <ul class="status-list">
-          <li class="no">Stable CLI compatibility</li>
-          <li class="no">Stable TypeScript SDK compatibility</li>
-          <li class="no">Production-grade cloud provider support</li>
-          <li class="no">Arbitrary OCI workload compatibility</li>
-          <li class="no">Native executable workload class</li>
-          <li class="no">Full deployment lifecycle/control plane</li>
-        </ul>
-      </article>
-
-      <article class="status-card">
-        <span class="kicker">Next</span>
-        <h2>External validation before broader architecture.</h2>
-        <p>The immediate phase is to put the runnable proof in front of platform, runtime, backend, and distributed-systems engineers and collect concrete objections, missing semantics, and real deployment cases.</p>
-        <p>Control-plane, scheduler, service-mesh, registry, and lifecycle-management work stays deferred until the core portability model survives outside scrutiny.</p>
-        <div class="hero-actions"><a class="button secondary" href="https://github.com/fierstdev/presolve/blob/main/docs/validation/first-developer-validation.md">Validation plan ↗</a></div>
-      </article>
-    </div>
-  </main>
-
-  <footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
-</body>
-</html>
+<article class="status-card"><span class="kicker">Next</span><h2>Broaden queue substitution and semantic precision.</h2><p>The next queue milestone is a materially different network/managed provider so the exact same queue release can be exercised across providers, as KV, objects, and SQL already are.</p><p>Real provider differences are also building evidence for richer typed semantic properties such as limits, retention, lease ranges, and other values that do not fit boolean feature flags.</p><div class="hero-actions"><a class="button secondary" href="/docs/proofs/#queue">Queue proof</a><a class="button secondary" href="/docs/capabilities/#limits">Semantic limits</a></div></article>
+</div>
+</main>
+<footer class="site-footer"><div class="shell footer-inner"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="21" height="25"><span>Presolve</span></a><p>Apache-2.0 · Built by <a href="https://fierst.dev">Fierst</a></p></div></footer>
+</body></html>

@@ -76,7 +76,7 @@ memory_mib = 4096
 cpu_millis = 4000
 
 [execution]
-workloads = ["component"]
+workloads = ["component", "container"]
 
 [[providers]]
 id = "prv_e02be85a-84ab-4dd7-b604-b3690357ed90"
@@ -90,11 +90,29 @@ version = "0.1.0"
 interface = "presolve:objects/store"
 version = "0.1.0"
 features = ["range-read", "user-metadata"]
+
+[[providers]]
+id = "prv_a62d1d0c-55f4-4ebf-9027-d5ab0ab43081"
+name = "sqlite-sql"
+
+[[providers.capabilities]]
+interface = "presolve:sql/database"
+version = "0.1.0"
+features = ["dialect-sqlite"]
+
+[[providers]]
+id = "prv_3fdadcf2-27ab-4fe2-9cb2-6c7649f130ad"
+name = "memory-queue"
+
+[[providers.capabilities]]
+interface = "presolve:queue/work-queue"
+version = "0.1.0"
+features = ["delivery-attempt-count", "configurable-lease-duration"]
 ```
 
 The current schema version is `0.1`.
 
-Recognized workload execution classes are `component` and `container`. The built-in local node currently executes Components; container execution is being added during Chunk 16. An Environment Specification should advertise `container` only when that environment actually has a compatible container executor.
+Recognized workload execution classes are `component` and `container`. The repository includes Component execution and a Docker-backed container execution path. An Environment Specification should advertise a workload class only when that environment actually has a compatible executor; the declaration remains a statement of real environment supply.
 
 ## Identity
 
@@ -152,7 +170,7 @@ cpu_millis = 4000
 
 Zero capacity is valid. For example, an environment may be intentionally drained while still remaining a valid environment declaration.
 
-Resource capacity currently represents resolver-visible supply. It is not yet a multi-application scheduler or reservation system.
+Resource capacity currently represents resolver-visible supply. It is not a multi-application scheduler or reservation system.
 
 ## Execution support
 
@@ -160,7 +178,7 @@ The execution section explicitly declares workload classes the environment can e
 
 ```toml
 [execution]
-workloads = ["component"]
+workloads = ["component", "container"]
 ```
 
 Execution support is not inferred from installed providers or node implementation details.
@@ -173,7 +191,7 @@ The corresponding resolver problem is:
 PS2005 UnsupportedWorkload
 ```
 
-The schema/resolver vocabulary may recognize a workload class before every Presolve node can materialize it. Environment declarations remain statements of actual environment supply: advertising `container` means that environment is asserting container execution is available.
+The schema/resolver vocabulary may recognize a workload class before every Presolve node can materialize it. Environment declarations remain statements of actual environment supply: advertising `container` means that environment is asserting compatible container execution is available.
 
 ## Providers
 
@@ -247,6 +265,8 @@ Current built-in semantic contracts include:
 ```text
 presolve:kv/store@0.1.0
 presolve:objects/store@0.1.0
+presolve:sql/database@0.1.0
+presolve:queue/work-queue@0.1.0
 ```
 
 The enrichment rules are deliberately strict:
@@ -287,6 +307,49 @@ During resolution:
 - unsupported preferred features do not reject the environment
 
 The Deployment Plan records only requested features that were actually negotiated.
+
+Different capability families now exercise this vocabulary in materially different ways. Examples include:
+
+```text
+objects/store
+    range-read
+    conditional-write
+    user-metadata
+
+sql/database
+    dialect-postgresql
+    dialect-sqlite
+    returning
+    savepoints
+    serializable-transactions
+
+queue/work-queue
+    delayed-send
+    delayed-retry
+    delivery-attempt-count
+    configurable-lease-duration
+    dead-letter-routing
+    ordered-receive
+```
+
+These are semantic claims. A provider must not advertise a feature merely because its implementation has some provider-specific operation with a similar name.
+
+## Realization settings are separate
+
+The Environment Specification intentionally does not contain provider credentials or node-local operational settings.
+
+Current concrete proof slices demonstrate this boundary directly:
+
+| Provider realization | Supplied only after provider selection |
+| --- | --- |
+| Redis KV | network address |
+| S3-compatible objects | endpoint, bucket, region, access credentials |
+| Cloudflare Workers KV | account, namespace, API credential |
+| SQLite SQL | database file path |
+| PostgreSQL SQL | host, port, database, user, password secret |
+| in-memory queue | process-local provider state/configuration |
+
+Those values are node/provider realization data rather than application identity or semantic environment inventory.
 
 ## Validation and normalization
 
@@ -385,9 +448,9 @@ The implementation rejects, among other invalid cases:
 
 Normalized serialization is deterministic and idempotent.
 
-## What Chunk 14 establishes
+## Current result
 
-Chunk 14 establishes the environment-side portability contract:
+The environment side of the portability model is implemented through a declarative, normalized supply document:
 
 ```text
 Application Contract
@@ -401,28 +464,17 @@ normalized compatibility model
 deterministic resolution
         │
         ▼
-symbolic Deployment Plan
+symbolic DeploymentPlan
         │
         ▼
-provider-ID-based node materialization
+ProviderId-based node materialization
 ```
 
-This proves that application requirements can be resolved against a declarative environment description without placing environment-specific implementation choices into the application release.
+The local CLI generates and persists `EnvironmentId` and `ProviderId` values, supports provider add/list/remove workflows, validates environment documents, and uses the nearest `presolve.env.toml` for compatibility checks, planning, and local execution.
 
-## Deferred to Chunk 15
+Current public proof slices resolve detached immutable releases against multiple checked-in environments and then materialize the exact selected provider identities. Redis, S3-compatible storage, SQLite, PostgreSQL, Cloudflare Workers KV, and the leased work-queue reference path demonstrate that environment/provider configuration can remain outside the application release.
 
-Chunk 15 owns local developer experience around this model, including expected workflows such as:
-
-```text
-presolve environment init
-presolve environment provider add
-presolve dev
-presolve check
-```
-
-The exact CLI surface is not yet locked.
-
-Chunk 15 should provide automatic generation and persistence of `EnvironmentId` and `ProviderId`, file discovery for `presolve.env.toml`, useful diagnostics, and a local environment workflow that avoids requiring users to manually manage opaque IDs during normal use.
+The capability families deliberately expose different semantic pressure: object-store limits, SQL dialect/type/transaction differences, and queue lease/settlement behavior are represented or documented rather than silently normalized away.
 
 ## Related documentation
 
@@ -430,3 +482,6 @@ Chunk 15 should provide automatic generation and persistence of `EnvironmentId` 
 - [Capabilities and providers](../concepts/capabilities-and-providers.md)
 - [Resolution and deployment](../concepts/resolution-and-deployment.md)
 - [Architecture overview](../architecture/overview.md)
+- [Provider realization](../architecture/provider-realization.md)
+- [SQL capability semantics](../architecture/sql-capability.md)
+- [Work-queue capability semantics](../architecture/work-queue-capability.md)
