@@ -3,5 +3,12 @@
   <url><loc>https://presolve.dev/</loc></url>
   <url><loc>https://presolve.dev/proof/</loc></url>
   <url><loc>https://presolve.dev/docs/</loc></url>
+  <url><loc>https://presolve.dev/docs/model/</loc></url>
+  <url><loc>https://presolve.dev/docs/application/</loc></url>
+  <url><loc>https://presolve.dev/docs/environment/</loc></url>
+  <url><loc>https://presolve.dev/docs/releases/</loc></url>
+  <url><loc>https://presolve.dev/docs/capabilities/</loc></url>
+  <url><loc>https://presolve.dev/docs/cli/</loc></url>
+  <url><loc>https://presolve.dev/docs/proofs/</loc></url>
   <url><loc>https://presolve.dev/status/</loc></url>
 </urlset>
