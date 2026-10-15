@@ -1,0 +1,82 @@
+name: Temporary SQL empty-result metadata validation
+
+on:
+  push:
+    branches:
+      - tmp/sql-empty-result-metadata
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/sql-empty-result-metadata
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+      - name: Tighten empty-result metadata semantics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          conformance = Path('crates/presolve-provider-conformance/src/sql.rs')
+          text = conformance.read_text()
+          needle = '    assert_scalar_round_trip(provider, fixture, BASE_ID);\n'
+          replacement = '    assert_empty_result_preserves_columns(provider, fixture, BASE_ID + 7);\n' + needle
+          if replacement not in text:
+              if needle not in text:
+                  raise SystemExit('conformance insertion point missing')
+              text = text.replace(needle, replacement, 1)
+          function_marker = 'fn assert_scalar_round_trip(\n'
+          function = '''fn assert_empty_result_preserves_columns(\n    provider: &dyn SqlDatabaseProvider,\n    fixture: SqlConformanceFixture,\n    id: i64,\n) {\n    let (columns, rows) = query_rows(provider, fixture.select_by_id, &[SqlValue::Integer(id)]);\n    assert_columns(&columns);\n    assert!(rows.is_empty(), "absent row query should remain empty");\n}\n\n'''
+          if function not in text:
+              if function_marker not in text:
+                  raise SystemExit('conformance function marker missing')
+              text = text.replace(function_marker, function + function_marker, 1)
+          conformance.write_text(text)
+
+          postgres = Path('providers/sql-postgres/src/lib.rs')
+          text = postgres.read_text()
+          old = '''    let rows = client\n        .query(statement, &refs)\n        .map_err(|error| map_postgres_error(&error))?;\n    let columns = rows.first().map_or_else(Vec::new, |row| {\n        row.columns()\n            .iter()\n            .map(|column| SqlColumn::new(column.name()))\n            .collect()\n    });\n'''
+          new = '''    let prepared = client\n        .prepare(statement)\n        .map_err(|error| map_postgres_error(&error))?;\n    let columns = prepared\n        .columns()\n        .iter()\n        .map(|column| SqlColumn::new(column.name()))\n        .collect::<Vec<_>>();\n    let rows = client\n        .query(&prepared, &refs)\n        .map_err(|error| map_postgres_error(&error))?;\n'''
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('PostgreSQL query metadata block missing')
+              text = text.replace(old, new, 1)
+          postgres.write_text(text)
+          PY
+          cargo fmt --all
+      - name: Validate provider slice
+        run: |
+          cargo test -p presolve-provider-sql-sqlite -p presolve-provider-sql-postgres
+          cargo clippy -p presolve-provider-sql-sqlite -p presolve-provider-sql-postgres --all-targets -- -D warnings
+      - name: Validate live PostgreSQL conformance
+        env:
+          PRESOLVE_POSTGRES_HOST: 127.0.0.1
+          PRESOLVE_POSTGRES_PORT: "55432"
+          PRESOLVE_POSTGRES_DATABASE: presolve
+          PRESOLVE_POSTGRES_USER: presolve
+          PRESOLVE_POSTGRES_PASSWORD: presolve-proof-password
+        run: |
+          docker run -d --rm --name presolve-sql-metadata \
+            -e POSTGRES_DB="$PRESOLVE_POSTGRES_DATABASE" \
+            -e POSTGRES_USER="$PRESOLVE_POSTGRES_USER" \
+            -e POSTGRES_PASSWORD="$PRESOLVE_POSTGRES_PASSWORD" \
+            -p 127.0.0.1:55432:5432 \
+            postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873 >/dev/null
+          trap 'docker rm -f presolve-sql-metadata >/dev/null 2>&1 || true' EXIT
+          for _ in $(seq 1 60); do
+            if docker exec presolve-sql-metadata pg_isready -U presolve -d presolve >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          cargo run -q -p presolve-node --example sql_provider_conformance_checkpoint -- postgres
+      - name: Commit validated semantic tightening
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/presolve-provider-conformance/src/sql.rs providers/sql-postgres/src/lib.rs
+          git commit -m "test: preserve SQL columns for empty results"
+          git push origin HEAD:tmp/sql-empty-result-metadata
