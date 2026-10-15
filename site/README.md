@@ -25,6 +25,8 @@ Current first-class documentation routes include:
 
 When capability semantics or public proof evidence changes, update both the canonical repository documentation/code and the corresponding website page in the same development phase.
 
+Proof documentation should describe the same operational path exercised by CI. Readiness checks for external providers must validate the provider-visible connection path used by conformance/execution rather than relying only on container-local health checks.
+
 `scripts/check-docs.py` validates both repository Markdown links and the local `href`/`src` graph across the static site. The existing Architecture CI job therefore rejects broken documentation routes or missing site assets.
 
 ## Local preview
