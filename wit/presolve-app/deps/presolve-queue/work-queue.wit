@@ -1,0 +1,61 @@
+package presolve:queue@0.1.0;
+
+/// Host-provided leased work queue.
+///
+/// This interface is one transport projection of the provider-neutral
+/// `presolve:queue/work-queue@0.1.0` semantic capability. Provider-native
+/// message identifiers and receipt/lease tokens remain opaque to applications.
+interface work-queue {
+    record send-options {
+        /// Optional initial delivery delay in milliseconds.
+        /// Requires the negotiated `delayed-send` feature when present.
+        delay-ms: option<u64>,
+    }
+
+    record receive-options {
+        /// Optional requested in-flight lease duration in milliseconds.
+        /// Requires the negotiated `configurable-lease-duration` feature when
+        /// present.
+        lease-ms: option<u64>,
+    }
+
+    record retry-options {
+        /// Optional redelivery delay in milliseconds.
+        /// Requires the negotiated `delayed-retry` feature when present.
+        delay-ms: option<u64>,
+    }
+
+    variant error {
+        unavailable(string),
+        invalid-request(string),
+        invalid-delivery(string),
+        unsupported(string),
+        transient(string),
+        internal(string),
+    }
+
+    /// One finite in-flight queue delivery.
+    ///
+    /// Dropping this resource does not acknowledge the message. The provider's
+    /// lease/recovery policy remains responsible for making an abandoned
+    /// logical message eligible for redelivery.
+    resource delivery {
+        /// Returns the opaque application payload.
+        body: func() -> list<u8>;
+
+        /// Returns a provider-maintained delivery-attempt count when available.
+        delivery-attempt: func() -> option<u32>;
+    }
+
+    /// Publishes one opaque message.
+    send: func(body: list<u8>, options: send-options) -> result<_, error>;
+
+    /// Receives at most one leased delivery.
+    receive: func(options: receive-options) -> result<option<delivery>, error>;
+
+    /// Acknowledges successful processing and consumes the delivery resource.
+    ack: func(delivery: own<delivery>) -> result<_, error>;
+
+    /// Requests redelivery and consumes the delivery resource.
+    retry: func(delivery: own<delivery>, options: retry-options) -> result<_, error>;
+}
