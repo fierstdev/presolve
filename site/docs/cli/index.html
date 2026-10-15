@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CLI and workflows — Presolve Docs</title>
-  <meta name="description" content="Presolve CLI reference for environment setup, application inspection, builds, compatibility checks, deployment plans, diagnostics, JSON automation, and local execution.">
+  <meta name="description" content="Presolve CLI installation and reference for environment setup, application inspection, builds, compatibility checks, deployment plans, diagnostics, JSON automation, and local execution.">
   <link rel="canonical" href="https://presolve.dev/docs/cli/">
   <meta name="theme-color" content="#0a0a0a"><link rel="icon" href="/assets/presolve-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/navigation.css"><link rel="stylesheet" href="/docs/mobile.css"><link rel="stylesheet" href="/docs/docs.css">
@@ -12,21 +12,30 @@
 <body>
 <header class="site-header"><div class="shell nav-shell"><a class="brand" href="/"><img src="/assets/presolve-mark.svg" alt="" width="26" height="31"><span>Presolve</span></a><nav class="nav-links" aria-label="Primary navigation"><a href="/#how">How it works</a><a href="/proof/">Proof</a><a href="/docs/">Docs</a><a href="/status/">Status</a><a class="nav-github" href="https://github.com/fierstdev/presolve">GitHub ↗</a></nav></div></header>
 <main>
-<section class="page-hero shell"><span class="kicker">CLI & workflows</span><h1>Use Presolve from the command line.</h1><p>Inspect what an app needs, build the release you will ship, check whether an environment can run it, inspect the selected plan, and execute locally. This page is the command reference; first-time users should start with the guided tutorial.</p><div class="hero-actions"><a class="button primary" href="/docs/getting-started/">Getting started</a></div></section>
+<section class="page-hero shell"><span class="kicker">CLI & workflows</span><h1>Use Presolve from the command line.</h1><p>Install the released CLI, inspect what an app needs, build the release you will ship, check whether an environment can run it, inspect the selected plan, and execute locally. This page is the command reference; first-time users should start with the guided tutorial.</p><div class="hero-actions"><a class="button primary" href="/docs/getting-started/">Getting started</a></div></section>
 <div class="docs-layout shell">
 <aside class="docs-nav"><strong>Documentation</strong><a href="/docs/">Overview</a><a href="/docs/getting-started/">Getting started</a><a href="/docs/cli/" aria-current="page">CLI & workflows</a><a href="/docs/application/">Define your application</a><a href="/docs/environment/">Define an environment</a><a href="/docs/releases/">Built releases</a><a href="/docs/capabilities/">Capabilities</a><a href="/docs/model/">Architecture</a><a href="/docs/proofs/">Proofs</a></aside>
 <article class="docs-content">
 <div class="doc-breadcrumb"><a href="/docs/">Docs</a> / CLI & workflows</div>
-<p class="doc-lede">The five commands to remember are <code>inspect</code>, <code>build</code>, <code>check</code>, <code>plan</code>, and <code>dev</code>. Environment commands describe what a target can provide. The sections below cover the complete current CLI surface and the machine-readable outputs intended for automation.</p>
+<p class="doc-lede">The five commands to remember are <code>inspect</code>, <code>build</code>, <code>check</code>, <code>plan</code>, and <code>dev</code>. Environment commands describe what a target can provide. The sections below cover installation, the complete current CLI surface, and machine-readable outputs intended for automation.</p>
 
-<section id="install"><span class="kicker">Developer Preview</span><h2>Build the current CLI from source.</h2>
+<section id="install"><span class="kicker">Installation</span><h2>Install the released Presolve CLI.</h2>
+<h3>macOS or Linux</h3>
+<div class="code-block"><pre><code>curl -fsSL https://presolve.dev/install.sh | sh
+presolve --version</code></pre></div>
+<p>The installer selects the native archive for your operating system and CPU architecture, verifies its SHA-256 checksum, installs it under <code>~/.presolve/bin</code>, and adds that directory to your shell PATH when necessary.</p>
+<h3>Windows PowerShell</h3>
+<div class="code-block"><pre><code>irm https://presolve.dev/install.ps1 | iex
+presolve --version</code></pre></div>
+<p>The Windows installer downloads the x86_64 native archive, verifies its checksum, installs <code>presolve.exe</code> under your user profile, and updates your user PATH.</p>
+<div class="note">Presolve is pre-stable, but using Presolve no longer requires compiling the CLI. Release artifacts are produced for Linux x86_64/arm64, macOS Intel/Apple Silicon, and Windows x86_64.</div>
+<h3 id="build-from-source">Build from source</h3>
+<p>Use a source build when contributing to Presolve itself or when you intentionally need an unreleased commit:</p>
 <div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
 cd presolve
 cargo build -p presolve-cli
-export PATH="$PWD/target/debug:$PATH"
-
-presolve --help</code></pre></div>
-<div class="note">Presolve is pre-stable. Public CI packages the CLI for Linux x86_64/arm64 and macOS Intel/Apple Silicon, but tagged binary distribution is still being matured.</div></section>
+./target/debug/presolve --version</code></pre></div>
+<p>This is a contributor/development path, not the normal installation path.</p></section>
 
 <section id="environment"><span class="kicker">Local environment</span><h2>Describe what is available here.</h2>
 <div class="code-block"><pre><code>presolve env init
