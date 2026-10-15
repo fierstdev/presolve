@@ -286,7 +286,7 @@ mod tests {
         WorkQueueConformanceOptions, assert_work_queue_conformance,
     };
     use presolve_provider_realization::{
-        EmptySecretResolver, ProviderAdapter, ProviderAdapterId, ProviderCapabilityRequest,
+        EnvironmentSecretResolver, ProviderAdapter, ProviderAdapterId, ProviderCapabilityRequest,
         ProviderRealizationProfile,
     };
     use presolve_provider_sdk::{
@@ -383,7 +383,7 @@ mod tests {
         )];
 
         let realized = InMemoryWorkQueueAdapter
-            .realize(&profile, &requested, &EmptySecretResolver)
+            .realize(&profile, &requested, &EnvironmentSecretResolver)
             .expect("baseline queue should realize");
 
         assert_eq!(*realized.provider_id(), provider_id);
@@ -404,7 +404,7 @@ mod tests {
         )];
 
         let error = InMemoryWorkQueueAdapter
-            .realize(&profile, &requested, &EmptySecretResolver)
+            .realize(&profile, &requested, &EnvironmentSecretResolver)
             .expect_err("unproven optional features should be rejected");
 
         assert!(matches!(
