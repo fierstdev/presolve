@@ -10,7 +10,10 @@
 use std::{error::Error, sync::Arc};
 
 use bytes::BytesMut;
-use postgres::{Client, Config, NoTls, Row, types::{IsNull, ToSql, Type, to_sql_checked}};
+use postgres::{
+    Client, Config, NoTls, Row,
+    types::{IsNull, ToSql, Type, to_sql_checked},
+};
 use presolve_capability::{
     SQL_DATABASE_FEATURE_DIALECT_POSTGRESQL, SQL_DATABASE_FEATURE_READ_ONLY_TRANSACTIONS,
     SQL_DATABASE_FEATURE_RETURNING, SQL_DATABASE_FEATURE_SAVEPOINTS,
@@ -19,7 +22,8 @@ use presolve_capability::{
 use presolve_provider_realization::SecretValue;
 use presolve_provider_sdk::{
     SQL_DATABASE_INTERFACE, SqlColumn, SqlDatabaseError, SqlDatabaseProvider, SqlExecuteResult,
-    SqlQueryResult, SqlRow, SqlTransaction, SqlTransactionIsolation, SqlTransactionOptions, SqlValue,
+    SqlQueryResult, SqlRow, SqlTransaction, SqlTransactionIsolation, SqlTransactionOptions,
+    SqlValue,
 };
 use thiserror::Error;
 
@@ -266,7 +270,9 @@ fn execute_on(
         .iter()
         .map(|value| value.as_ref() as &(dyn ToSql + Sync))
         .collect::<Vec<_>>();
-    let affected = client.execute(statement, &refs).map_err(map_postgres_error)?;
+    let affected = client
+        .execute(statement, &refs)
+        .map_err(map_postgres_error)?;
     Ok(SqlExecuteResult::new(affected))
 }
 
@@ -281,14 +287,12 @@ fn query_on(
         .map(|value| value.as_ref() as &(dyn ToSql + Sync))
         .collect::<Vec<_>>();
     let rows = client.query(statement, &refs).map_err(map_postgres_error)?;
-    let columns = rows
-        .first()
-        .map_or_else(Vec::new, |row| {
-            row.columns()
-                .iter()
-                .map(|column| SqlColumn::new(column.name()))
-                .collect()
-        });
+    let columns = rows.first().map_or_else(Vec::new, |row| {
+        row.columns()
+            .iter()
+            .map(|column| SqlColumn::new(column.name()))
+            .collect()
+    });
     let buffered = rows
         .into_iter()
         .map(|row| postgres_row(&row))
@@ -406,12 +410,14 @@ impl presolve_provider_realization::ProviderAdapter for PostgresSqlAdapter {
         let database = required_setting(profile, POSTGRES_DATABASE_SETTING)?;
         let user = required_setting(profile, POSTGRES_USER_SETTING)?;
         let port_text = profile.setting(POSTGRES_PORT_SETTING).unwrap_or("5432");
-        let port = port_text.parse::<u16>().map_err(|_| ProviderAdapterError::Configuration {
-            message: PostgresSqlConfigError::InvalidPort {
-                value: port_text.to_owned(),
-            }
-            .to_string(),
-        })?;
+        let port = port_text
+            .parse::<u16>()
+            .map_err(|_| ProviderAdapterError::Configuration {
+                message: PostgresSqlConfigError::InvalidPort {
+                    value: port_text.to_owned(),
+                }
+                .to_string(),
+            })?;
         let password_ref = profile.secret(POSTGRES_PASSWORD_SECRET).ok_or_else(|| {
             ProviderAdapterError::MissingSecret {
                 name: POSTGRES_PASSWORD_SECRET.to_owned(),
@@ -423,11 +429,12 @@ impl presolve_provider_realization::ProviderAdapter for PostgresSqlAdapter {
                 message: error.to_string(),
             }
         })?;
-        let provider = PostgresSqlProvider::new(host, port, database, user, password).map_err(
-            |error| ProviderAdapterError::Configuration {
-                message: error.to_string(),
-            },
-        )?;
+        let provider =
+            PostgresSqlProvider::new(host, port, database, user, password).map_err(|error| {
+                ProviderAdapterError::Configuration {
+                    message: error.to_string(),
+                }
+            })?;
 
         Ok(
             presolve_provider_realization::RealizedProvider::new(*profile.provider_id())
@@ -440,11 +447,11 @@ fn required_setting<'a>(
     profile: &'a presolve_provider_realization::ProviderRealizationProfile,
     key: &str,
 ) -> Result<&'a str, presolve_provider_realization::ProviderAdapterError> {
-    profile
-        .setting(key)
-        .ok_or_else(|| presolve_provider_realization::ProviderAdapterError::MissingSetting {
+    profile.setting(key).ok_or_else(|| {
+        presolve_provider_realization::ProviderAdapterError::MissingSetting {
             key: key.to_owned(),
-        })
+        }
+    })
 }
 
 #[cfg(test)]

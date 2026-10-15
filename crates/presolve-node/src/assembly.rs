@@ -23,7 +23,9 @@ pub enum AssemblyError {
     UnsupportedCapability { interface: String },
 
     /// The resolver selected a provider descriptor for which the node has no concrete implementation.
-    #[error("provider `{provider_id}` selected for capability `{interface}` has no registered implementation")]
+    #[error(
+        "provider `{provider_id}` selected for capability `{interface}` has no registered implementation"
+    )]
     MissingProvider {
         interface: String,
         provider_id: ProviderId,

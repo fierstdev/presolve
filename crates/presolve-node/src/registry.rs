@@ -163,7 +163,10 @@ mod tests {
         let error = registry
             .register_key_value(provider_id, Arc::new(InMemoryKeyValueProvider::new()))
             .expect_err("duplicate registration should fail");
-        assert_eq!(error, ProviderRegistryError::DuplicateKeyValueProvider { provider_id });
+        assert_eq!(
+            error,
+            ProviderRegistryError::DuplicateKeyValueProvider { provider_id }
+        );
     }
 
     #[test]

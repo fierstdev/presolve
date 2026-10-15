@@ -14,7 +14,8 @@ use presolve_capability::{
 };
 use presolve_provider_sdk::{
     SQL_DATABASE_INTERFACE, SqlColumn, SqlDatabaseError, SqlDatabaseProvider, SqlExecuteResult,
-    SqlQueryResult, SqlRow, SqlTransaction, SqlTransactionIsolation, SqlTransactionOptions, SqlValue,
+    SqlQueryResult, SqlRow, SqlTransaction, SqlTransactionIsolation, SqlTransactionOptions,
+    SqlValue,
 };
 use rusqlite::{Connection, Error as SqliteError, params_from_iter, types::ValueRef};
 use thiserror::Error;
@@ -89,7 +90,9 @@ impl SqlDatabaseProvider for SqliteSqlProvider {
 
         match options.isolation() {
             SqlTransactionIsolation::ProviderDefault | SqlTransactionIsolation::Serializable => {
-                connection.execute_batch("BEGIN").map_err(map_sqlite_error)?;
+                connection
+                    .execute_batch("BEGIN")
+                    .map_err(map_sqlite_error)?;
             }
         }
 
@@ -194,7 +197,9 @@ fn query_on(
     while let Some(row) = rows.next().map_err(map_sqlite_error)? {
         let mut values = Vec::with_capacity(column_count);
         for index in 0..column_count {
-            values.push(sqlite_row_value(row.get_ref(index).map_err(map_sqlite_error)?)?);
+            values.push(sqlite_row_value(
+                row.get_ref(index).map_err(map_sqlite_error)?,
+            )?);
         }
         buffered.push(Ok(SqlRow::new(values)));
     }
@@ -219,7 +224,9 @@ fn sqlite_row_value(value: ValueRef<'_>) -> Result<SqlValue, SqlDatabaseError> {
         ValueRef::Real(value) => Ok(SqlValue::Real(value)),
         ValueRef::Text(value) => std::str::from_utf8(value)
             .map(|value| SqlValue::Text(value.to_owned()))
-            .map_err(|error| SqlDatabaseError::internal(format!("SQLite returned invalid UTF-8 text: {error}"))),
+            .map_err(|error| {
+                SqlDatabaseError::internal(format!("SQLite returned invalid UTF-8 text: {error}"))
+            }),
         ValueRef::Blob(value) => Ok(SqlValue::Bytes(value.to_vec())),
     }
 }
@@ -228,7 +235,9 @@ fn map_sqlite_error(error: SqliteError) -> SqlDatabaseError {
     use rusqlite::ErrorCode;
 
     match error.sqlite_error_code() {
-        Some(ErrorCode::ConstraintViolation) => SqlDatabaseError::constraint_violation(error.to_string()),
+        Some(ErrorCode::ConstraintViolation) => {
+            SqlDatabaseError::constraint_violation(error.to_string())
+        }
         Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked) => {
             SqlDatabaseError::transient(error.to_string())
         }
@@ -237,7 +246,9 @@ fn map_sqlite_error(error: SqliteError) -> SqlDatabaseError {
             SqliteError::InvalidParameterName(_) | SqliteError::InvalidParameterCount(_, _) => {
                 SqlDatabaseError::invalid_parameter(error.to_string())
             }
-            SqliteError::SqlInputError { .. } => SqlDatabaseError::invalid_statement(error.to_string()),
+            SqliteError::SqlInputError { .. } => {
+                SqlDatabaseError::invalid_statement(error.to_string())
+            }
             _ => SqlDatabaseError::internal(error.to_string()),
         },
     }
@@ -304,11 +315,10 @@ impl presolve_provider_realization::ProviderAdapter for SqliteSqlAdapter {
                 key: SQLITE_PATH_SETTING.to_owned(),
             }
         })?;
-        let provider = SqliteSqlProvider::new(path).map_err(|error| {
-            ProviderAdapterError::Configuration {
+        let provider =
+            SqliteSqlProvider::new(path).map_err(|error| ProviderAdapterError::Configuration {
                 message: error.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(
             presolve_provider_realization::RealizedProvider::new(*profile.provider_id())
@@ -325,10 +335,8 @@ mod tests {
 
     #[test]
     fn sqlite_accepts_shared_postgres_style_parameter_markers() {
-        let path = std::env::temp_dir().join(format!(
-            "presolve-sqlite-marker-{}.db",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("presolve-sqlite-marker-{}.db", std::process::id()));
         let _ = std::fs::remove_file(&path);
         let provider = SqliteSqlProvider::new(&path).expect("provider should configure");
         provider
@@ -351,7 +359,10 @@ mod tests {
             .expect("query should succeed");
         let (_, mut rows) = result.into_parts();
         assert_eq!(
-            rows.next().expect("row should exist").expect("row should decode").values(),
+            rows.next()
+                .expect("row should exist")
+                .expect("row should decode")
+                .values(),
             [SqlValue::Text("ok".to_owned())]
         );
         let _ = std::fs::remove_file(path);
