@@ -8,6 +8,15 @@
   min-width: 0;
 }
 
+/* Link cards are sometimes used directly inside a section instead of as grid
+   items. Keep them as one rectangular box in Safari rather than allowing an
+   inline anchor with block children to fragment across line boxes. */
+.link-card {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
 .code-block {
   width: 100%;
   max-width: 100%;
