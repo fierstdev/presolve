@@ -209,6 +209,38 @@ jobs:
       - name: Run object-storage portability checkpoint
         run: bash ./scripts/check-object-portability.sh
 
+  sql-portability:
+    name: SQL portability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: >-
+          rustup toolchain install stable
+          --profile minimal
+          --target wasm32-wasip2
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Verify Docker
+        run: docker version
+
+      - name: Run relational SQL portability checkpoint
+        run: bash ./scripts/check-sql-portability.sh
+
   docker-portability:
     name: Docker portability
     runs-on: ubuntu-24.04
