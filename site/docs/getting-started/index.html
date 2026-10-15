@@ -26,7 +26,7 @@
 <section class="page-hero shell">
   <span class="kicker">Getting started</span>
   <h1>Run your first Presolve workflow.</h1>
-  <p>This guide uses the repository's KV example to show the complete developer loop. You will build the application once, describe a local environment, check compatibility, inspect the resulting plan, and run the app without learning the full architecture first.</p>
+  <p>Install the released Presolve CLI, then use the repository's KV example to build an application once, describe a local environment, check compatibility, inspect the resulting plan, and run the app.</p>
 </section>
 
 <div class="docs-layout shell">
@@ -50,40 +50,47 @@
     <section id="prerequisites">
       <span class="kicker">Before you begin</span>
       <h2>Prerequisites.</h2>
-      <p>Presolve is currently a developer preview and the CLI is built from source. For this walkthrough you need Git and a Rust toolchain with Cargo. The included KV example builds a WebAssembly Component through the repository's current Rust authoring path.</p>
+      <p>You do <strong>not</strong> need to compile Presolve itself. The CLI is distributed as a native release binary. This walkthrough does use Presolve's current Rust example, so Rust is only required to build that example application.</p>
       <div class="doc-table-wrap">
         <table class="doc-table">
           <thead><tr><th>Tool</th><th>Why you need it</th><th>Check</th></tr></thead>
           <tbody>
-            <tr><td>Git</td><td>Clone the Presolve repository</td><td><code>git --version</code></td></tr>
-            <tr><td>Rust + Cargo</td><td>Build the CLI and Rust example</td><td><code>cargo --version</code></td></tr>
-            <tr><td><code>wasm32-wasip2</code> target</td><td>Build the example Component</td><td><code>rustup target add wasm32-wasip2</code></td></tr>
+            <tr><td>Git</td><td>Clone the example source used by this walkthrough</td><td><code>git --version</code></td></tr>
+            <tr><td>Rust + Cargo</td><td>Build the Rust example application, not the Presolve CLI</td><td><code>cargo --version</code></td></tr>
+            <tr><td><code>wasm32-wasip2</code> target</td><td>Build the example WebAssembly Component</td><td><code>rustup target add wasm32-wasip2</code></td></tr>
           </tbody>
         </table>
       </div>
-      <div class="note">You do not need Redis, PostgreSQL, S3, Cloudflare credentials, or Docker for this first local walkthrough.</div>
+      <div class="note">You do not need Redis, PostgreSQL, S3, Cloudflare credentials, Docker, or a local Presolve source build for this first walkthrough.</div>
     </section>
 
     <section id="install">
       <span class="kicker">Step 1</span>
-      <h2>Build the Presolve CLI.</h2>
-      <div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
-cd presolve
+      <h2>Install Presolve.</h2>
+      <h3>macOS or Linux</h3>
+      <div class="code-block"><pre><code>curl -fsSL https://presolve.dev/install.sh | sh
 
-cargo build -p presolve-cli
-export PATH="$PWD/target/debug:$PATH"
+presolve --version</code></pre></div>
+      <p>The installer detects your operating system and CPU architecture, downloads the matching GitHub Release archive, verifies its SHA-256 checksum, installs the CLI under <code>~/.presolve/bin</code>, and adds that directory to your shell PATH when needed.</p>
 
-presolve --help</code></pre></div>
-      <p>The final command should print the Presolve CLI help. Keeping <code>target/debug</code> on your <code>PATH</code> means the rest of the guide can use <code>presolve</code> directly.</p>
-      <h3>What this does not do</h3>
-      <p>Building the CLI does not build an application release and does not create an environment. It only prepares the developer tooling.</p>
+      <h3>Windows PowerShell</h3>
+      <div class="code-block"><pre><code>irm https://presolve.dev/install.ps1 | iex
+
+presolve --version</code></pre></div>
+      <p>The Windows installer downloads the native x86_64 release, verifies its SHA-256 checksum, installs <code>presolve.exe</code> under your user profile, and adds the directory to your user PATH. Open a new terminal if your existing shell does not immediately see the updated PATH.</p>
+
+      <div class="note">The installers currently target Presolve <code>v0.1.0-alpha.1</code>. Advanced users can set <code>PRESOLVE_VERSION</code> to install a specific published version.</div>
+      <h3>Build from source</h3>
+      <p>Building the CLI from source is still supported for contributors and compiler/runtime development, but it is not part of normal Presolve installation. See the <a href="/docs/cli/#build-from-source">CLI reference</a>.</p>
     </section>
 
     <section id="example">
       <span class="kicker">Step 2</span>
       <h2>Open the KV example.</h2>
-      <div class="code-block"><pre><code>cd examples/kv-demo
+      <div class="code-block"><pre><code>git clone https://github.com/fierstdev/presolve.git
+cd presolve/examples/kv-demo
 ls</code></pre></div>
+      <p>You are cloning the repository here only because this tutorial uses its example application. The installed <code>presolve</code> command remains the released CLI binary from Step 1.</p>
       <p>The directory contains normal application source plus <code>presolve.toml</code>. That file tells Presolve what the application is and what it requires. For this example, the important requirement is key-value storage.</p>
       <div class="doc-two-col">
         <div class="doc-boundary good"><strong>Application source</strong><p>The code that implements the example's behavior.</p></div>
@@ -186,9 +193,11 @@ presolve plan --json</code></pre></div>
       <span class="kicker">Troubleshooting</span>
       <h2>Common first-run problems.</h2>
       <h3><code>presolve: command not found</code></h3>
-      <p>The CLI binary is not on your current shell's path. From the repository root, run <code>export PATH="$PWD/target/debug:$PATH"</code> again, or invoke the binary by its full path.</p>
+      <p>Open a new terminal after installation. On macOS/Linux, the installer uses <code>~/.presolve/bin</code>; if needed for the current shell, run <code>export PATH="$HOME/.presolve/bin:$PATH"</code>. On Windows, open a new PowerShell or terminal so it inherits the updated user PATH.</p>
+      <h3>The installer returns a 404</h3>
+      <p>The requested Presolve release is not published for your platform/version. Check the project's GitHub Releases page and confirm that the requested version has a native archive for your target.</p>
       <h3>The WebAssembly target is missing</h3>
-      <p>Install it with <code>rustup target add wasm32-wasip2</code>, then retry <code>presolve build</code>.</p>
+      <p>Install it with <code>rustup target add wasm32-wasip2</code>, then retry <code>presolve build</code>. This target is required by the example application, not by the Presolve CLI itself.</p>
       <h3>No environment is found</h3>
       <p>Run <code>presolve env init</code> in the example directory or a parent directory. Presolve searches upward for the nearest <code>presolve.env.toml</code>.</p>
       <h3><code>presolve check</code> reports a missing capability</h3>
@@ -201,7 +210,7 @@ presolve plan --json</code></pre></div>
       <span class="kicker">Continue</span>
       <h2>Go deeper only where you need to.</h2>
       <div class="link-row">
-        <a class="link-card" href="/docs/cli/"><strong>CLI & workflows</strong><span>All core commands, JSON output, diagnostics, environment management, and local execution.</span></a>
+        <a class="link-card" href="/docs/cli/"><strong>CLI & workflows</strong><span>Installation, all core commands, JSON output, diagnostics, environment management, and local execution.</span></a>
         <a class="link-card" href="/docs/application/"><strong>Define your application</strong><span>Workloads, service requirements, resources, topology, and network policy.</span></a>
         <a class="link-card" href="/docs/environment/"><strong>Define an environment</strong><span>Execution support, provider supply, resources, stable IDs, and realization boundaries.</span></a>
         <a class="link-card" href="/docs/proofs/"><strong>Run the portability proofs</strong><span>See the same release evaluated and executed through materially different providers.</span></a>

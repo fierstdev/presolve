@@ -5,6 +5,9 @@ on:
     paths:
       - ".github/workflows/release.yml"
       - "scripts/package-cli-release.sh"
+      - "scripts/package-cli-release.ps1"
+      - "site/install.sh"
+      - "site/install.ps1"
       - "docs/releases/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -33,7 +36,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  package:
+  package-unix:
     name: Package ${{ matrix.label }}
     strategy:
       fail-fast: false
@@ -91,12 +94,61 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  package-windows:
+    name: Package Windows x86_64
+    runs-on: windows-2025
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        shell: pwsh
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.cargo\registry
+            ~\.cargo\git
+            target
+          key: release-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            release-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Package native CLI
+        id: package
+        shell: pwsh
+        run: ./scripts/package-cli-release.ps1 -OutputDirectory "$env:RUNNER_TEMP/presolve-release"
+
+      - name: Verify packaged binary
+        shell: pwsh
+        run: |
+          $verify = Join-Path $env:RUNNER_TEMP "presolve-verify"
+          New-Item -ItemType Directory -Path $verify -Force | Out-Null
+          Expand-Archive -Path "${{ steps.package.outputs.archive }}" -DestinationPath $verify -Force
+          & (Join-Path $verify "${{ steps.package.outputs.package_name }}/presolve.exe") --version
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: presolve-${{ steps.package.outputs.target }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
+          if-no-files-found: error
+          retention-days: 14
+
   release:
     name: Publish GitHub Release
     if: >-
       (github.event_name == 'push' && github.ref_type == 'tag') ||
       (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
-    needs: package
+    needs:
+      - package-unix
+      - package-windows
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -173,12 +225,12 @@ jobs:
           from pathlib import Path
 
           root = Path('release-artifacts')
-          archives = sorted(root.glob('*.tar.gz'))
-          checksums = sorted(root.glob('*.tar.gz.sha256'))
+          archives = sorted(root.glob('*.tar.gz')) + sorted(root.glob('*.zip'))
+          checksums = sorted(root.glob('*.sha256'))
 
-          if len(archives) != 4 or len(checksums) != 4:
+          if len(archives) != 5 or len(checksums) != 5:
               raise SystemExit(
-                  f"expected four archives and four checksums, got {len(archives)} archives and {len(checksums)} checksums"
+                  f"expected five archives and five checksums, got {len(archives)} archives and {len(checksums)} checksums"
               )
 
           for checksum_path in checksums:
@@ -214,7 +266,8 @@ jobs:
 
           gh release create "$RELEASE_TAG" \
             release-artifacts/*.tar.gz \
-            release-artifacts/*.tar.gz.sha256 \
+            release-artifacts/*.zip \
+            release-artifacts/*.sha256 \
             "${TAG_ARGS[@]}" \
             --prerelease \
             "${NOTES_ARGS[@]}" \
