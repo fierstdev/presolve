@@ -1,0 +1,24 @@
+name: Temporary SQL end-to-end validation 2
+
+on:
+  push:
+    branches:
+      - tmp/sql-e2e-validate2
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt --target wasm32-wasip2
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Check SQL providers and node examples
+        run: cargo check -p presolve-provider-sql-sqlite -p presolve-provider-sql-postgres -p presolve-node --examples
+      - name: Clippy SQL slice
+        run: cargo clippy -p presolve-provider-sql-sqlite -p presolve-provider-sql-postgres -p presolve-node --all-targets -- -D warnings
+      - name: Verify Docker
+        run: docker version
+      - name: Run SQL portability checkpoint
+        run: bash ./scripts/check-sql-portability.sh
