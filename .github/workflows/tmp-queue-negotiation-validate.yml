@@ -1,0 +1,18 @@
+name: Temporary queue negotiation validation
+
+on:
+  push:
+    branches:
+      - tmp/queue-negotiation-validate
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: capability/queue-semantics
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+      - run: cargo fmt --all
+      - run: cargo test -p presolve-provider-queue-memory
+      - run: cargo clippy -p presolve-provider-queue-memory --all-targets -- -D warnings
