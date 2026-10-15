@@ -3,7 +3,7 @@ use presolve_provider_realization::{
     ProviderAdapterError, ProviderAdapterRegistry, ProviderCapabilityRequest,
     ProviderRealizationCatalog, RealizedProvider, SecretResolver,
 };
-use presolve_provider_sdk::{KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE};
+use presolve_provider_sdk::{KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE, SQL_DATABASE_INTERFACE};
 use presolve_resolver::DeploymentPlan;
 use thiserror::Error;
 
@@ -202,6 +202,21 @@ fn register_selected_capabilities(
                 })?;
 
                 registry.register_object_store(provider_id, provider)?;
+            }
+
+            SQL_DATABASE_INTERFACE => {
+                if registry.sql_database(provider_id).is_some() {
+                    continue;
+                }
+
+                let provider = realized.sql_database().ok_or_else(|| {
+                    ProviderMaterializationError::MissingCapabilityImplementation {
+                        provider_id,
+                        interface: request.interface().to_owned(),
+                    }
+                })?;
+
+                registry.register_sql_database(provider_id, provider)?;
             }
 
             interface => {

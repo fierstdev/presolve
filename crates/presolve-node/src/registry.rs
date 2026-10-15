@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use presolve_core::ProviderId;
-use presolve_provider_sdk::{KeyValueProvider, ObjectStoreProvider};
+use presolve_provider_sdk::{KeyValueProvider, ObjectStoreProvider, SqlDatabaseProvider};
 use thiserror::Error;
 
 /// Concrete provider implementations available to a `Presolve` node.
@@ -9,14 +9,11 @@ use thiserror::Error;
 /// The resolver operates exclusively on provider descriptors. This registry
 /// contains the host-side implementations identified by those same stable
 /// [`ProviderId`] values.
-///
-/// The registry is intentionally owned by the node rather than the resolver or
-/// runtime. Resolution decides which provider should be used; materialization
-/// retrieves the corresponding implementation.
 #[derive(Default)]
 pub struct ProviderRegistry {
     key_value: Vec<(ProviderId, Arc<dyn KeyValueProvider>)>,
     object_store: Vec<(ProviderId, Arc<dyn ObjectStoreProvider>)>,
+    sql_database: Vec<(ProviderId, Arc<dyn SqlDatabaseProvider>)>,
 }
 
 impl ProviderRegistry {
@@ -44,9 +41,7 @@ impl ProviderRegistry {
         {
             return Err(ProviderRegistryError::DuplicateKeyValueProvider { provider_id });
         }
-
         self.key_value.push((provider_id, provider));
-
         Ok(())
     }
 
@@ -77,9 +72,7 @@ impl ProviderRegistry {
         {
             return Err(ProviderRegistryError::DuplicateObjectStoreProvider { provider_id });
         }
-
         self.object_store.push((provider_id, provider));
-
         Ok(())
     }
 
@@ -91,30 +84,53 @@ impl ProviderRegistry {
             .find(|(registered_id, _)| *registered_id == provider_id)
             .map(|(_, provider)| Arc::clone(provider))
     }
+
+    /// Registers a relational SQL provider implementation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProviderRegistryError::DuplicateSqlDatabaseProvider`] when an
+    /// implementation has already been registered for `provider_id`.
+    pub fn register_sql_database(
+        &mut self,
+        provider_id: ProviderId,
+        provider: Arc<dyn SqlDatabaseProvider>,
+    ) -> Result<(), ProviderRegistryError> {
+        if self
+            .sql_database
+            .iter()
+            .any(|(registered_id, _)| *registered_id == provider_id)
+        {
+            return Err(ProviderRegistryError::DuplicateSqlDatabaseProvider { provider_id });
+        }
+        self.sql_database.push((provider_id, provider));
+        Ok(())
+    }
+
+    /// Returns the registered relational SQL implementation for `provider_id`.
+    #[must_use]
+    pub fn sql_database(&self, provider_id: ProviderId) -> Option<Arc<dyn SqlDatabaseProvider>> {
+        self.sql_database
+            .iter()
+            .find(|(registered_id, _)| *registered_id == provider_id)
+            .map(|(_, provider)| Arc::clone(provider))
+    }
 }
 
 /// Error returned while modifying a [`ProviderRegistry`].
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ProviderRegistryError {
     /// The same provider has already been registered for key/value service.
-    #[error(
-        "provider `{provider_id}` is already registered for \
-         `presolve:kv/store`"
-    )]
-    DuplicateKeyValueProvider {
-        /// Duplicate provider identifier.
-        provider_id: ProviderId,
-    },
+    #[error("provider `{provider_id}` is already registered for `presolve:kv/store`")]
+    DuplicateKeyValueProvider { provider_id: ProviderId },
 
     /// The same provider has already been registered for object storage.
-    #[error(
-        "provider `{provider_id}` is already registered for \\
-         `presolve:objects/store`"
-    )]
-    DuplicateObjectStoreProvider {
-        /// Duplicate provider identifier.
-        provider_id: ProviderId,
-    },
+    #[error("provider `{provider_id}` is already registered for `presolve:objects/store`")]
+    DuplicateObjectStoreProvider { provider_id: ProviderId },
+
+    /// The same provider has already been registered for relational SQL.
+    #[error("provider `{provider_id}` is already registered for `presolve:sql/database`")]
+    DuplicateSqlDatabaseProvider { provider_id: ProviderId },
 }
 
 #[cfg(test)]
@@ -123,6 +139,7 @@ mod tests {
 
     use presolve_provider_kv_memory::InMemoryKeyValueProvider;
     use presolve_provider_objects_memory::InMemoryObjectStoreProvider;
+    use presolve_provider_sdk::UnavailableSqlDatabaseProvider;
 
     use super::*;
 
@@ -130,11 +147,9 @@ mod tests {
     fn registered_key_value_provider_can_be_retrieved() {
         let provider_id = ProviderId::new();
         let mut registry = ProviderRegistry::new();
-
         registry
             .register_key_value(provider_id, Arc::new(InMemoryKeyValueProvider::new()))
             .expect("registration should succeed");
-
         assert!(registry.key_value(provider_id).is_some());
     }
 
@@ -142,15 +157,12 @@ mod tests {
     fn duplicate_key_value_provider_is_rejected() {
         let provider_id = ProviderId::new();
         let mut registry = ProviderRegistry::new();
-
         registry
             .register_key_value(provider_id, Arc::new(InMemoryKeyValueProvider::new()))
             .expect("first registration should succeed");
-
         let error = registry
             .register_key_value(provider_id, Arc::new(InMemoryKeyValueProvider::new()))
             .expect_err("duplicate registration should fail");
-
         assert_eq!(
             error,
             ProviderRegistryError::DuplicateKeyValueProvider { provider_id }
@@ -161,11 +173,9 @@ mod tests {
     fn registered_object_store_provider_can_be_retrieved() {
         let provider_id = ProviderId::new();
         let mut registry = ProviderRegistry::new();
-
         registry
             .register_object_store(provider_id, Arc::new(InMemoryObjectStoreProvider::new()))
-            .expect("registration should succeed");
-
+            .expect("object-store registration should succeed");
         assert!(registry.object_store(provider_id).is_some());
     }
 
@@ -173,18 +183,41 @@ mod tests {
     fn duplicate_object_store_provider_is_rejected() {
         let provider_id = ProviderId::new();
         let mut registry = ProviderRegistry::new();
-
         registry
             .register_object_store(provider_id, Arc::new(InMemoryObjectStoreProvider::new()))
             .expect("first registration should succeed");
-
         let error = registry
             .register_object_store(provider_id, Arc::new(InMemoryObjectStoreProvider::new()))
             .expect_err("duplicate registration should fail");
-
         assert_eq!(
             error,
             ProviderRegistryError::DuplicateObjectStoreProvider { provider_id }
+        );
+    }
+
+    #[test]
+    fn registered_sql_database_provider_can_be_retrieved() {
+        let provider_id = ProviderId::new();
+        let mut registry = ProviderRegistry::new();
+        registry
+            .register_sql_database(provider_id, Arc::new(UnavailableSqlDatabaseProvider))
+            .expect("SQL registration should succeed");
+        assert!(registry.sql_database(provider_id).is_some());
+    }
+
+    #[test]
+    fn duplicate_sql_database_provider_is_rejected() {
+        let provider_id = ProviderId::new();
+        let mut registry = ProviderRegistry::new();
+        registry
+            .register_sql_database(provider_id, Arc::new(UnavailableSqlDatabaseProvider))
+            .expect("first registration should succeed");
+        let error = registry
+            .register_sql_database(provider_id, Arc::new(UnavailableSqlDatabaseProvider))
+            .expect_err("duplicate registration should fail");
+        assert_eq!(
+            error,
+            ProviderRegistryError::DuplicateSqlDatabaseProvider { provider_id }
         );
     }
 }

@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use presolve_core::ProviderId;
-use presolve_provider_sdk::{KeyValueProvider, ObjectStoreProvider};
+use presolve_provider_sdk::{KeyValueProvider, ObjectStoreProvider, SqlDatabaseProvider};
 use semver::Version;
 use thiserror::Error;
 
@@ -63,6 +63,7 @@ pub struct RealizedProvider {
     provider_id: ProviderId,
     key_value: Option<Arc<dyn KeyValueProvider>>,
     object_store: Option<Arc<dyn ObjectStoreProvider>>,
+    sql_database: Option<Arc<dyn SqlDatabaseProvider>>,
 }
 
 impl RealizedProvider {
@@ -73,6 +74,7 @@ impl RealizedProvider {
             provider_id,
             key_value: None,
             object_store: None,
+            sql_database: None,
         }
     }
 
@@ -87,6 +89,13 @@ impl RealizedProvider {
     #[must_use]
     pub fn with_object_store(mut self, provider: Arc<dyn ObjectStoreProvider>) -> Self {
         self.object_store = Some(provider);
+        self
+    }
+
+    /// Attaches a relational SQL implementation.
+    #[must_use]
+    pub fn with_sql_database(mut self, provider: Arc<dyn SqlDatabaseProvider>) -> Self {
+        self.sql_database = Some(provider);
         self
     }
 
@@ -107,6 +116,12 @@ impl RealizedProvider {
     pub fn object_store(&self) -> Option<Arc<dyn ObjectStoreProvider>> {
         self.object_store.as_ref().map(Arc::clone)
     }
+
+    /// Returns the relational SQL implementation, if any.
+    #[must_use]
+    pub fn sql_database(&self) -> Option<Arc<dyn SqlDatabaseProvider>> {
+        self.sql_database.as_ref().map(Arc::clone)
+    }
 }
 
 impl fmt::Debug for RealizedProvider {
@@ -116,6 +131,7 @@ impl fmt::Debug for RealizedProvider {
             .field("provider_id", &self.provider_id)
             .field("key_value", &self.key_value.is_some())
             .field("object_store", &self.object_store.is_some())
+            .field("sql_database", &self.sql_database.is_some())
             .finish()
     }
 }

@@ -1,0 +1,24 @@
+[package]
+name = "presolve-provider-sql-postgres"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bytes.workspace = true
+postgres.workspace = true
+presolve-capability.workspace = true
+presolve-provider-realization.workspace = true
+presolve-provider-sdk.workspace = true
+semver.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+presolve-core.workspace = true
+presolve-provider-conformance.workspace = true
+
+[lints]
+workspace = true
