@@ -1,5 +1,7 @@
 use presolve_core::{ProviderId, WorkloadKind};
-use presolve_provider_sdk::{KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE, SQL_DATABASE_INTERFACE};
+use presolve_provider_sdk::{
+    KEY_VALUE_INTERFACE, OBJECT_STORE_INTERFACE, SQL_DATABASE_INTERFACE, WORK_QUEUE_INTERFACE,
+};
 use presolve_resolver::DeploymentPlan;
 use presolve_runtime::{Runtime, RuntimeError};
 use thiserror::Error;
@@ -90,6 +92,16 @@ pub fn assemble_runtime(
                 })?;
                 builder = builder.sql_database_provider(provider);
             }
+            WORK_QUEUE_INTERFACE => {
+                let provider_id = *binding.provider_id();
+                let provider = registry.work_queue(provider_id).ok_or_else(|| {
+                    AssemblyError::MissingProvider {
+                        interface: binding.interface().to_owned(),
+                        provider_id,
+                    }
+                })?;
+                builder = builder.work_queue_provider(provider);
+            }
             interface => {
                 return Err(AssemblyError::UnsupportedCapability {
                     interface: interface.to_owned(),
@@ -108,6 +120,7 @@ mod tests {
     use presolve_contract::parse_contract;
     use presolve_core::{EnvironmentId, ProviderId};
     use presolve_provider_objects_memory::InMemoryObjectStoreProvider;
+    use presolve_provider_queue_memory::InMemoryWorkQueueProvider;
     use presolve_provider_sdk::UnavailableSqlDatabaseProvider;
     use presolve_resolver::{
         EnvironmentInventory, EnvironmentResources, ProvidedCapability, ProviderDescriptor, resolve,
@@ -213,6 +226,17 @@ kind = "container"
             .register_sql_database(provider_id, Arc::new(UnavailableSqlDatabaseProvider))
             .expect("SQL registration should succeed");
         assemble_runtime(&plan, &registry).expect("SQL plan should materialize");
+    }
+
+    #[test]
+    fn assembles_work_queue_provider_from_resolved_plan() {
+        let provider_id = ProviderId::new();
+        let plan = plan_for(WORK_QUEUE_INTERFACE, provider_id);
+        let mut registry = ProviderRegistry::new();
+        registry
+            .register_work_queue(provider_id, Arc::new(InMemoryWorkQueueProvider::new()))
+            .expect("work-queue registration should succeed");
+        assemble_runtime(&plan, &registry).expect("work-queue plan should materialize");
     }
 
     #[test]
