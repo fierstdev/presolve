@@ -1,0 +1,58 @@
+name: Temporary queue final validation
+
+on:
+  push:
+    branches:
+      - tmp/queue-finalize1
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: capability/queue-semantics
+          fetch-depth: 0
+
+      - run: rustup toolchain install stable --profile minimal --component clippy --component rustfmt
+
+      - name: Format
+        run: cargo fmt --all
+
+      - name: Test queue runtime slice
+        run: >-
+          cargo test
+          -p presolve-capability
+          -p presolve-provider-sdk
+          -p presolve-provider-conformance
+          -p presolve-provider-realization
+          -p presolve-provider-queue-memory
+          -p presolve-runtime
+          -p presolve-node
+
+      - name: Clippy queue runtime slice
+        run: >-
+          cargo clippy
+          -p presolve-capability
+          -p presolve-provider-sdk
+          -p presolve-provider-conformance
+          -p presolve-provider-realization
+          -p presolve-provider-queue-memory
+          -p presolve-runtime
+          -p presolve-node
+          --all-targets -- -D warnings
+
+      - name: Commit formatting and generated lockfile
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock crates/presolve-node crates/presolve-runtime providers/queue-memory
+          if git diff --cached --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git commit -m 'queue: format runtime binding and refresh lockfile'
+          git push origin HEAD:capability/queue-semantics
