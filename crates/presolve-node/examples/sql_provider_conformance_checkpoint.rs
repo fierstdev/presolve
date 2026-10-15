@@ -32,9 +32,7 @@ impl Mode {
             "sqlite" => Ok(Self::Sqlite),
             "postgres" => Ok(Self::Postgres),
             "postgres-ready" => Ok(Self::PostgresReady),
-            _ => bail!(
-                "mode must be `sqlite`, `postgres`, or `postgres-ready`, got `{value}`"
-            ),
+            _ => bail!("mode must be `sqlite`, `postgres`, or `postgres-ready`, got `{value}`"),
         }
     }
 
